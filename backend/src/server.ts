@@ -10,6 +10,7 @@ import authRouter from "./routes/auth";
 import clientesRouter from "./routes/clientes";
 import cotizacionesRouter from "./routes/cotizaciones";
 import inventarioRouter from "./routes/inventario";
+import contratosRouter from "./routes/contratos";
 import { prisma } from "./db/client";
 
 const app = express();
@@ -32,6 +33,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/clientes", clientesRouter);
 app.use("/api/cotizaciones", cotizacionesRouter);
 app.use("/api/inventario", inventarioRouter);
+app.use("/api/contratos", contratosRouter);
 
 // 404 fallback
 app.use((_req, res) => {
