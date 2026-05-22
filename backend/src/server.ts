@@ -2,20 +2,29 @@ import express from "express";
 import helmet from "helmet";
 import cors from "cors";
 import morgan from "morgan";
-import { env } from "./config/env";
+import cookieParser from "cookie-parser";
+import { env, corsOrigins } from "./config/env";
 import healthRouter from "./routes/health";
+import authRouter from "./routes/auth";
 import { prisma } from "./db/client";
 
 const app = express();
 
 // Middlewares base
 app.use(helmet());
-app.use(cors());
+app.use(
+  cors({
+    origin: corsOrigins,
+    credentials: true,
+  }),
+);
 app.use(express.json({ limit: "1mb" }));
+app.use(cookieParser());
 app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 
 // Rutas
 app.use("/api", healthRouter);
+app.use("/api/auth", authRouter);
 
 // 404 fallback
 app.use((_req, res) => {

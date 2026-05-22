@@ -110,6 +110,9 @@ services:
       PORT: 3000
       # DNS interna de docker: techtrafo-postgres en techtrafo_net
       DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@techtrafo-postgres:5432/${POSTGRES_DB}?schema=public"
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3001,http://192.168.0.23:3001,http://localhost:3000}
     volumes:
       - ../../backend:/app
       - /app/node_modules

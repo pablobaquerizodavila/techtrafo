@@ -4,6 +4,15 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().url(),
+
+  // Auth (3.3)
+  JWT_SECRET: z.string().min(32, "JWT_SECRET debe tener al menos 32 caracteres"),
+  JWT_EXPIRES_IN: z.string().default("8h"),
+
+  // CORS: lista separada por comas. Default permite el frontend en dev y la IP del host
+  CORS_ORIGINS: z
+    .string()
+    .default("http://localhost:3001,http://192.168.0.23:3001,http://localhost:3000"),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -14,3 +23,7 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
+export const corsOrigins = env.CORS_ORIGINS.split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
