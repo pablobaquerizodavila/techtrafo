@@ -13,12 +13,15 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-// Opciones de cookie consistentes en set y clear
+// Opciones de cookie consistentes en set y clear.
+// En produccion: domain=.techtrafo.com para compartir cookie entre subdominios
+// (panel.techtrafo.com lee la cookie que setea api.techtrafo.com).
 const cookieOptions = {
   httpOnly: true,
   sameSite: "lax" as const,
   secure: env.NODE_ENV === "production",
   path: "/",
+  ...(env.NODE_ENV === "production" && { domain: ".techtrafo.com" }),
 };
 
 router.post("/login", async (req, res) => {
