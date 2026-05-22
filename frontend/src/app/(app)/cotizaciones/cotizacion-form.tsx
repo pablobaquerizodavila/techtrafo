@@ -339,7 +339,7 @@ export function CotizacionForm({ initial, readOnly = false, onSubmit, onCancel }
           <h3 className="text-sm font-semibold">Ajustes globales</h3>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="descuento_global" className="text-xs">Descuento global (USD)</Label>
+              <Label htmlFor="descuento_global" className="text-xs">Descuento global ($)</Label>
               <Input
                 id="descuento_global"
                 type="number"

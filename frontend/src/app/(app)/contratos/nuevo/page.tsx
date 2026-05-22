@@ -198,7 +198,7 @@ export default function NuevoContratoPage() {
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="monto">Monto total (USD) *</Label>
+            <Label htmlFor="monto">Monto total ($) *</Label>
             <Input id="monto" type="number" step="0.01" min="0" value={montoTotal} onChange={(e) => setMontoTotal(Number(e.target.value))} required />
             {Number(cotizacion.total) !== montoTotal && (
               <p className="text-xs text-muted-foreground">
@@ -238,7 +238,7 @@ export default function NuevoContratoPage() {
                 <TableHead className="w-40">Condicion</TableHead>
                 <TableHead className="w-32">Fecha esperada</TableHead>
                 <TableHead className="w-20 text-right">%</TableHead>
-                <TableHead className="w-28 text-right">Monto (USD)</TableHead>
+                <TableHead className="w-28 text-right">Monto ($)</TableHead>
                 <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>

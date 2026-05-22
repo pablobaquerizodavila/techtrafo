@@ -206,11 +206,11 @@ export function ItemForm({ initial, onSubmit, onCancel }: Props) {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="costo">Costo referencia (USD)</Label>
+          <Label htmlFor="costo">Costo referencia ($)</Label>
           <Input id="costo" type="number" step="0.01" min="0" value={costoRef} onChange={(e) => setCostoRef(Number(e.target.value))} />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="precio">Precio referencia (USD)</Label>
+          <Label htmlFor="precio">Precio referencia ($)</Label>
           <Input id="precio" type="number" step="0.01" min="0" value={precioRef} onChange={(e) => setPrecioRef(Number(e.target.value))} />
         </div>
       </div>

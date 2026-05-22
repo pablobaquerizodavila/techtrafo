@@ -217,7 +217,7 @@ export function MovimientoForm({ onSubmit, onCancel }: Props) {
         </div>
         {(tipo === "entrada" || tipo === "ajuste_positivo") && (
           <div className="space-y-2">
-            <Label htmlFor="costo">Costo unitario (USD)</Label>
+            <Label htmlFor="costo">Costo unitario ($)</Label>
             <Input id="costo" type="number" step="0.01" min="0" value={costoUnit} onChange={(e) => setCostoUnit(e.target.value === "" ? "" : Number(e.target.value))} />
           </div>
         )}

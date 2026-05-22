@@ -215,7 +215,7 @@ export function ClienteForm({ initial, onSubmit, onCancel }: Props) {
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="limite_credito">Limite de credito (USD)</Label>
+            <Label htmlFor="limite_credito">Limite de credito ($)</Label>
             <Input
               id="limite_credito"
               type="number"

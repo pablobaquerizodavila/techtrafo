@@ -273,7 +273,7 @@ export default function ContratoDetallePage({ params }: PageProps) {
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label htmlFor="cobro_monto">Monto a cobrar (USD)</Label>
+              <Label htmlFor="cobro_monto">Monto a cobrar ($)</Label>
               <Input id="cobro_monto" type="number" step="0.01" min="0" max={cobroDialog.pago ? Number(cobroDialog.pago.monto_estipulado) - Number(cobroDialog.pago.monto_pagado) : 0} value={cobroMonto} onChange={(e) => setCobroMonto(Number(e.target.value))} />
             </div>
             <div className="space-y-1">
