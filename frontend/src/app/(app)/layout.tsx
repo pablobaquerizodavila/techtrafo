@@ -28,6 +28,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           >
             Cotizaciones
           </Link>
+          <Link
+            href="/inventario"
+            className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground"
+          >
+            Bodega
+          </Link>
         </nav>
         <div className="mt-8 border-t pt-4">
           <LogoutButton />
