@@ -10,6 +10,7 @@
 #   grafana   - dashboards de KPIs
 #   nginx     - proxy local + health check
 #   api       - backend Node.js + Express + TypeScript + Prisma (FASE 3.2)
+#   web       - frontend Next.js 15 + Tailwind + shadcn/ui (FASE 3.5)
 #
 # Servicios pendientes:
 #   minio         - storage S3 cuando se active carga de archivos
@@ -112,7 +113,7 @@ services:
       DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@techtrafo-postgres:5432/${POSTGRES_DB}?schema=public"
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3001,http://192.168.0.23:3001,http://localhost:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3002,http://192.168.0.23:3002}
     volumes:
       - ../../backend:/app
       - /app/node_modules
@@ -123,6 +124,26 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  web:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile.dev
+    container_name: techtrafo-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${WEB_NODE_ENV:-development}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://192.168.0.23:3000}
+    volumes:
+      - ../../frontend:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - techtrafo_net
+    ports:
+      - "3002:3002"
+    depends_on:
+      - api
 
 networks:
   techtrafo_net:

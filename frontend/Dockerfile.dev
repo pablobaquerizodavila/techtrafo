@@ -1,0 +1,23 @@
+# ===================================================================
+# TECHTRAFO Web - Dockerfile de desarrollo
+# ===================================================================
+# Next.js 15 + App Router. Hot reload via volume mount.
+# Para produccion: imagen multi-stage separada en FASE futura.
+# ===================================================================
+FROM node:22-alpine
+
+WORKDIR /app
+
+# Dependencias del sistema
+RUN apk add --no-cache libc6-compat
+
+# Instalar deps primero (capa cacheable)
+COPY package.json package-lock.json* ./
+RUN npm install
+
+# Copiar el codigo (en dev se sobrescribe por el volumen del compose)
+COPY . .
+
+EXPOSE 3002
+
+CMD ["npm", "run", "dev"]
