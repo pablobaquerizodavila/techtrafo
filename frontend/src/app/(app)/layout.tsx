@@ -22,6 +22,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           >
             Clientes
           </Link>
+          <Link
+            href="/cotizaciones"
+            className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground"
+          >
+            Cotizaciones
+          </Link>
         </nav>
         <div className="mt-8 border-t pt-4">
           <LogoutButton />
