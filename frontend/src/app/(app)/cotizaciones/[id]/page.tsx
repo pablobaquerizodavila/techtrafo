@@ -67,6 +67,11 @@ export default function CotizacionDetallePage({ params }: PageProps) {
 
   async function handleTransicion(accion: TransicionAccion) {
     if (!cotizacion) return;
+    // Convertir tiene flujo propio: navegar a /contratos/nuevo precargado
+    if (accion === "convertir") {
+      router.push(`/contratos/nuevo?cotizacion=${cotizacion.id}`);
+      return;
+    }
     if (["rechazar", "cancelar", "vencer"].includes(accion)) {
       const motivo = window.prompt(`Motivo de ${accion}:`);
       if (motivo === null) return;

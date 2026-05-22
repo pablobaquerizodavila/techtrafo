@@ -29,6 +29,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             Cotizaciones
           </Link>
           <Link
+            href="/contratos"
+            className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground"
+          >
+            Contratos
+          </Link>
+          <Link
             href="/inventario"
             className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground"
           >
