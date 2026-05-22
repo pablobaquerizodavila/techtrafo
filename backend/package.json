@@ -1,0 +1,35 @@
+{
+  "name": "techtrafo-api",
+  "version": "0.3.0",
+  "description": "TECHTRAFO backend API (Node.js + Express + TypeScript + Prisma)",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only --exit-child src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "prisma:pull": "prisma db pull",
+    "prisma:generate": "prisma generate",
+    "prisma:format": "prisma format"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "morgan": "^1.10.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/morgan": "^1.9.9",
+    "@types/node": "^22.10.2",
+    "prisma": "^5.22.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.7.2"
+  }
+}

@@ -9,9 +9,9 @@
 #   redis     - cache y colas
 #   grafana   - dashboards de KPIs
 #   nginx     - proxy local + health check
+#   api       - backend Node.js + Express + TypeScript + Prisma (FASE 3.2)
 #
 # Servicios pendientes:
-#   app-techtrafo - backend Node.js (FASE 3)
 #   minio         - storage S3 cuando se active carga de archivos
 #   influxdb      - fase SCADA (opcion A o C)
 #   mosquitto     - broker MQTT para sensores
@@ -98,6 +98,28 @@ services:
       - "8080:80"
     depends_on:
       - grafana
+
+  api:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile.dev
+    container_name: techtrafo-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${API_NODE_ENV:-development}
+      PORT: 3000
+      # DNS interna de docker: techtrafo-postgres en techtrafo_net
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@techtrafo-postgres:5432/${POSTGRES_DB}?schema=public"
+    volumes:
+      - ../../backend:/app
+      - /app/node_modules
+    networks:
+      - techtrafo_net
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 networks:
   techtrafo_net:
