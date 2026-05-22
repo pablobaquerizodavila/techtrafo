@@ -1,3 +1,4 @@
+import "./utils/bigint"; // activa BigInt.prototype.toJSON antes que nada
 import express from "express";
 import helmet from "helmet";
 import cors from "cors";
@@ -6,6 +7,7 @@ import cookieParser from "cookie-parser";
 import { env, corsOrigins } from "./config/env";
 import healthRouter from "./routes/health";
 import authRouter from "./routes/auth";
+import clientesRouter from "./routes/clientes";
 import { prisma } from "./db/client";
 
 const app = express();
@@ -25,6 +27,7 @@ app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 // Rutas
 app.use("/api", healthRouter);
 app.use("/api/auth", authRouter);
+app.use("/api/clientes", clientesRouter);
 
 // 404 fallback
 app.use((_req, res) => {
