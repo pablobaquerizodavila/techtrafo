@@ -1,0 +1,105 @@
+# ===================================================================
+# TECHTRAFO - Stack base de infraestructura
+# ===================================================================
+# Estado: validado en produccion el 22 de mayo de 2026
+# Ubicacion: PC Ubuntu 192.168.0.23 - /opt/techtrafo/
+#
+# Servicios activos:
+#   postgres  - PostgreSQL 16 (datos del negocio)
+#   redis     - cache y colas
+#   grafana   - dashboards de KPIs
+#   nginx     - proxy local + health check
+#
+# Servicios pendientes:
+#   app-techtrafo - backend Node.js (FASE 3)
+#   minio         - storage S3 cuando se active carga de archivos
+#   influxdb      - fase SCADA (opcion A o C)
+#   mosquitto     - broker MQTT para sensores
+#
+# Uso:
+#   docker compose up -d        - levantar stack
+#   docker compose down         - detener (mantiene datos)
+#   docker compose logs -f      - ver logs en vivo
+#   docker compose restart NOM  - reiniciar un servicio especifico
+# ===================================================================
+
+name: techtrafo
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: techtrafo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - /opt/techtrafo/postgres-data:/var/lib/postgresql/data
+    networks:
+      - techtrafo_net
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: techtrafo-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+    volumes:
+      - /opt/techtrafo/redis-data:/data
+    networks:
+      - techtrafo_net
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: techtrafo-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_INSTALL_PLUGINS: "grafana-clock-panel,grafana-piechart-panel"
+      GF_SERVER_ROOT_URL: "http://192.168.0.23:3001"
+    volumes:
+      - /opt/techtrafo/grafana-data:/var/lib/grafana
+    networks:
+      - techtrafo_net
+    ports:
+      - "3001:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:alpine
+    container_name: techtrafo-nginx
+    restart: unless-stopped
+    volumes:
+      - /opt/techtrafo/nginx-conf:/etc/nginx/conf.d:ro
+      - /opt/techtrafo/nginx-logs:/var/log/nginx
+    networks:
+      - techtrafo_net
+    ports:
+      - "8080:80"
+    depends_on:
+      - grafana
+
+networks:
+  techtrafo_net:
+    name: techtrafo_net
+    driver: bridge
