@@ -82,6 +82,18 @@ export async function updateRolPermisos(id: number, permisos: Record<string, boo
   return api.patch(`/api/admin/roles/${id}`, { permisos });
 }
 
+export async function createRol(payload: {
+  nombre: string;
+  descripcion?: string | null;
+  permisos?: Record<string, boolean>;
+}): Promise<{ data: RolAdmin }> {
+  return api.post(`/api/admin/roles`, payload);
+}
+
+export async function deleteRol(id: number): Promise<void> {
+  await api.delete(`/api/admin/roles/${id}`);
+}
+
 export async function getCatalogoPermisos(): Promise<{ data: PermisoCatalogoEntry[] }> {
   return api.get("/api/admin/permisos/catalogo");
 }

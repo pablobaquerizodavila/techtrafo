@@ -42,6 +42,12 @@ const updateRolPermisosSchema = z.object({
   permisos: z.record(z.string(), z.boolean()),
 });
 
+const createRolSchema = z.object({
+  nombre: z.string().min(1).max(50).regex(/^[a-z0-9_]+$/, "Solo minusculas, numeros y guion bajo"),
+  descripcion: z.string().max(500).optional().nullable(),
+  permisos: z.record(z.string(), z.boolean()).optional().default({}),
+});
+
 // ===================================================================
 // USUARIOS  -  requiere permission admin.usuarios
 // ===================================================================
@@ -271,6 +277,62 @@ router.get("/roles", async (_req, res) => {
     },
   });
   res.json({ data });
+});
+
+// POST /api/admin/roles  -  solo super_admin crea roles nuevos
+router.post("/roles", requireSuperAdmin, async (req, res) => {
+  const parsed = createRolSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  try {
+    const rol = await prisma.roles.create({
+      data: {
+        nombre: parsed.data.nombre,
+        descripcion: parsed.data.descripcion ?? null,
+        permisos: parsed.data.permisos as Prisma.InputJsonValue,
+        es_super_admin: false,
+        activo: true,
+      },
+      select: {
+        id: true, nombre: true, descripcion: true,
+        permisos: true, es_super_admin: true, activo: true,
+      },
+    });
+    res.status(201).json({ data: rol });
+  } catch (err) {
+    if (err && typeof err === "object" && "code" in err && (err as { code: string }).code === "P2002") {
+      res.status(409).json({ error: "nombre_duplicado" });
+      return;
+    }
+    throw err;
+  }
+});
+
+// DELETE /api/admin/roles/:id  -  solo super_admin; rechaza si tiene usuarios
+router.delete("/roles/:id", requireSuperAdmin, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  const rol = await prisma.roles.findUnique({ where: { id } });
+  if (!rol) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+  if (rol.es_super_admin) {
+    res.status(409).json({ error: "no_se_puede_borrar_super_admin" });
+    return;
+  }
+  const usuariosAsignados = await prisma.usuarios.count({ where: { rol_id: id } });
+  if (usuariosAsignados > 0) {
+    res.status(409).json({ error: "rol_con_usuarios", count: usuariosAsignados });
+    return;
+  }
+  await prisma.roles.delete({ where: { id } });
+  res.status(204).end();
 });
 
 // PATCH /api/admin/roles/:id  -  solo super_admin edita permisos

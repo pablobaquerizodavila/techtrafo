@@ -1,18 +1,32 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save } from "lucide-react";
+import { Save, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Toaster, toast } from "sonner";
 import {
   PermisoCatalogoEntry,
   RolAdmin,
+  createRol,
+  deleteRol,
   getCatalogoPermisos,
   listRolesAdmin,
   updateRolPermisos,
 } from "@/lib/admin";
+import { ApiError } from "@/lib/api";
 
 export default function RolesAdminPage() {
   const [roles, setRoles] = useState<RolAdmin[]>([]);
@@ -20,15 +34,21 @@ export default function RolesAdminPage() {
   const [editing, setEditing] = useState<Record<number, Record<string, boolean>>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<number | null>(null);
+  const [newDialogOpen, setNewDialogOpen] = useState(false);
+  const [newRol, setNewRol] = useState({ nombre: "", descripcion: "" });
+  const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    Promise.all([listRolesAdmin(), getCatalogoPermisos()])
+  function loadAll() {
+    return Promise.all([listRolesAdmin(), getCatalogoPermisos()])
       .then(([r, c]) => {
         setRoles(r.data);
         setCatalogo(c.data);
       })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .catch(() => {});
+  }
+
+  useEffect(() => {
+    loadAll().finally(() => setLoading(false));
   }, []);
 
   function togglePermiso(rolId: number, clave: string) {
@@ -58,15 +78,12 @@ export default function RolesAdminPage() {
     if (!rol) return;
     setSaving(rolId);
     try {
-      // Construir el set completo de permisos para guardar: original + cambios
       const merged: Record<string, boolean> = { ...rol.permisos };
-      // Aplicar los toggles editados (incluso si quedaron en false los borramos para no inflar el JSONB)
       const editado = editing[rolId] ?? {};
       for (const [k, v] of Object.entries(editado)) {
         if (v) merged[k] = true;
         else delete merged[k];
       }
-      // Quitar tambien los originales en false (limpieza)
       for (const [k, v] of Object.entries(merged)) {
         if (v !== true) delete merged[k];
       }
@@ -85,18 +102,72 @@ export default function RolesAdminPage() {
     }
   }
 
+  async function handleCrear() {
+    if (!newRol.nombre.trim()) return;
+    setCreating(true);
+    try {
+      await createRol({
+        nombre: newRol.nombre.trim().toLowerCase(),
+        descripcion: newRol.descripcion.trim() || null,
+        permisos: {},
+      });
+      toast.success(`Rol ${newRol.nombre} creado`);
+      setNewDialogOpen(false);
+      setNewRol({ nombre: "", descripcion: "" });
+      await loadAll();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const body = err.body as { error?: string; details?: { nombre?: string[] } };
+        if (body?.error === "nombre_duplicado") toast.error("Ya existe un rol con ese nombre");
+        else if (body?.details?.nombre) toast.error(body.details.nombre[0]);
+        else toast.error("Error creando rol");
+      } else {
+        toast.error("Error creando rol");
+      }
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleEliminar(rol: RolAdmin) {
+    if (!window.confirm(`Eliminar el rol "${rol.nombre}"? Esta accion no se puede deshacer.`)) return;
+    try {
+      await deleteRol(rol.id);
+      toast.success(`Rol ${rol.nombre} eliminado`);
+      await loadAll();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const body = err.body as { error?: string; count?: number };
+        if (body?.error === "rol_con_usuarios") {
+          toast.error(`No se puede eliminar: ${body.count} usuario(s) tienen este rol`);
+        } else if (body?.error === "no_se_puede_borrar_super_admin") {
+          toast.error("No se puede eliminar el rol super admin");
+        } else {
+          toast.error("Error eliminando rol");
+        }
+      } else {
+        toast.error("Error eliminando rol");
+      }
+    }
+  }
+
   if (loading) return <p className="text-muted-foreground">Cargando roles...</p>;
 
   return (
     <div className="space-y-6">
-      <header>
-        <h2 className="text-3xl font-bold">Roles y permisos</h2>
-        <p className="text-muted-foreground">
-          Define que puede hacer cada rol. Solo el super admin puede editar estos permisos.
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Roles marcados como <Badge variant="warning">super admin</Badge> tienen todos los permisos automaticamente.
-        </p>
+      <header className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold">Roles y permisos</h2>
+          <p className="text-muted-foreground">
+            Define que puede hacer cada rol. Solo el super admin puede editar estos permisos.
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Roles marcados como <Badge variant="warning">super admin</Badge> tienen todos los permisos automaticamente.
+          </p>
+        </div>
+        <Button onClick={() => setNewDialogOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" /> Nuevo rol
+        </Button>
       </header>
 
       {roles.map((rol) => {
@@ -114,12 +185,19 @@ export default function RolesAdminPage() {
                   </CardTitle>
                   <CardDescription>{rol.descripcion ?? "Sin descripcion"}</CardDescription>
                 </div>
-                {dirty && (
-                  <Button onClick={() => guardar(rol.id)} disabled={saving === rol.id}>
-                    <Save className="mr-2 h-4 w-4" />
-                    {saving === rol.id ? "Guardando..." : "Guardar cambios"}
-                  </Button>
-                )}
+                <div className="flex gap-2">
+                  {dirty && (
+                    <Button onClick={() => guardar(rol.id)} disabled={saving === rol.id}>
+                      <Save className="mr-2 h-4 w-4" />
+                      {saving === rol.id ? "Guardando..." : "Guardar"}
+                    </Button>
+                  )}
+                  {!rol.es_super_admin && (
+                    <Button variant="ghost" size="icon" onClick={() => handleEliminar(rol)} aria-label="Eliminar rol">
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -163,6 +241,48 @@ export default function RolesAdminPage() {
           </Card>
         );
       })}
+
+      {/* Dialog crear rol */}
+      <Dialog open={newDialogOpen} onOpenChange={setNewDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nuevo rol</DialogTitle>
+            <DialogDescription>
+              El rol se crea sin permisos. Luego configuras la matriz desde la tarjeta del rol.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="rol_nombre">Nombre interno *</Label>
+              <Input
+                id="rol_nombre"
+                value={newRol.nombre}
+                onChange={(e) => setNewRol((p) => ({ ...p, nombre: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_") }))}
+                placeholder="ej: supervisor_planta"
+                maxLength={50}
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">Solo minusculas, numeros y guion bajo.</p>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="rol_desc">Descripcion</Label>
+              <Textarea
+                id="rol_desc"
+                rows={2}
+                value={newRol.descripcion}
+                onChange={(e) => setNewRol((p) => ({ ...p, descripcion: e.target.value }))}
+                placeholder="Para que se usa este rol"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewDialogOpen(false)} disabled={creating}>Cancelar</Button>
+            <Button onClick={handleCrear} disabled={creating || !newRol.nombre.trim()}>
+              {creating ? "Creando..." : "Crear rol"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Toaster richColors position="top-right" />
     </div>
