@@ -74,9 +74,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             Contratos
           </Link>
           {puedeVerOT && (
-            <Link href="/ot" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-              Órdenes de trabajo
-            </Link>
+            <>
+              <Link href="/ot" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
+                Órdenes de trabajo
+              </Link>
+              <Link href="/produccion" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground font-medium">
+                📊 Dashboard producción
+              </Link>
+            </>
           )}
           <Link href="/inventario" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
             Bodega
