@@ -2,11 +2,11 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import {
   LayoutDashboard, Users, FileText, FileSignature, Factory, FolderOpen,
-  Boxes, Bell, Shield, ArrowRight, AlertTriangle, LogIn,
+  Boxes, Bell, Shield, ArrowRight, AlertTriangle,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { SessionExpiredButton } from "../session-expired-button";
 
 interface AuthMeResponse {
   user: {
@@ -76,9 +76,7 @@ export default async function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button asChild>
-              <Link href="/login"><LogIn className="mr-2 h-4 w-4" /> Ir al login</Link>
-            </Button>
+            <SessionExpiredButton />
           </CardContent>
         </Card>
       </div>
