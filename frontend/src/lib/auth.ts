@@ -7,6 +7,8 @@ export interface AuthUser {
   apellidos: string;
   rol_id: number | null;
   rol_nombre: string | null;
+  es_super_admin: boolean;
+  permisos: Record<string, boolean>;
 }
 
 interface AuthResponse {
@@ -29,4 +31,28 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   } catch {
     return null;
   }
+}
+
+export interface RegisterPayload {
+  email: string;
+  password: string;
+  nombres: string;
+  apellidos: string;
+  telefono?: string;
+}
+
+export async function register(payload: RegisterPayload): Promise<{ status: string }> {
+  return api.post("/api/auth/register", payload);
+}
+
+/**
+ * Verifica si el usuario tiene un permiso especifico.
+ * Acepta los 3 formatos: granular (modulo.accion), por area (modulo), comodin (all).
+ * Super admin siempre tiene.
+ */
+export function hasPermission(user: AuthUser | null, modulo: string, accion: string): boolean {
+  if (!user) return false;
+  if (user.es_super_admin) return true;
+  const p = user.permisos ?? {};
+  return p[`${modulo}.${accion}`] === true || p[modulo] === true || p.all === true;
 }

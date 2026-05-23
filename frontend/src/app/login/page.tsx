@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,8 +33,21 @@ export default function LoginPage() {
       router.push("/dashboard");
       router.refresh();
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        setError("Email o contrasena incorrectos");
+      if (err instanceof ApiError) {
+        if (err.status === 401) {
+          setError("Email o contrasena incorrectos");
+        } else if (err.status === 403) {
+          const body = err.body as { error?: string; mensaje?: string };
+          if (body?.error === "pendiente_aprobacion") {
+            setError("Tu cuenta esta pendiente de aprobacion por el administrador. Espera el aviso de activacion.");
+          } else if (body?.error === "registro_rechazado") {
+            setError(`Tu solicitud fue rechazada. ${body.mensaje ?? ""}`);
+          } else {
+            setError(body?.mensaje ?? "Acceso denegado");
+          }
+        } else {
+          setError("No se pudo iniciar sesion. Intenta de nuevo.");
+        }
       } else {
         setError("No se pudo iniciar sesion. Intenta de nuevo.");
       }
@@ -81,10 +95,16 @@ export default function LoginPage() {
               </p>
             )}
           </CardContent>
-          <CardFooter>
+          <CardFooter className="flex flex-col gap-2">
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Verificando..." : "Iniciar sesion"}
             </Button>
+            <p className="text-center text-xs text-muted-foreground">
+              No tienes cuenta?{" "}
+              <Link href="/register" className="text-primary hover:underline">
+                Solicitar registro
+              </Link>
+            </p>
           </CardFooter>
         </form>
       </Card>
