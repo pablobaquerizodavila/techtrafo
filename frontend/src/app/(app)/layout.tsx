@@ -104,13 +104,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           )}
         </nav>
 
-        {user && (
+        {user ? (
           <div className="mt-8 border-t pt-4">
             <div className="mb-2 px-3 text-xs">
               <div className="font-medium truncate">{user.nombres} {user.apellidos}</div>
               <div className="text-muted-foreground">{user.rol_nombre ?? "sin rol"}</div>
             </div>
             <LogoutButton />
+          </div>
+        ) : (
+          <div className="mt-8 rounded border border-yellow-500/40 bg-yellow-50/60 p-3 text-xs">
+            <p className="mb-2 font-semibold text-yellow-800">Sin sesión activa</p>
+            <p className="mb-2 text-yellow-700">Tu cookie expiró. Volvé a iniciar sesión.</p>
+            <Link href="/login" className="inline-block rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:opacity-90">
+              Ir al login
+            </Link>
           </div>
         )}
       </aside>
