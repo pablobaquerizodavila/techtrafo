@@ -43,6 +43,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await fetchMe();
   const puedeAdminUsuarios = hasPerm(user, "admin", "usuarios");
   const puedeAdminRoles = user?.es_super_admin ?? false;
+  const puedeVerExpedientes = hasPerm(user, "expedientes", "read");
 
   return (
     <div className="flex min-h-screen">
@@ -58,6 +59,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Link href="/clientes" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
             Clientes
           </Link>
+          {puedeVerExpedientes && (
+            <Link href="/expedientes" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
+              Expedientes
+            </Link>
+          )}
           <Link href="/cotizaciones" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
             Cotizaciones
           </Link>
