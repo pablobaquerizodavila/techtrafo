@@ -114,6 +114,15 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3002,http://192.168.0.23:3002}
+      # --- SMTP / Notificaciones (4.D) ---
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
+      PANEL_URL: ${PANEL_URL:-https://panel.techtrafo.com}
+      NOTIF_WORKER_INTERVAL_SECONDS: ${NOTIF_WORKER_INTERVAL_SECONDS:-300}
     volumes:
       - ../../backend:/app
       - /app/node_modules
