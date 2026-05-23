@@ -6,6 +6,85 @@ El formato sigue Keep a Changelog y este proyecto adhiere a Semantic Versioning.
 
 ---
 
+## [0.4.5] — 2026-05-23
+
+### Agregado — FASE 4: módulos de operación + Dashboard de producción
+
+#### 4.1 — Cotizaciones
+- CRUD completo con líneas, revisiones (historial inmutable de versiones) y transiciones de estado: `borrador → enviada → aprobada/rechazada/vencida/cancelada → convertida`.
+- Generación auto de código `COT-YYYY-NNNN` con `SPLIT_PART` para evitar el bug de `SUBSTRING` con BigInt.
+- UI con form de líneas dinámicas, cálculo en vivo de subtotal/IVA/total, validación zod.
+
+#### 4.3 — Inventario
+- API y UI de catálogo (categorías, ubicaciones, ítems) y stock con lotes/series + kárdex de movimientos.
+
+#### 4.4 — Contratos
+- CRUD con plan de pagos por hitos. Transiciones `borrador → vigente → suspendido/completado/cancelado`.
+
+#### 4.5 — Órdenes de Trabajo
+- Migration 011: `produccion.paso_plantillas` con seed de 9/11/6 pasos (con 2/3/1 gates de QA) para `reparacion / fabricacion / mantenimiento`.
+- API completa de OT con código `OT-YYYY-NNNN`, transiciones (iniciar / pausar / completar / cancelar) y operaciones por paso (iniciar / completar / rechazar gate / saltar).
+- Vinculación automática `expedientes.ot_id` al crear OT desde contrato.
+- Trigger `fn_sync_hito_ot`: cerrar OT marca hitos de producción del expediente como completados y activa "entrega".
+- UI con pipeline visual, barra de progreso, gates resaltados con border amarillo.
+
+#### 4.8 — Roles, super_admin y aprobación de usuarios
+- Migration 008: campo `es_super_admin` en `roles`, campo `estado_aprobacion` en `usuarios` (`pendiente / aprobado / rechazado`).
+- `/register` público que crea usuario en estado pendiente.
+- `/admin/usuarios` y `/admin/roles` con matriz de permisos editable desde UI.
+- Catálogo de permisos granular `modulo.accion`: clientes, cotizaciones, contratos, inventario, expedientes, ot, admin.
+- Renombrado consistente `cliente_externo → cliente` en todo el catálogo.
+
+#### 4.A — Migration 010: hoja de ruta del pedido
+- 6 tablas nuevas: `hito_plantillas`, `expedientes`, `expediente_hitos`, `visitas_tecnicas`, `informes_tecnicos`, `core.notificaciones`.
+- 3 trigger functions de sincronización (cotización / contrato / OT → hitos).
+- Vista `comercial.v_expediente_pipeline` calcula `estancado` en runtime usando `horas_transcurridas` vs `sla_horas`.
+- Seed de 17 hitos con SLAs por etapa.
+
+#### 4.B — API de expedientes / visitas / informes
+- CRUD completo con instanciación automática de hitos al crear expediente.
+- Workflow de gates: `iniciar / aprobar / rechazar` por hito, con validación de rol aprobador (super_admin bypass).
+- Cascada: aprobar hito activa el siguiente en orden.
+- Informes técnicos con número auto `INF-YYYY-NNNN` y estados `borrador / en_revision / aprobado / rechazado`.
+
+#### 4.C — UI tablero de expedientes
+- `/expedientes` listado con KPIs (activos, estancados clickable como filtro, ganados), filtros y búsqueda.
+- `/expedientes/[id]` pipeline gráfico de los 15 hitos con iconos por estado, highlight rojo para estancados, botones inline iniciar/aprobar/rechazar.
+- Cards de documentos relacionados + panel lateral con visitas + informes.
+
+#### 4.D — Notificaciones email
+- Backend: nodemailer + 3 templates HTML, worker `setInterval` in-process (default 5 min) que detecta estancamientos vía `v_expediente_pipeline` (idempotente por día) y procesa cola con reintentos.
+- Ganchos en iniciar / aprobar / rechazar / crear expediente → email al rol aprobador y al ejecutivo.
+- SMTP configurado contra **Synology MailPlus** (192.168.0.116:465) con cuenta `notificaciones@medicvip.org` (DKIM/SPF/DMARC operacional).
+- Frontend: `/notificaciones` bandeja + badge con polling 60s en sidebar.
+- Modo dry-run automático si `SMTP_HOST` no está configurado.
+
+#### Dashboard A — Dashboard ejecutivo de producción
+- Migration: ninguna (usa data existente).
+- `GET /api/produccion/dashboard` unifica KPIs + semáforo de fases (verde/amarillo/rojo/azul/gris calculado en SQL) + matriz comparativa unificada OT + expedientes + rankings + alertas + próximas entregas.
+- `/produccion` con 9 KPIs ejecutivos, semáforo con barras, matriz con 4 filtros, refresh automático 60s.
+- Bloques DUMMY claramente etiquetados para capacidad por área, causas de demora y productividad (pendiente migration 013).
+
+#### Dashboard B — Migration 012: transformadores
+- Nueva tabla `produccion.transformadores` con identificación (código auto, marca, modelo, serie), características técnicas completas (tipo de los 7 del prompt, capacidad kVA, tensiones, conexión, grupo vectorial, fases, frecuencia, refrigeración), dimensiones y ciclo de vida.
+- FK desde `ot.transformador_id` y `expedientes.transformador_id` (nullable).
+- Vista `v_transformador_historial` con duración real por OT.
+- API CRUD + búsqueda + endpoint `/cliente/:id` para selects + `historial_stats` agregado en detalle.
+- UI: listado con filtros, ficha con stats banner y historial completo, formulario en 4 bloques.
+- Integración con OT: selector de transformador autocarga los del cliente del contrato; el detalle de OT muestra card destacada del equipo.
+- Matriz del dashboard ya muestra capacidad real (`500 kVA`, `1 MVA`).
+- Seed de 2 equipos demo: Siemens TPV-500 (500 kVA) y ABB POT-1MVA-V2 (1 MVA).
+
+### Mejorado
+- Dashboard placeholder `/dashboard` reescrito: accesos rápidos por permiso + roadmap actual (antes era texto de FASE 3 desactualizado).
+- Fix de loop login/dashboard cuando el JWT expira: `SessionExpiredButton` cliente que limpia cookie via `/api/auth/logout` y hard navigation, + middleware con validación de forma JWT antes de redirigir.
+
+### Infraestructura
+- Backup workflow documentado en README + scripts manuales en `/home/techtrafo/backups/`.
+- `docker-compose.yml`: nuevas env vars SMTP inyectadas al servicio `api`.
+
+---
+
 ## [0.3.0] — 2026-05-22
 
 ### Agregado — FASE 3: desarrollo del stack vertical
