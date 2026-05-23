@@ -269,14 +269,15 @@ model configuracion {
 }
 
 model roles {
-  id          Int        @id @default(autoincrement())
-  nombre      String     @unique @db.VarChar(50)
-  descripcion String?
-  permisos    Json?      @default("{}")
-  activo      Boolean?   @default(true)
-  created_at  DateTime?  @default(now()) @db.Timestamptz(6)
-  updated_at  DateTime?  @default(now()) @db.Timestamptz(6)
-  usuarios    usuarios[]
+  id             Int        @id @default(autoincrement())
+  nombre         String     @unique @db.VarChar(50)
+  descripcion    String?
+  permisos       Json?      @default("{}")
+  activo         Boolean?   @default(true)
+  created_at     DateTime?  @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime?  @default(now()) @db.Timestamptz(6)
+  es_super_admin Boolean    @default(false)
+  usuarios       usuarios[]
 
   @@schema("core")
 }
@@ -293,6 +294,11 @@ model usuarios {
   ultimo_login                                                  DateTime?               @db.Timestamptz(6)
   created_at                                                    DateTime?               @default(now()) @db.Timestamptz(6)
   updated_at                                                    DateTime?               @default(now()) @db.Timestamptz(6)
+  estado_aprobacion                                             String                  @default("pendiente") @db.VarChar(20)
+  aprobado_por                                                  String?                 @db.Uuid
+  fecha_aprobacion                                              DateTime?               @db.Timestamptz(6)
+  motivo_rechazo                                                String?
+  telefono_solicitud                                            String?                 @db.VarChar(20)
   cliente_contactos_cliente_contactos_actualizado_porTousuarios cliente_contactos[]     @relation("cliente_contactos_actualizado_porTousuarios")
   cliente_contactos_cliente_contactos_creado_porTousuarios      cliente_contactos[]     @relation("cliente_contactos_creado_porTousuarios")
   clientes_clientes_actualizado_porTousuarios                   clientes[]              @relation("clientes_actualizado_porTousuarios")
@@ -309,6 +315,8 @@ model usuarios {
   cotizaciones_cotizaciones_vendedor_idTousuarios               cotizaciones[]          @relation("cotizaciones_vendedor_idTousuarios")
   auditoria                                                     auditoria[]
   configuracion                                                 configuracion[]
+  usuarios                                                      usuarios?               @relation("usuariosTousuarios", fields: [aprobado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_usuarios                                                usuarios[]              @relation("usuariosTousuarios")
   roles                                                         roles?                  @relation(fields: [rol_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   categorias_item_categorias_item_actualizado_porTousuarios     categorias_item[]       @relation("categorias_item_actualizado_porTousuarios")
   categorias_item_categorias_item_creado_porTousuarios          categorias_item[]       @relation("categorias_item_creado_porTousuarios")
@@ -338,6 +346,7 @@ model usuarios {
 
   @@index([email], map: "idx_usuarios_email")
   @@index([rol_id], map: "idx_usuarios_rol")
+  @@index([estado_aprobacion], map: "idx_usuarios_estado_aprobacion")
   @@schema("core")
 }
 
