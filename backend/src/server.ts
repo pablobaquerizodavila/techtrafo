@@ -12,6 +12,9 @@ import cotizacionesRouter from "./routes/cotizaciones";
 import inventarioRouter from "./routes/inventario";
 import contratosRouter from "./routes/contratos";
 import adminRouter from "./routes/admin";
+import expedientesRouter from "./routes/expedientes";
+import visitasTecnicasRouter from "./routes/visitas-tecnicas";
+import informesTecnicosRouter from "./routes/informes-tecnicos";
 import { prisma } from "./db/client";
 
 const app = express();
@@ -36,6 +39,9 @@ app.use("/api/cotizaciones", cotizacionesRouter);
 app.use("/api/inventario", inventarioRouter);
 app.use("/api/contratos", contratosRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/expedientes", expedientesRouter);
+app.use("/api/visitas-tecnicas", visitasTecnicasRouter);
+app.use("/api/informes-tecnicos", informesTecnicosRouter);
 
 // 404 fallback
 app.use((_req, res) => {

@@ -31,6 +31,7 @@ model cliente_contactos {
   clientes                                             clientes       @relation(fields: [cliente_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   usuarios_cliente_contactos_creado_porTousuarios      usuarios?      @relation("cliente_contactos_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
   cotizaciones                                         cotizaciones[]
+  expedientes                                          expedientes[]
   reclamos                                             reclamos[]
 
   @@index([cliente_id], map: "idx_contactos_cliente")
@@ -68,6 +69,7 @@ model clientes {
   usuarios_clientes_creado_porTousuarios      usuarios?           @relation("clientes_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
   contratos                                   contratos[]
   cotizaciones                                cotizaciones[]
+  expedientes                                 expedientes[]
   garantias                                   garantias[]
 
   @@index([estado], map: "idx_clientes_estado")
@@ -134,6 +136,7 @@ model contratos {
   cotizaciones                                 cotizaciones     @relation(fields: [cotizacion_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   usuarios_contratos_creado_porTousuarios      usuarios?        @relation("contratos_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
   usuarios_contratos_firmado_porTousuarios     usuarios?        @relation("contratos_firmado_porTousuarios", fields: [firmado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  expedientes                                  expedientes[]
   garantias                                    garantias[]
   ot                                           ot[]
 
@@ -222,6 +225,7 @@ model cotizaciones {
   cliente_contactos                               cliente_contactos?      @relation(fields: [contacto_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   usuarios_cotizaciones_creado_porTousuarios      usuarios?               @relation("cotizaciones_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
   usuarios_cotizaciones_vendedor_idTousuarios     usuarios?               @relation("cotizaciones_vendedor_idTousuarios", fields: [vendedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  expedientes                                     expedientes[]
 
   @@index([cliente_id], map: "idx_cotizaciones_cliente")
   @@index([codigo], map: "idx_cotizaciones_codigo")
@@ -269,15 +273,17 @@ model configuracion {
 }
 
 model roles {
-  id             Int        @id @default(autoincrement())
-  nombre         String     @unique @db.VarChar(50)
-  descripcion    String?
-  permisos       Json?      @default("{}")
-  activo         Boolean?   @default(true)
-  created_at     DateTime?  @default(now()) @db.Timestamptz(6)
-  updated_at     DateTime?  @default(now()) @db.Timestamptz(6)
-  es_super_admin Boolean    @default(false)
-  usuarios       usuarios[]
+  id               Int                @id @default(autoincrement())
+  nombre           String             @unique @db.VarChar(50)
+  descripcion      String?
+  permisos         Json?              @default("{}")
+  activo           Boolean?           @default(true)
+  created_at       DateTime?          @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?          @default(now()) @db.Timestamptz(6)
+  es_super_admin   Boolean            @default(false)
+  expediente_hitos expediente_hitos[]
+  hito_plantillas  hito_plantillas[]
+  usuarios         usuarios[]
 
   @@schema("core")
 }
@@ -313,8 +319,24 @@ model usuarios {
   cotizaciones_cotizaciones_aprobada_porTousuarios              cotizaciones[]          @relation("cotizaciones_aprobada_porTousuarios")
   cotizaciones_cotizaciones_creado_porTousuarios                cotizaciones[]          @relation("cotizaciones_creado_porTousuarios")
   cotizaciones_cotizaciones_vendedor_idTousuarios               cotizaciones[]          @relation("cotizaciones_vendedor_idTousuarios")
+  expediente_hitos_expediente_hitos_actualizado_porTousuarios   expediente_hitos[]      @relation("expediente_hitos_actualizado_porTousuarios")
+  expediente_hitos_expediente_hitos_aprobado_porTousuarios      expediente_hitos[]      @relation("expediente_hitos_aprobado_porTousuarios")
+  expediente_hitos_expediente_hitos_creado_porTousuarios        expediente_hitos[]      @relation("expediente_hitos_creado_porTousuarios")
+  expediente_hitos_expediente_hitos_responsable_idTousuarios    expediente_hitos[]      @relation("expediente_hitos_responsable_idTousuarios")
+  expedientes_expedientes_actualizado_porTousuarios             expedientes[]           @relation("expedientes_actualizado_porTousuarios")
+  expedientes_expedientes_creado_porTousuarios                  expedientes[]           @relation("expedientes_creado_porTousuarios")
+  expedientes_expedientes_ejecutivo_idTousuarios                expedientes[]           @relation("expedientes_ejecutivo_idTousuarios")
+  hito_plantillas_hito_plantillas_actualizado_porTousuarios     hito_plantillas[]       @relation("hito_plantillas_actualizado_porTousuarios")
+  hito_plantillas_hito_plantillas_creado_porTousuarios          hito_plantillas[]       @relation("hito_plantillas_creado_porTousuarios")
+  informes_tecnicos_informes_tecnicos_actualizado_porTousuarios informes_tecnicos[]     @relation("informes_tecnicos_actualizado_porTousuarios")
+  informes_tecnicos_informes_tecnicos_aprobado_porTousuarios    informes_tecnicos[]     @relation("informes_tecnicos_aprobado_porTousuarios")
+  informes_tecnicos_informes_tecnicos_creado_porTousuarios      informes_tecnicos[]     @relation("informes_tecnicos_creado_porTousuarios")
+  visitas_tecnicas_visitas_tecnicas_actualizado_porTousuarios   visitas_tecnicas[]      @relation("visitas_tecnicas_actualizado_porTousuarios")
+  visitas_tecnicas_visitas_tecnicas_creado_porTousuarios        visitas_tecnicas[]      @relation("visitas_tecnicas_creado_porTousuarios")
+  visitas_tecnicas_visitas_tecnicas_ingeniero_idTousuarios      visitas_tecnicas[]      @relation("visitas_tecnicas_ingeniero_idTousuarios")
   auditoria                                                     auditoria[]
   configuracion                                                 configuracion[]
+  notificaciones                                                notificaciones[]
   usuarios                                                      usuarios?               @relation("usuariosTousuarios", fields: [aprobado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
   other_usuarios                                                usuarios[]              @relation("usuariosTousuarios")
   roles                                                         roles?                  @relation(fields: [rol_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -532,28 +554,29 @@ model ubicaciones {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model garantias {
-  id                                           BigInt     @id @default(autoincrement())
-  codigo                                       String?    @unique @db.VarChar(30)
-  serie_id                                     BigInt     @unique
+  id                                           BigInt        @id @default(autoincrement())
+  codigo                                       String?       @unique @db.VarChar(30)
+  serie_id                                     BigInt        @unique
   contrato_id                                  BigInt?
   cliente_id                                   BigInt
-  fecha_emision                                DateTime   @default(dbgenerated("CURRENT_DATE")) @db.Date
-  fecha_inicio                                 DateTime   @db.Date
-  fecha_fin                                    DateTime   @db.Date
+  fecha_emision                                DateTime      @default(dbgenerated("CURRENT_DATE")) @db.Date
+  fecha_inicio                                 DateTime      @db.Date
+  fecha_fin                                    DateTime      @db.Date
   duracion_meses                               Int
   alcance                                      String?
   condiciones                                  String?
-  estado                                       String     @default("vigente") @db.VarChar(20)
+  estado                                       String        @default("vigente") @db.VarChar(20)
   motivo_estado                                String?
-  creado_por                                   String?    @db.Uuid
-  actualizado_por                              String?    @db.Uuid
-  created_at                                   DateTime?  @default(now()) @db.Timestamptz(6)
-  updated_at                                   DateTime?  @default(now()) @db.Timestamptz(6)
-  usuarios_garantias_actualizado_porTousuarios usuarios?  @relation("garantias_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  clientes                                     clientes   @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  contratos                                    contratos? @relation(fields: [contrato_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  usuarios_garantias_creado_porTousuarios      usuarios?  @relation("garantias_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  series                                       series     @relation(fields: [serie_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  creado_por                                   String?       @db.Uuid
+  actualizado_por                              String?       @db.Uuid
+  created_at                                   DateTime?     @default(now()) @db.Timestamptz(6)
+  updated_at                                   DateTime?     @default(now()) @db.Timestamptz(6)
+  expedientes                                  expedientes[]
+  usuarios_garantias_actualizado_porTousuarios usuarios?     @relation("garantias_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  clientes                                     clientes      @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  contratos                                    contratos?    @relation(fields: [contrato_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_garantias_creado_porTousuarios      usuarios?     @relation("garantias_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  series                                       series        @relation(fields: [serie_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   reclamos                                     reclamos[]
 
   @@index([cliente_id], map: "idx_garantias_cliente")
@@ -649,6 +672,7 @@ model ot {
   actualizado_por                       String?          @db.Uuid
   created_at                            DateTime?        @default(now()) @db.Timestamptz(6)
   updated_at                            DateTime?        @default(now()) @db.Timestamptz(6)
+  expedientes                           expedientes[]
   series                                series[]
   intervenciones                        intervenciones[]
   usuarios_ot_actualizado_porTousuarios usuarios?        @relation("ot_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -717,4 +741,197 @@ model ot_pasos {
   @@index([estado], map: "idx_ot_pasos_estado")
   @@index([ot_id], map: "idx_ot_pasos_ot")
   @@schema("produccion")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model expediente_hitos {
+  id                                                  BigInt              @id @default(autoincrement())
+  expediente_id                                       BigInt
+  plantilla_id                                        BigInt?
+  codigo                                              String              @db.VarChar(50)
+  nombre                                              String              @db.VarChar(200)
+  orden                                               Int
+  visible_cliente                                     Boolean             @default(false)
+  requiere_aprobacion                                 Boolean             @default(false)
+  rol_aprobador_id                                    Int?
+  sla_horas                                           Int?
+  estado                                              String              @default("no_iniciado") @db.VarChar(20)
+  responsable_id                                      String?             @db.Uuid
+  fecha_inicio                                        DateTime?           @db.Timestamptz(6)
+  fecha_fin                                           DateTime?           @db.Timestamptz(6)
+  fecha_alerta_estancamiento                          DateTime?           @db.Timestamptz(6)
+  aprobado_por                                        String?             @db.Uuid
+  fecha_aprobacion                                    DateTime?           @db.Timestamptz(6)
+  motivo_rechazo                                      String?
+  notas                                               String?
+  metadata                                            Json?               @default("{}")
+  creado_por                                          String?             @db.Uuid
+  actualizado_por                                     String?             @db.Uuid
+  created_at                                          DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at                                          DateTime?           @default(now()) @db.Timestamptz(6)
+  usuarios_expediente_hitos_actualizado_porTousuarios usuarios?           @relation("expediente_hitos_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_expediente_hitos_aprobado_porTousuarios    usuarios?           @relation("expediente_hitos_aprobado_porTousuarios", fields: [aprobado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_expediente_hitos_creado_porTousuarios      usuarios?           @relation("expediente_hitos_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  expedientes                                         expedientes         @relation(fields: [expediente_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  hito_plantillas                                     hito_plantillas?    @relation(fields: [plantilla_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_expediente_hitos_responsable_idTousuarios  usuarios?           @relation("expediente_hitos_responsable_idTousuarios", fields: [responsable_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  roles                                               roles?              @relation(fields: [rol_aprobador_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  informes_tecnicos                                   informes_tecnicos[]
+  visitas_tecnicas                                    visitas_tecnicas[]
+
+  @@unique([expediente_id, codigo])
+  @@index([estado], map: "idx_exp_hitos_estado")
+  @@index([expediente_id], map: "idx_exp_hitos_expediente")
+  @@index([responsable_id], map: "idx_exp_hitos_responsable")
+  @@schema("comercial")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model expedientes {
+  id                                             BigInt              @id @default(autoincrement())
+  codigo                                         String?             @unique @db.VarChar(30)
+  cliente_id                                     BigInt
+  contacto_id                                    BigInt?
+  ejecutivo_id                                   String?             @db.Uuid
+  canal_origen                                   String?             @db.VarChar(20)
+  tipo_servicio_estimado                         String?             @db.VarChar(20)
+  tipo_servicio_confirmado                       String?             @db.VarChar(20)
+  descripcion_problema                           String?
+  cotizacion_id                                  BigInt?
+  contrato_id                                    BigInt?
+  ot_id                                          BigInt?
+  garantia_id                                    BigInt?
+  estado                                         String              @default("activo") @db.VarChar(20)
+  motivo_cierre                                  String?
+  fecha_apertura                                 DateTime            @default(now()) @db.Timestamptz(6)
+  fecha_cierre                                   DateTime?           @db.Timestamptz(6)
+  creado_por                                     String?             @db.Uuid
+  actualizado_por                                String?             @db.Uuid
+  created_at                                     DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at                                     DateTime?           @default(now()) @db.Timestamptz(6)
+  expediente_hitos                               expediente_hitos[]
+  usuarios_expedientes_actualizado_porTousuarios usuarios?           @relation("expedientes_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  clientes                                       clientes            @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  cliente_contactos                              cliente_contactos?  @relation(fields: [contacto_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  contratos                                      contratos?          @relation(fields: [contrato_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  cotizaciones                                   cotizaciones?       @relation(fields: [cotizacion_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_expedientes_creado_porTousuarios      usuarios?           @relation("expedientes_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_expedientes_ejecutivo_idTousuarios    usuarios?           @relation("expedientes_ejecutivo_idTousuarios", fields: [ejecutivo_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  garantias                                      garantias?          @relation(fields: [garantia_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ot                                             ot?                 @relation(fields: [ot_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  informes_tecnicos                              informes_tecnicos[]
+  visitas_tecnicas                               visitas_tecnicas[]
+
+  @@index([cliente_id], map: "idx_expedientes_cliente")
+  @@index([ejecutivo_id], map: "idx_expedientes_ejecutivo")
+  @@index([estado], map: "idx_expedientes_estado")
+  @@schema("comercial")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model hito_plantillas {
+  id                                                 BigInt             @id @default(autoincrement())
+  codigo                                             String             @unique @db.VarChar(50)
+  nombre                                             String             @db.VarChar(200)
+  descripcion                                        String?
+  orden                                              Int
+  tipo_servicio                                      String             @default("comun") @db.VarChar(20)
+  visible_cliente                                    Boolean            @default(false)
+  requiere_aprobacion                                Boolean            @default(false)
+  rol_aprobador_id                                   Int?
+  sla_horas                                          Int?
+  es_automatico                                      Boolean            @default(false)
+  fuente_tabla                                       String?            @db.VarChar(50)
+  activo                                             Boolean            @default(true)
+  creado_por                                         String?            @db.Uuid
+  actualizado_por                                    String?            @db.Uuid
+  created_at                                         DateTime?          @default(now()) @db.Timestamptz(6)
+  updated_at                                         DateTime?          @default(now()) @db.Timestamptz(6)
+  expediente_hitos                                   expediente_hitos[]
+  usuarios_hito_plantillas_actualizado_porTousuarios usuarios?          @relation("hito_plantillas_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_hito_plantillas_creado_porTousuarios      usuarios?          @relation("hito_plantillas_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  roles                                              roles?             @relation(fields: [rol_aprobador_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@schema("comercial")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model informes_tecnicos {
+  id                                                   BigInt            @id @default(autoincrement())
+  expediente_id                                        BigInt
+  hito_id                                              BigInt?
+  visita_id                                            BigInt?
+  numero                                               String?           @unique @db.VarChar(30)
+  diagnostico_completo                                 String?
+  decision_tecnica                                     String?           @db.VarChar(20)
+  justificacion                                        String?
+  archivo_pdf_url                                      String?
+  aprobado_por                                         String?           @db.Uuid
+  fecha_aprobacion                                     DateTime?         @db.Timestamptz(6)
+  estado                                               String            @default("borrador") @db.VarChar(20)
+  creado_por                                           String?           @db.Uuid
+  actualizado_por                                      String?           @db.Uuid
+  created_at                                           DateTime?         @default(now()) @db.Timestamptz(6)
+  updated_at                                           DateTime?         @default(now()) @db.Timestamptz(6)
+  usuarios_informes_tecnicos_actualizado_porTousuarios usuarios?         @relation("informes_tecnicos_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_informes_tecnicos_aprobado_porTousuarios    usuarios?         @relation("informes_tecnicos_aprobado_porTousuarios", fields: [aprobado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_informes_tecnicos_creado_porTousuarios      usuarios?         @relation("informes_tecnicos_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  expedientes                                          expedientes       @relation(fields: [expediente_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  expediente_hitos                                     expediente_hitos? @relation(fields: [hito_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  visitas_tecnicas                                     visitas_tecnicas? @relation(fields: [visita_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([expediente_id], map: "idx_informes_expediente")
+  @@schema("comercial")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model visitas_tecnicas {
+  id                                                  BigInt              @id @default(autoincrement())
+  expediente_id                                       BigInt
+  hito_id                                             BigInt?
+  fecha_programada                                    DateTime?           @db.Date
+  fecha_realizada                                     DateTime?           @db.Timestamptz(6)
+  ubicacion_tipo                                      String              @default("sitio_cliente") @db.VarChar(20)
+  direccion                                           String?
+  ingeniero_id                                        String?             @db.Uuid
+  hallazgos                                           String?
+  fotos_urls                                          String[]
+  recomendacion                                       String?             @db.VarChar(20)
+  observaciones                                       String?
+  estado                                              String              @default("programada") @db.VarChar(20)
+  creado_por                                          String?             @db.Uuid
+  actualizado_por                                     String?             @db.Uuid
+  created_at                                          DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at                                          DateTime?           @default(now()) @db.Timestamptz(6)
+  informes_tecnicos                                   informes_tecnicos[]
+  usuarios_visitas_tecnicas_actualizado_porTousuarios usuarios?           @relation("visitas_tecnicas_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_visitas_tecnicas_creado_porTousuarios      usuarios?           @relation("visitas_tecnicas_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  expedientes                                         expedientes         @relation(fields: [expediente_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  expediente_hitos                                    expediente_hitos?   @relation(fields: [hito_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_visitas_tecnicas_ingeniero_idTousuarios    usuarios?           @relation("visitas_tecnicas_ingeniero_idTousuarios", fields: [ingeniero_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([expediente_id], map: "idx_visitas_expediente")
+  @@index([fecha_programada], map: "idx_visitas_fecha")
+  @@schema("comercial")
+}
+
+model notificaciones {
+  id                 BigInt    @id @default(autoincrement())
+  tipo               String    @db.VarChar(40)
+  destinatario_id    String?   @db.Uuid
+  destinatario_email String    @db.VarChar(255)
+  asunto             String    @db.VarChar(200)
+  cuerpo_html        String?
+  cuerpo_texto       String?
+  enviado            Boolean   @default(false)
+  intento_count      Int       @default(0)
+  error              String?
+  fecha_envio        DateTime? @db.Timestamptz(6)
+  contexto           Json?     @default("{}")
+  created_at         DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime? @default(now()) @db.Timestamptz(6)
+  usuarios           usuarios? @relation(fields: [destinatario_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([destinatario_id, created_at(sort: Desc)], map: "idx_notif_destinatario")
+  @@schema("core")
 }
