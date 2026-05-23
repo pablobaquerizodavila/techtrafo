@@ -71,6 +71,7 @@ model clientes {
   cotizaciones                                cotizaciones[]
   expedientes                                 expedientes[]
   garantias                                   garantias[]
+  transformadores                             transformadores[]
 
   @@index([estado], map: "idx_clientes_estado")
   @@index([razon_social], map: "idx_clientes_razon")
@@ -365,6 +366,8 @@ model usuarios {
   ot_evidencias                                                 ot_evidencias[]
   ot_pasos_ot_pasos_aprobado_porTousuarios                      ot_pasos[]              @relation("ot_pasos_aprobado_porTousuarios")
   ot_pasos_ot_pasos_ejecutado_porTousuarios                     ot_pasos[]              @relation("ot_pasos_ejecutado_porTousuarios")
+  transformadores_transformadores_actualizado_porTousuarios     transformadores[]       @relation("transformadores_actualizado_porTousuarios")
+  transformadores_transformadores_creado_porTousuarios          transformadores[]       @relation("transformadores_creado_porTousuarios")
 
   @@index([email], map: "idx_usuarios_email")
   @@index([rol_id], map: "idx_usuarios_rol")
@@ -672,6 +675,7 @@ model ot {
   actualizado_por                       String?          @db.Uuid
   created_at                            DateTime?        @default(now()) @db.Timestamptz(6)
   updated_at                            DateTime?        @default(now()) @db.Timestamptz(6)
+  transformador_id                      BigInt?
   expedientes                           expedientes[]
   series                                series[]
   intervenciones                        intervenciones[]
@@ -679,6 +683,7 @@ model ot {
   contratos                             contratos        @relation(fields: [contrato_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   usuarios_ot_creado_porTousuarios      usuarios?        @relation("ot_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
   usuarios_ot_responsable_idTousuarios  usuarios?        @relation("ot_responsable_idTousuarios", fields: [responsable_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  transformadores                       transformadores? @relation(fields: [transformador_id], references: [id], onUpdate: NoAction)
   ot_evidencias                         ot_evidencias[]
   ot_pasos                              ot_pasos[]
 
@@ -809,6 +814,7 @@ model expedientes {
   actualizado_por                                String?             @db.Uuid
   created_at                                     DateTime?           @default(now()) @db.Timestamptz(6)
   updated_at                                     DateTime?           @default(now()) @db.Timestamptz(6)
+  transformador_id                               BigInt?
   expediente_hitos                               expediente_hitos[]
   usuarios_expedientes_actualizado_porTousuarios usuarios?           @relation("expedientes_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
   clientes                                       clientes            @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -819,6 +825,7 @@ model expedientes {
   usuarios_expedientes_ejecutivo_idTousuarios    usuarios?           @relation("expedientes_ejecutivo_idTousuarios", fields: [ejecutivo_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   garantias                                      garantias?          @relation(fields: [garantia_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   ot                                             ot?                 @relation(fields: [ot_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  transformadores                                transformadores?    @relation(fields: [transformador_id], references: [id], onUpdate: NoAction)
   informes_tecnicos                              informes_tecnicos[]
   visitas_tecnicas                               visitas_tecnicas[]
 
@@ -951,5 +958,51 @@ model paso_plantillas {
 
   @@unique([tipo_ruta, numero])
   @@index([tipo_ruta, numero], map: "idx_paso_plantillas_tipo")
+  @@schema("produccion")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model transformadores {
+  id                                                 BigInt        @id @default(autoincrement())
+  codigo_interno                                     String?       @unique @db.VarChar(30)
+  numero_serie                                       String?       @db.VarChar(100)
+  marca                                              String?       @db.VarChar(80)
+  modelo                                             String?       @db.VarChar(100)
+  cliente_id                                         BigInt?
+  tipo                                               String        @default("distribucion") @db.VarChar(30)
+  capacidad_kva                                      Int
+  tension_primaria_kv                                Decimal?      @db.Decimal(8, 3)
+  tension_secundaria_v                               Int?
+  conexion                                           String?       @db.VarChar(20)
+  grupo_vectorial                                    String?       @db.VarChar(20)
+  numero_fases                                       Int?          @db.SmallInt
+  frecuencia_hz                                      Int?          @db.SmallInt
+  refrigeracion                                      String?       @db.VarChar(20)
+  peso_kg                                            Decimal?      @db.Decimal(10, 2)
+  ancho_mm                                           Int?
+  alto_mm                                            Int?
+  profundidad_mm                                     Int?
+  anio_fabricacion                                   Int?
+  fecha_puesta_servicio                              DateTime?     @db.Date
+  ubicacion_actual                                   String?       @db.VarChar(200)
+  estado                                             String        @default("en_servicio") @db.VarChar(20)
+  observaciones                                      String?
+  notas_internas                                     String?
+  creado_por                                         String?       @db.Uuid
+  actualizado_por                                    String?       @db.Uuid
+  created_at                                         DateTime?     @default(now()) @db.Timestamptz(6)
+  updated_at                                         DateTime?     @default(now()) @db.Timestamptz(6)
+  expedientes                                        expedientes[]
+  ot                                                 ot[]
+  usuarios_transformadores_actualizado_porTousuarios usuarios?     @relation("transformadores_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  clientes                                           clientes?     @relation(fields: [cliente_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  usuarios_transformadores_creado_porTousuarios      usuarios?     @relation("transformadores_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([marca, numero_serie], map: "transformadores_marca_serie_unq")
+  @@index([capacidad_kva], map: "idx_trf_capacidad")
+  @@index([cliente_id], map: "idx_trf_cliente")
+  @@index([estado], map: "idx_trf_estado")
+  @@index([tipo], map: "idx_trf_tipo")
   @@schema("produccion")
 }

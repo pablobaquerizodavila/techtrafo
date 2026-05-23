@@ -40,10 +40,21 @@ export interface OTEvidencia {
   created_at: string;
 }
 
+export interface OTTransformadorRef {
+  id: number;
+  codigo_interno: string | null;
+  marca: string | null;
+  modelo: string | null;
+  capacidad_kva: number;
+  tipo: string;
+  numero_serie: string | null;
+}
+
 export interface OT {
   id: number;
   codigo: string | null;
   contrato_id: number;
+  transformador_id?: number | null;
   tipo_ruta: TipoRuta;
   prioridad: PrioridadOT;
   descripcion: string | null;
@@ -62,6 +73,7 @@ export interface OT {
     clientes?: { id: number; razon_social: string; ruc_cedula: string } | null;
   };
   usuarios_ot_responsable_idTousuarios?: { id: string; nombres: string; apellidos: string; email?: string } | null;
+  transformadores?: OTTransformadorRef | null;
   ot_pasos?: OTPaso[];
   ot_evidencias?: OTEvidencia[];
   expedientes?: Array<{ id: number; codigo: string }>;
@@ -77,6 +89,7 @@ export interface CreateOT {
   fecha_fin_planeada?: string | null;
   responsable_id?: string | null;
   observaciones?: string | null;
+  transformador_id?: number | null;
 }
 
 export interface ListParams {

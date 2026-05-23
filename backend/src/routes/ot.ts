@@ -26,6 +26,7 @@ const createSchema = z.object({
   fecha_fin_planeada: z.string().optional().nullable(),
   responsable_id: z.string().uuid().optional().nullable(),
   observaciones: z.string().optional().nullable(),
+  transformador_id: z.number().int().positive().optional().nullable(),
 });
 
 const updateSchema = z.object({
@@ -152,6 +153,9 @@ router.get("/:id", requirePermission("ot", "read"), async (req, res) => {
         },
       },
       usuarios_ot_responsable_idTousuarios: { select: { id: true, nombres: true, apellidos: true, email: true } },
+      transformadores: {
+        select: { id: true, codigo_interno: true, marca: true, modelo: true, capacidad_kva: true, tipo: true, numero_serie: true },
+      },
       ot_pasos: {
         orderBy: { numero: "asc" },
         include: {
@@ -205,6 +209,7 @@ router.post("/", requirePermission("ot", "write"), async (req, res) => {
           fecha_fin_planeada: d.fecha_fin_planeada ? new Date(d.fecha_fin_planeada) : null,
           responsable_id: d.responsable_id ?? null,
           observaciones: d.observaciones ?? null,
+          transformador_id: d.transformador_id ?? null,
           estado: "planeada",
           creado_por: userId,
           actualizado_por: userId,

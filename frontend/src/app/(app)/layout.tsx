@@ -79,6 +79,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <Link href="/ot" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
                 Órdenes de trabajo
               </Link>
+              <Link href="/transformadores" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
+                ⚡ Transformadores
+              </Link>
               <Link href="/produccion" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground font-medium">
                 📊 Dashboard producción
               </Link>

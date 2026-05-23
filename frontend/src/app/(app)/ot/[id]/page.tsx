@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft, Play, Pause, CheckCircle2, XCircle, AlertTriangle,
-  Ban, ShieldCheck, SkipForward, ExternalLink, User,
+  Ban, ShieldCheck, SkipForward, ExternalLink, User, Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -274,6 +274,32 @@ export default function OTDetallePage({ params }: PageProps) {
           </p>
         </div>
       </div>
+
+      {/* Transformador vinculado */}
+      {ot.transformadores && (
+        <Link
+          href={`/transformadores/${ot.transformadores.id}`}
+          className="block rounded-md border p-4 transition hover:border-primary hover:bg-accent"
+        >
+          <div className="flex items-center gap-3">
+            <Zap className="h-6 w-6 text-primary" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold">
+                {ot.transformadores.codigo_interno} —{" "}
+                {ot.transformadores.marca ?? ""} {ot.transformadores.modelo ?? ""}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {ot.transformadores.capacidad_kva >= 1000
+                  ? `${(ot.transformadores.capacidad_kva / 1000).toFixed(ot.transformadores.capacidad_kva % 1000 === 0 ? 0 : 2)} MVA`
+                  : `${ot.transformadores.capacidad_kva} kVA`}
+                {" · "}{ot.transformadores.tipo}
+                {ot.transformadores.numero_serie && ` · serie ${ot.transformadores.numero_serie}`}
+              </p>
+            </div>
+            <ExternalLink className="h-4 w-4 text-muted-foreground" />
+          </div>
+        </Link>
+      )}
 
       {ot.descripcion && (
         <div className="rounded-md border bg-muted/20 p-4 text-sm">

@@ -100,6 +100,7 @@ router.get("/dashboard", requirePermission("ot", "read"), async (_req, res) => {
       contratos: { select: { clientes: { select: { razon_social: true } } } },
       usuarios_ot_responsable_idTousuarios: { select: { nombres: true, apellidos: true } },
       ot_pasos: { select: { estado: true, numero: true, nombre: true } },
+      transformadores: { select: { id: true, capacidad_kva: true, tipo: true, marca: true, modelo: true } },
     },
   });
 
@@ -139,7 +140,7 @@ router.get("/dashboard", requirePermission("ot", "read"), async (_req, res) => {
       codigo: ot.codigo,
       cliente: ot.contratos?.clientes?.razon_social ?? null,
       tipo: ot.tipo_ruta,
-      capacidad_kva: null, // DUMMY: pendiente migration 012
+      capacidad_kva: ot.transformadores?.capacidad_kva ?? null,
       prioridad: ot.prioridad,
       estado: ot.estado,
       fase_actual: faseActual ? `${faseActual.numero}. ${faseActual.nombre}` : null,
@@ -150,7 +151,7 @@ router.get("/dashboard", requirePermission("ot", "read"), async (_req, res) => {
         : null,
       dias_diff: diasDiff,
       semaforo: semaforoOT,
-      capacidad_dummy: true,
+      capacidad_dummy: ot.transformadores == null,
     });
   }
 

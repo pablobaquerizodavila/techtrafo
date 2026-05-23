@@ -14,6 +14,9 @@ import {
 import { Toaster, toast } from "sonner";
 import { listContratos, Contrato } from "@/lib/contratos";
 import { createOT, PrioridadOT, TipoRuta } from "@/lib/ot";
+import {
+  Transformador, formatCapacidad, listTransformadoresByCliente, tipoLabel as trfTipoLabel,
+} from "@/lib/transformadores";
 import { ApiError } from "@/lib/api";
 
 function NuevaOTForm() {
@@ -23,6 +26,8 @@ function NuevaOTForm() {
 
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [contratoId, setContratoId] = useState<number | null>(preselectContrato ? Number(preselectContrato) : null);
+  const [transformadores, setTransformadores] = useState<Transformador[]>([]);
+  const [transformadorId, setTransformadorId] = useState<number | null>(null);
   const [tipoRuta, setTipoRuta] = useState<TipoRuta>("reparacion");
   const [prioridad, setPrioridad] = useState<PrioridadOT>("normal");
   const [descripcion, setDescripcion] = useState("");
@@ -39,6 +44,24 @@ function NuevaOTForm() {
       .catch(() => setContratos([]));
   }, []);
 
+  // Al cambiar el contrato, cargar los transformadores del cliente del contrato
+  useEffect(() => {
+    if (!contratoId) {
+      setTransformadores([]);
+      setTransformadorId(null);
+      return;
+    }
+    const contrato = contratos.find((c) => c.id === contratoId);
+    if (!contrato?.cliente_id) {
+      setTransformadores([]);
+      setTransformadorId(null);
+      return;
+    }
+    listTransformadoresByCliente(contrato.cliente_id)
+      .then((r) => setTransformadores(r.data))
+      .catch(() => setTransformadores([]));
+  }, [contratoId, contratos]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -53,6 +76,7 @@ function NuevaOTForm() {
         fecha_inicio_planeada: fechaInicio || null,
         fecha_fin_planeada: fechaFin || null,
         observaciones: observaciones.trim() || null,
+        transformador_id: transformadorId,
       });
       toast.success(`OT ${res.data.codigo} creada`);
       router.push(`/ot/${res.data.id}`);
@@ -99,6 +123,33 @@ function NuevaOTForm() {
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="transformador">Transformador a intervenir</Label>
+          <Select
+            value={transformadorId?.toString() ?? "_"}
+            onValueChange={(v) => setTransformadorId(v === "_" ? null : Number(v))}
+            disabled={!contratoId}
+          >
+            <SelectTrigger id="transformador">
+              <SelectValue placeholder={!contratoId ? "Primero seleccioná un contrato" : "— Sin especificar —"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_">— Sin especificar —</SelectItem>
+              {transformadores.map((t) => (
+                <SelectItem key={t.id} value={t.id.toString()}>
+                  {t.codigo_interno ?? `#${t.id}`} · {t.marca ?? ""} {t.modelo ?? ""} · {formatCapacidad(t.capacidad_kva)} · {trfTipoLabel(t.tipo as "distribucion")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {contratoId && transformadores.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Este cliente no tiene transformadores registrados.{" "}
+              <Link href="/transformadores/nuevo" className="text-primary hover:underline">Registrar uno</Link>
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
