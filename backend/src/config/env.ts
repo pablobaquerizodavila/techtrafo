@@ -13,6 +13,19 @@ const envSchema = z.object({
   CORS_ORIGINS: z
     .string()
     .default("http://localhost:3001,http://192.168.0.23:3001,http://localhost:3000"),
+
+  // SMTP (4.D notificaciones). Si SMTP_HOST queda vacio, el worker corre en
+  // dry-run: registra notificaciones en core.notificaciones pero no envia email.
+  SMTP_HOST: z.string().optional().default(""),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_SECURE: z.coerce.boolean().default(false), // true = TLS implicito (465), false = STARTTLS
+  SMTP_USER: z.string().optional().default(""),
+  SMTP_PASS: z.string().optional().default(""),
+  SMTP_FROM: z.string().default("TECHTRAFO <noreply@techtrafo.com>"),
+  // URL publica del panel, usada para construir deeplinks en los correos
+  PANEL_URL: z.string().url().default("https://panel.techtrafo.com"),
+  // Cadencia del worker de notificaciones, en segundos
+  NOTIF_WORKER_INTERVAL_SECONDS: z.coerce.number().int().positive().default(300),
 });
 
 const parsed = envSchema.safeParse(process.env);

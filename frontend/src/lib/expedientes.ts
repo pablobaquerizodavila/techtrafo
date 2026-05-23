@@ -193,6 +193,27 @@ export function estadoExpedienteVariant(e: EstadoExpediente): "success" | "defau
   }
 }
 
+// ===================================================================
+// Notificaciones (4.D)
+// ===================================================================
+export interface Notificacion {
+  id: number;
+  tipo: string;
+  asunto: string;
+  enviado: boolean;
+  fecha_envio: string | null;
+  contexto: Record<string, unknown>;
+  created_at: string;
+}
+
+export async function listNotificaciones(limit = 25): Promise<{ data: Notificacion[] }> {
+  return api.get(`/api/notificaciones?limit=${limit}`);
+}
+
+export async function getResumenNotificaciones(): Promise<{ data: { recientes_48h: number; total: number } }> {
+  return api.get(`/api/notificaciones/resumen`);
+}
+
 export function canalOrigenLabel(c: CanalOrigen | null): string {
   if (!c) return "—";
   return {

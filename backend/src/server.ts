@@ -15,7 +15,9 @@ import adminRouter from "./routes/admin";
 import expedientesRouter from "./routes/expedientes";
 import visitasTecnicasRouter from "./routes/visitas-tecnicas";
 import informesTecnicosRouter from "./routes/informes-tecnicos";
+import notificacionesRouter from "./routes/notificaciones";
 import { prisma } from "./db/client";
+import { startNotificacionesWorker, stopNotificacionesWorker } from "./workers/notificaciones-worker";
 
 const app = express();
 
@@ -42,6 +44,7 @@ app.use("/api/admin", adminRouter);
 app.use("/api/expedientes", expedientesRouter);
 app.use("/api/visitas-tecnicas", visitasTecnicasRouter);
 app.use("/api/informes-tecnicos", informesTecnicosRouter);
+app.use("/api/notificaciones", notificacionesRouter);
 
 // 404 fallback
 app.use((_req, res) => {
@@ -57,11 +60,14 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
 const server = app.listen(env.PORT, () => {
   console.log(`[techtrafo-api] escuchando en :${env.PORT} (NODE_ENV=${env.NODE_ENV})`);
+  // Worker de notificaciones (4.D)
+  void startNotificacionesWorker();
 });
 
 // Apagado limpio
 async function shutdown(signal: string) {
   console.log(`[techtrafo-api] recibido ${signal}, cerrando...`);
+  stopNotificacionesWorker();
   server.close(async () => {
     await prisma.$disconnect();
     process.exit(0);

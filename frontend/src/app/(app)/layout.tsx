@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { LogoutButton } from "./logout-button";
+import { NotifLink } from "./notif-link";
 
 interface MeResponse {
   user: {
@@ -64,6 +65,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               Expedientes
             </Link>
           )}
+          {user && <NotifLink />}
           <Link href="/cotizaciones" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
             Cotizaciones
           </Link>

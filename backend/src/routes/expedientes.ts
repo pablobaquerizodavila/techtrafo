@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { withAppUser } from "../db/withAppUser";
 import { requireAuth, requirePermission } from "../auth/middleware";
+import { notificarHitoEsperaAprobacion, notificarResolucionHito } from "../services/notificaciones";
 
 const router = Router();
 router.use(requireAuth);
@@ -292,6 +293,15 @@ router.post("/", requirePermission("expedientes", "write"), async (req, res) => 
         expediente_hitos: { orderBy: { orden: "asc" } },
       },
     });
+
+    // Si el primer hito en_curso requiere aprobacion, notificar (4.D)
+    const primero = completo?.expediente_hitos.find((h) => h.estado === "en_curso");
+    if (primero?.requiere_aprobacion && primero.rol_aprobador_id) {
+      void notificarHitoEsperaAprobacion(Number(primero.id)).catch((e) =>
+        console.error("[notif] crear->esperaAprobacion fallo:", e),
+      );
+    }
+
     res.status(201).json({ data: completo });
   } catch (err) {
     if (err instanceof Error && err.message === "cliente_no_disponible") {
@@ -405,6 +415,12 @@ router.post("/:id/hitos/:hitoId/iniciar", requirePermission("expedientes", "writ
       `;
     });
     const updated = await prisma.expediente_hitos.findUnique({ where: { id: hitoId } });
+    // Notificar al rol aprobador si el hito requiere gate (4.D)
+    if (updated?.requiere_aprobacion && updated.rol_aprobador_id) {
+      void notificarHitoEsperaAprobacion(hitoId).catch((e) =>
+        console.error("[notif] iniciar->esperaAprobacion fallo:", e),
+      );
+    }
     res.json({ data: updated });
   } catch (err) {
     if (err instanceof Error) {
@@ -486,6 +502,21 @@ router.post("/:id/hitos/:hitoId/aprobar", requirePermission("expedientes", "apro
     });
 
     const updated = await prisma.expediente_hitos.findUnique({ where: { id: hitoId } });
+    // Notificar al ejecutivo del expediente (4.D)
+    void notificarResolucionHito(hitoId, true, null).catch((e) =>
+      console.error("[notif] aprobar->resolucion fallo:", e),
+    );
+    // Si el siguiente hito activado requiere aprobacion, notificar a su rol aprobador
+    const siguiente = await prisma.expediente_hitos.findFirst({
+      where: { expediente_id: id, estado: "en_curso", id: { not: hitoId } },
+      orderBy: { orden: "asc" },
+      select: { id: true, requiere_aprobacion: true, rol_aprobador_id: true },
+    });
+    if (siguiente?.requiere_aprobacion && siguiente.rol_aprobador_id) {
+      void notificarHitoEsperaAprobacion(Number(siguiente.id)).catch((e) =>
+        console.error("[notif] siguiente->esperaAprobacion fallo:", e),
+      );
+    }
     res.json({ data: updated });
   } catch (err) {
     if (err instanceof Error) {
@@ -548,6 +579,10 @@ router.post("/:id/hitos/:hitoId/rechazar", requirePermission("expedientes", "apr
       `;
     });
     const updated = await prisma.expediente_hitos.findUnique({ where: { id: hitoId } });
+    // Notificar al ejecutivo del expediente (4.D)
+    void notificarResolucionHito(hitoId, false, motivo).catch((e) =>
+      console.error("[notif] rechazar->resolucion fallo:", e),
+    );
     res.json({ data: updated });
   } catch (err) {
     if (err instanceof Error) {
