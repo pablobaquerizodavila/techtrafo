@@ -655,6 +655,73 @@ router.post("/:id/pasos/:pasoId/saltar", requirePermission("ot", "write"), async
 });
 
 // ===================================================================
+// GET /api/ot/:id/gantt  -  datos para Gantt visual (Dashboard E)
+// ===================================================================
+router.get("/:id/gantt", requirePermission("ot", "read"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  const ot = await prisma.ot.findUnique({
+    where: { id },
+    select: {
+      id: true, codigo: true, tipo_ruta: true,
+      fecha_inicio_planeada: true, fecha_fin_planeada: true,
+      fecha_inicio_real: true, fecha_fin_real: true,
+      ot_pasos: {
+        orderBy: { numero: "asc" },
+        select: {
+          id: true, numero: true, nombre: true, estado: true, es_gate: true,
+          fecha_inicio: true, fecha_fin: true,
+          areas: { select: { codigo: true, nombre: true, color_hex: true } },
+        },
+      },
+    },
+  });
+  if (!ot) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+
+  // Distribuir los pasos sobre el rango planeado de la OT
+  const inicio = ot.fecha_inicio_planeada ?? ot.fecha_inicio_real ?? new Date();
+  const fin = ot.fecha_fin_planeada ?? ot.fecha_fin_real ?? new Date(Date.now() + 30 * 86400_000);
+  const rangoMs = Math.max(1, new Date(fin).getTime() - new Date(inicio).getTime());
+  const total = ot.ot_pasos.length;
+  const duracionPaso = total > 0 ? rangoMs / total : rangoMs;
+
+  res.json({
+    data: {
+      ot: {
+        id: Number(ot.id), codigo: ot.codigo, tipo_ruta: ot.tipo_ruta,
+        inicio_planeado: ot.fecha_inicio_planeada,
+        fin_planeado: ot.fecha_fin_planeada,
+        inicio_real: ot.fecha_inicio_real,
+        fin_real: ot.fecha_fin_real,
+      },
+      rango: {
+        desde: new Date(inicio).toISOString(),
+        hasta: new Date(fin).toISOString(),
+      },
+      pasos: ot.ot_pasos.map((p, i) => {
+        const planStart = new Date(new Date(inicio).getTime() + duracionPaso * i);
+        const planEnd = new Date(new Date(inicio).getTime() + duracionPaso * (i + 1));
+        return {
+          id: Number(p.id),
+          numero: p.numero, nombre: p.nombre, estado: p.estado, es_gate: p.es_gate,
+          area: p.areas ? { codigo: p.areas.codigo, nombre: p.areas.nombre, color: p.areas.color_hex } : null,
+          plan_inicio: planStart.toISOString(),
+          plan_fin: planEnd.toISOString(),
+          real_inicio: p.fecha_inicio,
+          real_fin: p.fecha_fin,
+        };
+      }),
+    },
+  });
+});
+
+// ===================================================================
 // Dashboard mini de OT
 // ===================================================================
 router.get("/dashboard/resumen", requirePermission("ot", "read"), async (_req, res) => {

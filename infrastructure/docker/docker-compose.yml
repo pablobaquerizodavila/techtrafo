@@ -123,8 +123,10 @@ services:
       SMTP_FROM: ${SMTP_FROM}
       PANEL_URL: ${PANEL_URL:-https://panel.techtrafo.com}
       NOTIF_WORKER_INTERVAL_SECONDS: ${NOTIF_WORKER_INTERVAL_SECONDS:-300}
+      UPLOAD_DIR: ${UPLOAD_DIR:-/uploads}
     volumes:
       - ../../backend:/app
+      - ../../uploads:/uploads
       - /app/node_modules
     networks:
       - techtrafo_net

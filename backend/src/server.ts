@@ -21,6 +21,8 @@ import produccionRouter from "./routes/produccion";
 import transformadoresRouter from "./routes/transformadores";
 import areasRouter from "./routes/areas";
 import portalRouter from "./routes/portal";
+import evidenciasRouter from "./routes/evidencias";
+import auditoriaRouter from "./routes/auditoria";
 import { prisma } from "./db/client";
 import { startNotificacionesWorker, stopNotificacionesWorker } from "./workers/notificaciones-worker";
 
@@ -55,6 +57,8 @@ app.use("/api/produccion", produccionRouter);
 app.use("/api/transformadores", transformadoresRouter);
 app.use("/api/produccion", areasRouter); // /areas, /causas-demora, /tiempos, /reprocesos
 app.use("/api/portal", portalRouter);
+app.use("/api/ot", evidenciasRouter);     // /:id/evidencias[...]
+app.use("/api/auditoria", auditoriaRouter); // /ot/:id, /expediente/:id
 
 // 404 fallback
 app.use((_req, res) => {

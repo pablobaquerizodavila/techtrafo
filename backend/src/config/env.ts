@@ -26,6 +26,11 @@ const envSchema = z.object({
   PANEL_URL: z.string().url().default("https://panel.techtrafo.com"),
   // Cadencia del worker de notificaciones, en segundos
   NOTIF_WORKER_INTERVAL_SECONDS: z.coerce.number().int().positive().default(300),
+
+  // Storage local para evidencias (Dashboard E). El docker-compose monta
+  // ../../uploads en /uploads. Migrable a MinIO en el futuro.
+  UPLOAD_DIR: z.string().default("/uploads"),
+  UPLOAD_MAX_BYTES: z.coerce.number().int().positive().default(20 * 1024 * 1024), // 20 MB default
 });
 
 const parsed = envSchema.safeParse(process.env);

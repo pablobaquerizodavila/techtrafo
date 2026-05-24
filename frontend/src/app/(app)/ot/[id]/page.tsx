@@ -18,6 +18,9 @@ import {
 } from "@/lib/ot";
 import { ApiError } from "@/lib/api";
 import { TiemposReprocesosPanel } from "./tiempos-reprocesos-panel";
+import { GanttOT } from "./gantt";
+import { EvidenciasPanel } from "./evidencias-panel";
+import { AuditoriaPanel } from "./auditoria-panel";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -423,6 +426,15 @@ export default function OTDetallePage({ params }: PageProps) {
 
       {/* Panel de tiempos + reprocesos (migration 013) */}
       <TiemposReprocesosPanel otId={ot.id} pasos={pasos} />
+
+      {/* Gantt visual (Dashboard E) */}
+      <GanttOT otId={ot.id} />
+
+      {/* Evidencias (Dashboard E) */}
+      <EvidenciasPanel otId={ot.id} pasos={pasos} />
+
+      {/* Trazabilidad (Dashboard E) */}
+      <AuditoriaPanel otId={ot.id} />
 
       <Toaster richColors position="top-right" />
     </div>
