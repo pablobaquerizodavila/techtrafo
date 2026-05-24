@@ -157,6 +157,10 @@ export async function rechazarHito(expId: number, hitoId: number, motivo: string
   return api.post(`/api/expedientes/${expId}/hitos/${hitoId}/rechazar`, { motivo });
 }
 
+export async function updateHitoSla(expId: number, hitoId: number, sla_horas: number | null): Promise<{ data: { id: number; codigo: string; nombre: string; sla_horas: number | null; estado: string } }> {
+  return api.patch(`/api/expedientes/${expId}/hitos/${hitoId}`, { sla_horas });
+}
+
 // Helpers de UI
 export function estadoHitoVariant(estado: EstadoHito, estancado: boolean): "success" | "default" | "warning" | "destructive" | "muted" {
   if (estancado) return "destructive";

@@ -379,6 +379,52 @@ router.patch("/:id", requirePermission("expedientes", "write"), async (req, res)
 });
 
 // ===================================================================
+// PATCH /api/expedientes/:id/hitos/:hitoId
+// Edita el SLA del hito puntual sin tocar la plantilla maestra.
+// Util cuando un proyecto requiere urgencia (o relajamiento) particular.
+// ===================================================================
+const updateHitoSchema = z.object({
+  sla_horas: z.number().int().positive().max(8760).nullable(),
+});
+
+router.patch("/:id/hitos/:hitoId", requirePermission("expedientes", "write"), async (req, res) => {
+  const id = Number(req.params.id);
+  const hitoId = Number(req.params.hitoId);
+  if (!Number.isInteger(id) || !Number.isInteger(hitoId)) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  const parsed = updateHitoSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  const userId = req.user!.id;
+
+  const hito = await prisma.expediente_hitos.findUnique({ where: { id: hitoId } });
+  if (!hito || Number(hito.expediente_id) !== id) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+
+  await withAppUser(userId, async (tx) => {
+    await tx.$executeRaw`
+      UPDATE comercial.expediente_hitos
+         SET sla_horas = ${parsed.data.sla_horas},
+             actualizado_por = ${userId}::uuid,
+             updated_at = NOW()
+       WHERE id = ${hitoId}
+    `;
+  });
+
+  const updated = await prisma.expediente_hitos.findUnique({
+    where: { id: hitoId },
+    select: { id: true, codigo: true, nombre: true, sla_horas: true, estado: true },
+  });
+  res.json({ data: updated });
+});
+
+// ===================================================================
 // POST /api/expedientes/:id/hitos/:hitoId/iniciar
 // Cambia el hito a estado en_curso, asigna responsable opcional
 // ===================================================================

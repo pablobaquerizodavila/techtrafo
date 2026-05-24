@@ -15,9 +15,15 @@ import {
   User,
   Mail,
   Phone,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { Toaster, toast } from "sonner";
 import { PdfButton } from "../../pdf-button";
 import {
@@ -31,6 +37,7 @@ import {
   getExpediente,
   iniciarHito,
   rechazarHito,
+  updateHitoSla,
 } from "@/lib/expedientes";
 import { ApiError } from "@/lib/api";
 
@@ -45,6 +52,9 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<number | null>(null);
+  const [slaDialog, setSlaDialog] = useState<{ hito: ExpedienteHito } | null>(null);
+  const [slaInput, setSlaInput] = useState("");
+  const [savingSla, setSavingSla] = useState(false);
 
   useEffect(() => {
     params.then(({ id }) => setId(Number(id)));
@@ -109,6 +119,37 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
       toast.error(msg);
     } finally {
       setWorking(null);
+    }
+  }
+
+  function openSlaDialog(hito: ExpedienteHito) {
+    setSlaDialog({ hito });
+    setSlaInput(hito.sla_horas?.toString() ?? "");
+  }
+
+  async function handleSlaSubmit() {
+    if (!slaDialog || !expediente) return;
+    const h = slaDialog.hito;
+    const parsed = slaInput.trim() === "" ? null : Number(slaInput);
+    if (parsed !== null && (!Number.isFinite(parsed) || parsed <= 0 || parsed > 8760)) {
+      toast.error("SLA invalido: entero positivo (1-8760) o vacio");
+      return;
+    }
+    if (parsed === h.sla_horas) {
+      setSlaDialog(null);
+      return;
+    }
+    setSavingSla(true);
+    try {
+      await updateHitoSla(expediente.id, h.id, parsed);
+      toast.success(`SLA del hito "${h.nombre}" actualizado`);
+      setSlaDialog(null);
+      load();
+    } catch (err) {
+      const code = err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error";
+      toast.error(code);
+    } finally {
+      setSavingSla(false);
     }
   }
 
@@ -344,30 +385,31 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
                     )}
 
                     {/* Acciones */}
-                    {(puedeIniciar || puedeAprobar) && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {puedeIniciar && (
-                          <Button size="sm" variant="outline" onClick={() => handleIniciar(h)} disabled={isWorking}>
-                            <Play className="mr-1 h-3.5 w-3.5" /> Iniciar
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {puedeIniciar && (
+                        <Button size="sm" variant="outline" onClick={() => handleIniciar(h)} disabled={isWorking}>
+                          <Play className="mr-1 h-3.5 w-3.5" /> Iniciar
+                        </Button>
+                      )}
+                      {puedeAprobar && (
+                        <>
+                          <Button size="sm" onClick={() => handleAprobar(h)} disabled={isWorking}>
+                            <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Aprobar
                           </Button>
-                        )}
-                        {puedeAprobar && (
-                          <>
-                            <Button size="sm" onClick={() => handleAprobar(h)} disabled={isWorking}>
-                              <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Aprobar
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleRechazar(h)}
-                              disabled={isWorking}
-                            >
-                              <XCircle className="mr-1 h-3.5 w-3.5" /> Rechazar
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    )}
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleRechazar(h)}
+                            disabled={isWorking}
+                          >
+                            <XCircle className="mr-1 h-3.5 w-3.5" /> Rechazar
+                          </Button>
+                        </>
+                      )}
+                      <Button size="sm" variant="ghost" onClick={() => openSlaDialog(h)} title="Editar SLA solo para este expediente">
+                        <Clock className="mr-1 h-3.5 w-3.5" /> SLA
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -479,6 +521,36 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
           )}
         </section>
       </div>
+
+      <Dialog open={!!slaDialog} onOpenChange={(open) => { if (!open) { setSlaDialog(null); setSlaInput(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar SLA del hito</DialogTitle>
+            <DialogDescription>
+              {slaDialog && (
+                <>Cambia el SLA <strong>solo para este expediente</strong>. La plantilla del catalogo queda igual ({slaDialog.hito.nombre}).</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="sla_input">SLA en horas (vacio = sin SLA)</Label>
+            <Input
+              id="sla_input" type="number" min="1" max="8760"
+              value={slaInput}
+              onChange={(e) => setSlaInput(e.target.value)}
+              placeholder="Ej: 48"
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground">
+              Tiempo maximo antes de marcar el hito como estancado. Rango 1 - 8760 horas (1 ano).
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setSlaDialog(null); setSlaInput(""); }} disabled={savingSla}>Cancelar</Button>
+            <Button onClick={handleSlaSubmit} disabled={savingSla}>{savingSla ? "Guardando..." : "Guardar"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Toaster richColors position="top-right" />
     </div>

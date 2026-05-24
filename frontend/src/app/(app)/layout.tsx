@@ -118,9 +118,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                     </Link>
                   )}
                   {puedeAdminRoles && (
-                    <Link href="/admin/roles" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-                      Roles y permisos
-                    </Link>
+                    <>
+                      <Link href="/admin/roles" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
+                        Roles y permisos
+                      </Link>
+                      <Link href="/admin/hito-plantillas" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
+                        Hitos del catalogo
+                      </Link>
+                    </>
                   )}
                 </>
               )}

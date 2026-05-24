@@ -416,6 +416,87 @@ router.patch("/roles/:id", requireSuperAdmin, async (req, res) => {
   res.json({ data: rol });
 });
 
+// ===================================================================
+// HITO PLANTILLAS - catalogo maestro de hitos (SLA, aprobacion, etc.)
+// Solo super_admin edita. La lectura es publica para que cualquier user
+// con permiso expedientes pueda ver los SLA base.
+// ===================================================================
+
+const updatePlantillaSchema = z.object({
+  nombre: z.string().min(1).max(200).optional(),
+  descripcion: z.string().optional().nullable(),
+  sla_horas: z.number().int().positive().max(8760).optional().nullable(),
+  requiere_aprobacion: z.boolean().optional(),
+  rol_aprobador_id: z.number().int().positive().optional().nullable(),
+  visible_cliente: z.boolean().optional(),
+  activo: z.boolean().optional(),
+});
+
+router.get("/hito-plantillas", requireAuth, async (_req, res) => {
+  const data = await prisma.hito_plantillas.findMany({
+    orderBy: [{ tipo_servicio: "asc" }, { orden: "asc" }],
+    select: {
+      id: true, codigo: true, nombre: true, descripcion: true,
+      orden: true, tipo_servicio: true, visible_cliente: true,
+      requiere_aprobacion: true, rol_aprobador_id: true, sla_horas: true,
+      es_automatico: true, fuente_tabla: true, activo: true,
+      roles: { select: { id: true, nombre: true } },
+    },
+  });
+  res.json({ data });
+});
+
+router.patch("/hito-plantillas/:id", requireSuperAdmin, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  const parsed = updatePlantillaSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
+    return;
+  }
+
+  const existing = await prisma.hito_plantillas.findUnique({ where: { id } });
+  if (!existing) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+
+  // Validar rol si requiere_aprobacion + rol_aprobador_id juntos cambian
+  if (parsed.data.rol_aprobador_id) {
+    const rol = await prisma.roles.findUnique({ where: { id: parsed.data.rol_aprobador_id } });
+    if (!rol) {
+      res.status(400).json({ error: "rol_no_existe" });
+      return;
+    }
+  }
+
+  const updated = await prisma.hito_plantillas.update({
+    where: { id },
+    data: {
+      ...(parsed.data.nombre !== undefined && { nombre: parsed.data.nombre }),
+      ...(parsed.data.descripcion !== undefined && { descripcion: parsed.data.descripcion }),
+      ...(parsed.data.sla_horas !== undefined && { sla_horas: parsed.data.sla_horas }),
+      ...(parsed.data.requiere_aprobacion !== undefined && { requiere_aprobacion: parsed.data.requiere_aprobacion }),
+      ...(parsed.data.rol_aprobador_id !== undefined && { rol_aprobador_id: parsed.data.rol_aprobador_id }),
+      ...(parsed.data.visible_cliente !== undefined && { visible_cliente: parsed.data.visible_cliente }),
+      ...(parsed.data.activo !== undefined && { activo: parsed.data.activo }),
+      actualizado_por: req.user!.id,
+      updated_at: new Date(),
+    },
+    select: {
+      id: true, codigo: true, nombre: true, descripcion: true,
+      orden: true, tipo_servicio: true, visible_cliente: true,
+      requiere_aprobacion: true, rol_aprobador_id: true, sla_horas: true,
+      es_automatico: true, fuente_tabla: true, activo: true,
+      roles: { select: { id: true, nombre: true } },
+    },
+  });
+  res.json({ data: updated });
+});
+
 // Catalogo de permisos disponibles para usar en el editor de roles del frontend
 router.get("/permisos/catalogo", (_req, res) => {
   res.json({

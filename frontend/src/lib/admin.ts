@@ -78,6 +78,40 @@ export async function resetPasswordUsuarioAdmin(id: string, new_password: string
   return api.post(`/api/admin/usuarios/${id}/password`, { new_password });
 }
 
+// ---------- Hito plantillas (catalogo maestro) ----------
+export interface HitoPlantilla {
+  id: number;
+  codigo: string;
+  nombre: string;
+  descripcion: string | null;
+  orden: number;
+  tipo_servicio: string;
+  visible_cliente: boolean;
+  requiere_aprobacion: boolean;
+  rol_aprobador_id: number | null;
+  sla_horas: number | null;
+  es_automatico: boolean;
+  fuente_tabla: string | null;
+  activo: boolean;
+  roles?: { id: number; nombre: string } | null;
+}
+
+export async function listHitoPlantillas(): Promise<{ data: HitoPlantilla[] }> {
+  return api.get("/api/admin/hito-plantillas");
+}
+
+export async function updateHitoPlantilla(id: number, payload: {
+  nombre?: string;
+  descripcion?: string | null;
+  sla_horas?: number | null;
+  requiere_aprobacion?: boolean;
+  rol_aprobador_id?: number | null;
+  visible_cliente?: boolean;
+  activo?: boolean;
+}): Promise<{ data: HitoPlantilla }> {
+  return api.patch(`/api/admin/hito-plantillas/${id}`, payload);
+}
+
 // ---------- Roles ----------
 export async function listRolesAdmin(): Promise<{ data: RolAdmin[] }> {
   return api.get("/api/admin/roles");
