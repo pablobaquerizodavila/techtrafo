@@ -366,6 +366,8 @@ model usuarios {
   ot_evidencias                                                 ot_evidencias[]
   ot_pasos_ot_pasos_aprobado_porTousuarios                      ot_pasos[]              @relation("ot_pasos_aprobado_porTousuarios")
   ot_pasos_ot_pasos_ejecutado_porTousuarios                     ot_pasos[]              @relation("ot_pasos_ejecutado_porTousuarios")
+  reprocesos                                                    reprocesos[]
+  tiempos_trabajo                                               tiempos_trabajo[]
   transformadores_transformadores_actualizado_porTousuarios     transformadores[]       @relation("transformadores_actualizado_porTousuarios")
   transformadores_transformadores_creado_porTousuarios          transformadores[]       @relation("transformadores_creado_porTousuarios")
 
@@ -655,37 +657,39 @@ model reclamos {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model ot {
-  id                                    BigInt           @id @default(autoincrement())
-  codigo                                String?          @unique @db.VarChar(30)
+  id                                    BigInt            @id @default(autoincrement())
+  codigo                                String?           @unique @db.VarChar(30)
   contrato_id                           BigInt
-  tipo_ruta                             String           @db.VarChar(20)
-  prioridad                             String           @default("normal") @db.VarChar(20)
+  tipo_ruta                             String            @db.VarChar(20)
+  prioridad                             String            @default("normal") @db.VarChar(20)
   descripcion                           String?
-  fecha_inicio_planeada                 DateTime?        @db.Date
-  fecha_fin_planeada                    DateTime?        @db.Date
-  fecha_inicio_real                     DateTime?        @db.Timestamptz(6)
-  fecha_fin_real                        DateTime?        @db.Timestamptz(6)
+  fecha_inicio_planeada                 DateTime?         @db.Date
+  fecha_fin_planeada                    DateTime?         @db.Date
+  fecha_inicio_real                     DateTime?         @db.Timestamptz(6)
+  fecha_fin_real                        DateTime?         @db.Timestamptz(6)
   paso_actual                           Int?
-  responsable_id                        String?          @db.Uuid
-  estado                                String           @default("planeada") @db.VarChar(20)
+  responsable_id                        String?           @db.Uuid
+  estado                                String            @default("planeada") @db.VarChar(20)
   motivo_cancelacion                    String?
   observaciones                         String?
   notas_internas                        String?
-  creado_por                            String?          @db.Uuid
-  actualizado_por                       String?          @db.Uuid
-  created_at                            DateTime?        @default(now()) @db.Timestamptz(6)
-  updated_at                            DateTime?        @default(now()) @db.Timestamptz(6)
+  creado_por                            String?           @db.Uuid
+  actualizado_por                       String?           @db.Uuid
+  created_at                            DateTime?         @default(now()) @db.Timestamptz(6)
+  updated_at                            DateTime?         @default(now()) @db.Timestamptz(6)
   transformador_id                      BigInt?
   expedientes                           expedientes[]
   series                                series[]
   intervenciones                        intervenciones[]
-  usuarios_ot_actualizado_porTousuarios usuarios?        @relation("ot_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  contratos                             contratos        @relation(fields: [contrato_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  usuarios_ot_creado_porTousuarios      usuarios?        @relation("ot_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  usuarios_ot_responsable_idTousuarios  usuarios?        @relation("ot_responsable_idTousuarios", fields: [responsable_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  transformadores                       transformadores? @relation(fields: [transformador_id], references: [id], onUpdate: NoAction)
+  usuarios_ot_actualizado_porTousuarios usuarios?         @relation("ot_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  contratos                             contratos         @relation(fields: [contrato_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_ot_creado_porTousuarios      usuarios?         @relation("ot_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_ot_responsable_idTousuarios  usuarios?         @relation("ot_responsable_idTousuarios", fields: [responsable_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  transformadores                       transformadores?  @relation(fields: [transformador_id], references: [id], onUpdate: NoAction)
   ot_evidencias                         ot_evidencias[]
   ot_pasos                              ot_pasos[]
+  reprocesos                            reprocesos[]
+  tiempos_trabajo                       tiempos_trabajo[]
 
   @@index([codigo], map: "idx_ot_codigo")
   @@index([contrato_id], map: "idx_ot_contrato")
@@ -719,28 +723,34 @@ model ot_evidencias {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model ot_pasos {
-  id                                        BigInt          @id @default(autoincrement())
+  id                                        BigInt            @id @default(autoincrement())
   ot_id                                     BigInt
   numero                                    Int
-  nombre                                    String          @db.VarChar(200)
+  nombre                                    String            @db.VarChar(200)
   descripcion                               String?
-  es_gate                                   Boolean         @default(false)
+  es_gate                                   Boolean           @default(false)
   numero_gate                               Int?
-  estado                                    String          @default("pendiente") @db.VarChar(20)
-  resultado_gate                            String?         @db.VarChar(20)
+  estado                                    String            @default("pendiente") @db.VarChar(20)
+  resultado_gate                            String?           @db.VarChar(20)
   mediciones                                Json?
-  fecha_inicio                              DateTime?       @db.Timestamptz(6)
-  fecha_fin                                 DateTime?       @db.Timestamptz(6)
-  ejecutado_por                             String?         @db.Uuid
-  aprobado_por                              String?         @db.Uuid
+  fecha_inicio                              DateTime?         @db.Timestamptz(6)
+  fecha_fin                                 DateTime?         @db.Timestamptz(6)
+  ejecutado_por                             String?           @db.Uuid
+  aprobado_por                              String?           @db.Uuid
   observaciones                             String?
   notas_internas                            String?
-  created_at                                DateTime?       @default(now()) @db.Timestamptz(6)
-  updated_at                                DateTime?       @default(now()) @db.Timestamptz(6)
+  created_at                                DateTime?         @default(now()) @db.Timestamptz(6)
+  updated_at                                DateTime?         @default(now()) @db.Timestamptz(6)
+  area_id                                   BigInt?
+  causa_demora_id                           BigInt?
   ot_evidencias                             ot_evidencias[]
-  usuarios_ot_pasos_aprobado_porTousuarios  usuarios?       @relation("ot_pasos_aprobado_porTousuarios", fields: [aprobado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  usuarios_ot_pasos_ejecutado_porTousuarios usuarios?       @relation("ot_pasos_ejecutado_porTousuarios", fields: [ejecutado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  ot                                        ot              @relation(fields: [ot_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  usuarios_ot_pasos_aprobado_porTousuarios  usuarios?         @relation("ot_pasos_aprobado_porTousuarios", fields: [aprobado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  areas                                     areas?            @relation(fields: [area_id], references: [id], onUpdate: NoAction)
+  causas_demora                             causas_demora?    @relation(fields: [causa_demora_id], references: [id], onUpdate: NoAction)
+  usuarios_ot_pasos_ejecutado_porTousuarios usuarios?         @relation("ot_pasos_ejecutado_porTousuarios", fields: [ejecutado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ot                                        ot                @relation(fields: [ot_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  reprocesos                                reprocesos[]
+  tiempos_trabajo                           tiempos_trabajo[]
 
   @@unique([ot_id, numero])
   @@index([estado], map: "idx_ot_pasos_estado")
@@ -955,6 +965,8 @@ model paso_plantillas {
   activo      Boolean   @default(true)
   created_at  DateTime? @default(now()) @db.Timestamptz(6)
   updated_at  DateTime? @default(now()) @db.Timestamptz(6)
+  area_codigo String?   @db.VarChar(30)
+  areas       areas?    @relation(fields: [area_codigo], references: [codigo], onUpdate: NoAction)
 
   @@unique([tipo_ruta, numero])
   @@index([tipo_ruta, numero], map: "idx_paso_plantillas_tipo")
@@ -1004,5 +1016,84 @@ model transformadores {
   @@index([cliente_id], map: "idx_trf_cliente")
   @@index([estado], map: "idx_trf_estado")
   @@index([tipo], map: "idx_trf_tipo")
+  @@schema("produccion")
+}
+
+model areas {
+  id              BigInt            @id @default(autoincrement())
+  codigo          String            @unique @db.VarChar(30)
+  nombre          String            @db.VarChar(80)
+  descripcion     String?
+  color_hex       String?           @default("#64748b") @db.VarChar(7)
+  orden           Int               @default(0)
+  activo          Boolean           @default(true)
+  created_at      DateTime?         @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime?         @default(now()) @db.Timestamptz(6)
+  ot_pasos        ot_pasos[]
+  paso_plantillas paso_plantillas[]
+  tiempos_trabajo tiempos_trabajo[]
+
+  @@schema("produccion")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model causas_demora {
+  id         BigInt       @id @default(autoincrement())
+  codigo     String       @unique @db.VarChar(40)
+  nombre     String       @db.VarChar(120)
+  categoria  String       @default("operativa") @db.VarChar(30)
+  activo     Boolean      @default(true)
+  created_at DateTime?    @default(now()) @db.Timestamptz(6)
+  updated_at DateTime?    @default(now()) @db.Timestamptz(6)
+  ot_pasos   ot_pasos[]
+  reprocesos reprocesos[]
+
+  @@schema("produccion")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model reprocesos {
+  id               BigInt         @id @default(autoincrement())
+  ot_id            BigInt
+  paso_id          BigInt?
+  causa_demora_id  BigInt?
+  descripcion      String
+  dias_perdidos    Decimal        @default(0) @db.Decimal(6, 2)
+  costo_estimado   Decimal?       @db.Decimal(14, 2)
+  reportado_por    String?        @db.Uuid
+  resuelto         Boolean        @default(false)
+  fecha_resolucion DateTime?      @db.Timestamptz(6)
+  notas_resolucion String?
+  created_at       DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?      @default(now()) @db.Timestamptz(6)
+  causas_demora    causas_demora? @relation(fields: [causa_demora_id], references: [id], onUpdate: NoAction)
+  ot               ot             @relation(fields: [ot_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  ot_pasos         ot_pasos?      @relation(fields: [paso_id], references: [id], onUpdate: NoAction)
+  usuarios         usuarios?      @relation(fields: [reportado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([causa_demora_id], map: "idx_reprocesos_causa")
+  @@index([ot_id], map: "idx_reprocesos_ot")
+  @@index([resuelto, created_at(sort: Desc)], map: "idx_reprocesos_resuelto")
+  @@schema("produccion")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model tiempos_trabajo {
+  id          BigInt    @id @default(autoincrement())
+  ot_id       BigInt
+  paso_id     BigInt?
+  area_id     BigInt?
+  usuario_id  String    @db.Uuid
+  fecha       DateTime  @default(dbgenerated("CURRENT_DATE")) @db.Date
+  horas       Decimal   @db.Decimal(5, 2)
+  descripcion String?
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  areas       areas?    @relation(fields: [area_id], references: [id], onUpdate: NoAction)
+  ot          ot        @relation(fields: [ot_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  ot_pasos    ot_pasos? @relation(fields: [paso_id], references: [id], onUpdate: NoAction)
+  usuarios    usuarios  @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([ot_id], map: "idx_tiempos_ot")
+  @@index([usuario_id, fecha], map: "idx_tiempos_usuario")
   @@schema("produccion")
 }

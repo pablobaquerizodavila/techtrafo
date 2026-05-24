@@ -291,39 +291,72 @@ router.get("/dashboard", requirePermission("ot", "read"), async (_req, res) => {
   });
 
   // -------------------------------------------------------------------
-  // Datos DUMMY (pendientes de migrations futuras)
+  // Capacidad / causas / productividad — data REAL desde vistas (013)
   // -------------------------------------------------------------------
-  const dummy_capacidad_planta = {
-    dummy: true,
-    nota: "Pendiente: tablas produccion.areas + produccion.tiempos_trabajo (migration 013)",
-    por_area: [
-      { area: "Bobinado", carga_pct: 87, ot_activas: 4 },
-      { area: "Núcleo", carga_pct: 62, ot_activas: 2 },
-      { area: "Tanque", carga_pct: 45, ot_activas: 2 },
-      { area: "Pintura", carga_pct: 30, ot_activas: 1 },
-      { area: "Pruebas", carga_pct: 75, ot_activas: 3 },
-      { area: "Despacho", carga_pct: 20, ot_activas: 1 },
-    ],
+  const [cargaAreaRows, causasRows, productividadRows] = await Promise.all([
+    prisma.$queryRaw<Array<{
+      area_codigo: string; area_nombre: string; color_hex: string;
+      ot_activas: bigint; pasos_en_curso: bigint; pasos_pendientes: bigint; completados_mes: bigint;
+    }>>`SELECT area_codigo, area_nombre, color_hex, ot_activas, pasos_en_curso, pasos_pendientes, completados_mes
+        FROM produccion.v_carga_por_area`,
+    prisma.$queryRaw<Array<{
+      codigo: string; nombre: string; categoria: string;
+      incidencias_total: bigint; incidencias_abiertas: bigint;
+      dias_perdidos_total: number; costo_estimado_total: number;
+    }>>`SELECT codigo, nombre, categoria, incidencias_total, incidencias_abiertas,
+               dias_perdidos_total, costo_estimado_total
+        FROM produccion.v_causas_demora_agregado
+        WHERE incidencias_total > 0
+        ORDER BY incidencias_total DESC, dias_perdidos_total DESC
+        LIMIT 10`,
+    prisma.$queryRaw<Array<{
+      usuario_id: string; nombre: string; email: string;
+      ot_intervenidas_mes: bigint; horas_mes: number; pasos_completados_mes: bigint;
+    }>>`SELECT usuario_id::text, nombre, email, ot_intervenidas_mes, horas_mes, pasos_completados_mes
+        FROM produccion.v_productividad_responsable
+        LIMIT 10`,
+  ]);
+
+  // Estimar % de carga por area: regla simple — pasos_en_curso + pasos_pendientes / 5 capacidad nominal
+  const CAPACIDAD_NOMINAL_PASOS_POR_AREA = 5;
+  const capacidad_planta = {
+    dummy: false,
+    por_area: cargaAreaRows.map((r) => {
+      const carga = Number(r.pasos_en_curso) + Number(r.pasos_pendientes);
+      const carga_pct = Math.min(100, Math.round((carga / CAPACIDAD_NOMINAL_PASOS_POR_AREA) * 100));
+      return {
+        area: r.area_nombre,
+        codigo: r.area_codigo,
+        color_hex: r.color_hex,
+        carga_pct,
+        ot_activas: Number(r.ot_activas),
+        completados_mes: Number(r.completados_mes),
+      };
+    }),
   };
 
-  const dummy_causas_demora = {
-    dummy: true,
-    nota: "Pendiente: tabla produccion.causas_demora (migration 013)",
-    causas: [
-      { causa: "Falta de materiales", incidencias: 8, dias_perdidos: 24 },
-      { causa: "Falta de personal", incidencias: 5, dias_perdidos: 12 },
-      { causa: "Reproceso por QA", incidencias: 3, dias_perdidos: 9 },
-      { causa: "Fallas técnicas equipo", incidencias: 2, dias_perdidos: 5 },
-      { causa: "Espera aprobación cliente", incidencias: 4, dias_perdidos: 14 },
-    ],
+  const causas_demora = {
+    dummy: false,
+    causas: causasRows.map((c) => ({
+      codigo: c.codigo,
+      causa: c.nombre,
+      categoria: c.categoria,
+      incidencias: Number(c.incidencias_total),
+      abiertas: Number(c.incidencias_abiertas),
+      dias_perdidos: Number(c.dias_perdidos_total),
+    })),
   };
 
-  const dummy_productividad = {
-    dummy: true,
-    nota: "Pendiente: produccion.tiempos_trabajo (migration 013)",
-    por_responsable: [
-      { nombre: "Sin asignación tipificada", ot_completadas_mes: 0, eficiencia_pct: 0 },
-    ],
+  const productividad = {
+    dummy: false,
+    por_responsable: productividadRows.map((r) => ({
+      usuario_id: r.usuario_id,
+      nombre: r.nombre,
+      email: r.email,
+      ot_intervenidas_mes: Number(r.ot_intervenidas_mes),
+      horas_mes: Number(r.horas_mes),
+      pasos_completados_mes: Number(r.pasos_completados_mes),
+    })),
   };
 
   // -------------------------------------------------------------------
@@ -370,10 +403,10 @@ router.get("/dashboard", requirePermission("ot", "read"), async (_req, res) => {
           ? Math.ceil((o.fecha_fin_planeada.getTime() - Date.now()) / 86400000)
           : null,
       })),
-      // DUMMY explícito
-      dummy_capacidad_planta,
-      dummy_causas_demora,
-      dummy_productividad,
+      // Capacidad / causas / productividad (REAL desde migration 013)
+      capacidad_planta,
+      causas_demora,
+      productividad,
       // Meta
       generado_en: new Date().toISOString(),
     },

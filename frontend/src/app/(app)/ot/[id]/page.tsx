@@ -17,6 +17,7 @@ import {
   iniciarPaso, completarPaso, rechazarPaso, saltarPaso,
 } from "@/lib/ot";
 import { ApiError } from "@/lib/api";
+import { TiemposReprocesosPanel } from "./tiempos-reprocesos-panel";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -419,6 +420,9 @@ export default function OTDetallePage({ params }: PageProps) {
           })}
         </div>
       </section>
+
+      {/* Panel de tiempos + reprocesos (migration 013) */}
+      <TiemposReprocesosPanel otId={ot.id} pasos={pasos} />
 
       <Toaster richColors position="top-right" />
     </div>

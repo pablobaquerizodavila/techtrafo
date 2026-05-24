@@ -19,6 +19,7 @@ import notificacionesRouter from "./routes/notificaciones";
 import otRouter from "./routes/ot";
 import produccionRouter from "./routes/produccion";
 import transformadoresRouter from "./routes/transformadores";
+import areasRouter from "./routes/areas";
 import { prisma } from "./db/client";
 import { startNotificacionesWorker, stopNotificacionesWorker } from "./workers/notificaciones-worker";
 
@@ -51,6 +52,7 @@ app.use("/api/notificaciones", notificacionesRouter);
 app.use("/api/ot", otRouter);
 app.use("/api/produccion", produccionRouter);
 app.use("/api/transformadores", transformadoresRouter);
+app.use("/api/produccion", areasRouter); // /areas, /causas-demora, /tiempos, /reprocesos
 
 // 404 fallback
 app.use((_req, res) => {

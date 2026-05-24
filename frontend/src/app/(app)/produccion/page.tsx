@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Activity, AlertTriangle, AlertOctagon, BellRing, Bug,
+  Activity, AlertTriangle, AlertOctagon, BellRing,
   CheckCircle2, Clock, Eye, Factory, Flag, Gauge, LayoutDashboard,
   PieChart, RefreshCw, Truck, Users, Zap,
 } from "lucide-react";
@@ -270,8 +270,8 @@ export default function ProduccionDashboardPage() {
                   <TableCell className="font-mono text-sm">{m.codigo ?? "—"}</TableCell>
                   <TableCell className="text-sm">{m.cliente ?? "—"}</TableCell>
                   <TableCell className="text-sm capitalize">{m.tipo}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    <DummyChip text="—" />
+                  <TableCell className="text-sm font-mono">
+                    {m.capacidad_kva ? (m.capacidad_kva >= 1000 ? `${(m.capacidad_kva / 1000).toFixed(0)} MVA` : `${m.capacidad_kva} kVA`) : <span className="text-muted-foreground">—</span>}
                   </TableCell>
                   <TableCell className="text-xs">{m.fase_actual ?? "—"}</TableCell>
                   <TableCell>
@@ -359,29 +359,24 @@ export default function ProduccionDashboardPage() {
         </section>
       </div>
 
-      {/* Bloques DUMMY claramente etiquetados */}
-      <section className="rounded-md border border-dashed border-yellow-500/40 bg-yellow-500/5 p-4">
-        <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-yellow-800">
-          <Bug className="h-4 w-4" /> Bloques de ejemplo (data simulada) — pendiente migrations futuras
-        </h3>
-        <p className="mb-4 text-xs text-yellow-700">
-          Los componentes que siguen muestran valores ficticios para que veas la forma del dashboard.
-          Cuando se ejecuten las migrations 012 (transformadores) y 013 (áreas + causas + tiempos)
-          se reemplazan por data real. Cualquier bloque con esta marca está en este modo.
-        </p>
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* Capacidad de planta */}
-          <div className="rounded-md border bg-background p-3">
-            <h4 className="mb-2 flex items-center gap-2 text-xs font-semibold">
-              <Gauge className="h-3.5 w-3.5" /> Capacidad de planta por área
-              <DummyChip text="DUMMY" />
-            </h4>
+      {/* Capacidad / Causas / Productividad — data REAL desde migration 013 */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Capacidad de planta */}
+        <section className="rounded-md border p-4">
+          <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+            <Gauge className="h-4 w-4" /> Capacidad de planta por área
+          </h4>
+          {data.capacidad_planta.por_area.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Sin áreas registradas</p>
+          ) : (
             <ul className="space-y-2 text-xs">
-              {data.dummy_capacidad_planta.por_area.map((a) => (
-                <li key={a.area}>
+              {data.capacidad_planta.por_area.map((a) => (
+                <li key={a.codigo}>
                   <div className="mb-1 flex items-center justify-between">
-                    <span>{a.area}</span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block h-2 w-2 rounded-full" style={{ background: a.color_hex }} />
+                      {a.area}
+                    </span>
                     <span className="text-muted-foreground">{a.carga_pct}% · {a.ot_activas} OT</span>
                   </div>
                   <div className="h-1.5 overflow-hidden rounded bg-muted">
@@ -393,44 +388,58 @@ export default function ProduccionDashboardPage() {
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-[10px] text-muted-foreground italic">{data.dummy_capacidad_planta.nota}</p>
-          </div>
+          )}
+          <p className="mt-3 text-[10px] text-muted-foreground italic">
+            % calculado sobre capacidad nominal de 5 pasos simultáneos por área
+          </p>
+        </section>
 
-          {/* Causas de demora */}
-          <div className="rounded-md border bg-background p-3">
-            <h4 className="mb-2 flex items-center gap-2 text-xs font-semibold">
-              <PieChart className="h-3.5 w-3.5" /> Causas de demora
-              <DummyChip text="DUMMY" />
-            </h4>
+        {/* Causas de demora */}
+        <section className="rounded-md border p-4">
+          <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+            <PieChart className="h-4 w-4" /> Causas de demora
+          </h4>
+          {data.causas_demora.causas.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Aún no se reportaron reprocesos</p>
+          ) : (
             <ul className="space-y-1.5 text-xs">
-              {data.dummy_causas_demora.causas.map((c) => (
-                <li key={c.causa} className="flex items-center justify-between">
-                  <span>{c.causa}</span>
-                  <span className="text-muted-foreground">{c.incidencias}× · {c.dias_perdidos}d</span>
+              {data.causas_demora.causas.map((c) => (
+                <li key={c.codigo} className="flex items-center justify-between gap-2">
+                  <span className="flex-1 line-clamp-1">{c.causa}</span>
+                  <span className="text-right text-muted-foreground">
+                    <strong>{c.incidencias}×</strong> · {c.dias_perdidos}d
+                    {c.abiertas > 0 && <span className="ml-1 text-destructive">({c.abiertas} abiertas)</span>}
+                  </span>
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-[10px] text-muted-foreground italic">{data.dummy_causas_demora.nota}</p>
-          </div>
+          )}
+        </section>
 
-          {/* Productividad por responsable */}
-          <div className="rounded-md border bg-background p-3">
-            <h4 className="mb-2 flex items-center gap-2 text-xs font-semibold">
-              <Clock className="h-3.5 w-3.5" /> Productividad por responsable
-              <DummyChip text="DUMMY" />
-            </h4>
-            <ul className="space-y-1.5 text-xs">
-              {data.dummy_productividad.por_responsable.map((r) => (
-                <li key={r.nombre} className="flex items-center justify-between">
-                  <span className="line-clamp-1">{r.nombre}</span>
-                  <span className="text-muted-foreground">{r.ot_completadas_mes} OT · {r.eficiencia_pct}%</span>
+        {/* Productividad por responsable */}
+        <section className="rounded-md border p-4">
+          <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+            <Clock className="h-4 w-4" /> Productividad por responsable (30 días)
+          </h4>
+          {data.productividad.por_responsable.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Aún no se registran tiempos</p>
+          ) : (
+            <ul className="space-y-2 text-xs">
+              {data.productividad.por_responsable.map((r) => (
+                <li key={r.usuario_id}>
+                  <div className="mb-0.5 flex items-center justify-between">
+                    <span className="font-medium line-clamp-1">{r.nombre}</span>
+                    <span className="text-muted-foreground">{r.horas_mes.toFixed(1)}h</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    {r.ot_intervenidas_mes} OT · {r.pasos_completados_mes} pasos completados
+                  </p>
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-[10px] text-muted-foreground italic">{data.dummy_productividad.nota}</p>
-          </div>
-        </div>
-      </section>
+          )}
+        </section>
+      </div>
 
       <Toaster richColors position="top-right" />
     </div>
@@ -459,10 +468,3 @@ function Kpi({ icon, label, value, tone = "default" }: {
   );
 }
 
-function DummyChip({ text }: { text: string }) {
-  return (
-    <span className="ml-1 inline-flex items-center rounded bg-yellow-500/20 px-1.5 py-0 text-[9px] font-bold uppercase text-yellow-800">
-      {text}
-    </span>
-  );
-}
