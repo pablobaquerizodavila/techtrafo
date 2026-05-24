@@ -900,6 +900,7 @@ model informes_tecnicos {
   actualizado_por                                      String?           @db.Uuid
   created_at                                           DateTime?         @default(now()) @db.Timestamptz(6)
   updated_at                                           DateTime?         @default(now()) @db.Timestamptz(6)
+  datos_inspeccion                                     Json?
   usuarios_informes_tecnicos_actualizado_porTousuarios usuarios?         @relation("informes_tecnicos_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
   usuarios_informes_tecnicos_aprobado_porTousuarios    usuarios?         @relation("informes_tecnicos_aprobado_porTousuarios", fields: [aprobado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
   usuarios_informes_tecnicos_creado_porTousuarios      usuarios?         @relation("informes_tecnicos_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -930,6 +931,7 @@ model visitas_tecnicas {
   actualizado_por                                     String?             @db.Uuid
   created_at                                          DateTime?           @default(now()) @db.Timestamptz(6)
   updated_at                                          DateTime?           @default(now()) @db.Timestamptz(6)
+  datos_inspeccion                                    Json?
   informes_tecnicos                                   informes_tecnicos[]
   usuarios_visitas_tecnicas_actualizado_porTousuarios usuarios?           @relation("visitas_tecnicas_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
   usuarios_visitas_tecnicas_creado_porTousuarios      usuarios?           @relation("visitas_tecnicas_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)

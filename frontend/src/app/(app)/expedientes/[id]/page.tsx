@@ -22,6 +22,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Cronometro, TiempoTotal } from "@/components/cronometro";
+import { VisitaTecnicaForm } from "@/components/visita-tecnica-form";
+import { InformeTecnicoDialog } from "@/components/informe-tecnico-dialog";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -56,6 +58,8 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
   const [slaDialog, setSlaDialog] = useState<{ hito: ExpedienteHito } | null>(null);
   const [slaInput, setSlaInput] = useState("");
   const [savingSla, setSavingSla] = useState(false);
+  const [visitaFormOpen, setVisitaFormOpen] = useState(false);
+  const [informeDialogId, setInformeDialogId] = useState<number | null>(null);
 
   useEffect(() => {
     params.then(({ id }) => setId(Number(id)));
@@ -434,7 +438,10 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
               <ClipboardCheck className="mr-1 inline h-5 w-5" />
               Visitas tecnicas
             </h3>
-            <span className="text-xs text-muted-foreground">{visitas.length} registrada(s)</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">{visitas.length} registrada(s)</span>
+              <Button size="sm" onClick={() => setVisitaFormOpen(true)}>+ Nueva visita</Button>
+            </div>
           </div>
           {visitas.length === 0 ? (
             <p className="rounded-md border bg-muted/20 p-4 text-sm text-muted-foreground">
@@ -495,7 +502,7 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
           ) : (
             <ul className="space-y-2">
               {informes.map((i) => (
-                <li key={i.id} className="rounded-md border p-3 text-sm">
+                <li key={i.id} className="cursor-pointer rounded-md border p-3 text-sm transition hover:border-primary hover:bg-accent/30" onClick={() => setInformeDialogId(i.id)}>
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-mono font-medium">{i.numero}</p>
                     <div className="flex items-center gap-2">
@@ -512,7 +519,7 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
                       >
                         {i.estado}
                       </Badge>
-                      <PdfButton recurso="informe-tecnico" id={i.id} />
+                      <span className="text-xs text-muted-foreground">click para ver</span>
                     </div>
                   </div>
                   {i.decision_tecnica && (
@@ -559,6 +566,24 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <VisitaTecnicaForm
+        open={visitaFormOpen}
+        onClose={() => setVisitaFormOpen(false)}
+        onSaved={({ informeCreadoId }) => {
+          if (informeCreadoId) {
+            setInformeDialogId(informeCreadoId);
+          }
+          load();
+        }}
+        expedienteId={expediente.id}
+      />
+
+      <InformeTecnicoDialog
+        open={informeDialogId !== null}
+        onClose={() => setInformeDialogId(null)}
+        informeId={informeDialogId}
+      />
 
       <Toaster richColors position="top-right" />
     </div>

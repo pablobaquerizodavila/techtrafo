@@ -315,8 +315,29 @@ export interface DataInformeTecnico {
   diagnostico_completo: string | null;
   justificacion: string | null;
   fecha_aprobacion: Date | string | null;
+  datos_inspeccion?: Record<string, unknown> | null;
   expedientes: { codigo: string; clientes?: { razon_social: string } | null };
   visitas_tecnicas?: { fecha_realizada: Date | string | null; ubicacion_tipo: string; hallazgos: string | null } | null;
+}
+
+// Map de labels para los campos estandarizados del form de inspeccion.
+// Cualquier clave no listada se ignora (forward compat con campos viejos).
+const INSPECCION_FIELDS: Array<{ key: string; label: string; unit?: string }> = [
+  { key: "estado_general",            label: "Estado general" },
+  { key: "estado_aceite",             label: "Estado del aceite" },
+  { key: "color_aceite",              label: "Color del aceite" },
+  { key: "ruidos_anomalos",           label: "Ruidos anómalos" },
+  { key: "temperatura_externa_c",     label: "Temperatura externa", unit: "°C" },
+  { key: "resistencia_aislamiento_mohm", label: "Resistencia aislamiento", unit: "MΩ" },
+  { key: "voltaje_primario_v",        label: "Voltaje primario", unit: "V" },
+  { key: "voltaje_secundario_v",      label: "Voltaje secundario", unit: "V" },
+];
+
+function fmtCampo(v: unknown, unit?: string): string {
+  if (v === null || v === undefined || v === "") return "—";
+  if (typeof v === "boolean") return v ? "Sí" : "No";
+  const s = typeof v === "string" ? v.replace(/_/g, " ") : String(v);
+  return unit ? `${s} ${unit}` : s;
 }
 
 export function renderInformeTecnico(doc: Doc, inf: DataInformeTecnico, nivel: Nivel): void {
@@ -339,6 +360,22 @@ export function renderInformeTecnico(doc: Doc, inf: DataInformeTecnico, nivel: N
     if (inf.visitas_tecnicas.hallazgos) {
       subtitulo(doc, "Hallazgos en sitio");
       parrafo(doc, inf.visitas_tecnicas.hallazgos);
+      doc.moveDown(0.3);
+    }
+  }
+
+  // Datos estandarizados del formulario de inspeccion (JSONB).
+  if (inf.datos_inspeccion && Object.keys(inf.datos_inspeccion).length > 0) {
+    titulo(doc, "Datos de inspección");
+    const filas = INSPECCION_FIELDS
+      .map((f) => ({ label: f.label, valor: fmtCampo(inf.datos_inspeccion![f.key], f.unit) }))
+      .filter((f) => f.valor !== "—");
+    if (filas.length > 0) bloqueDatos(doc, filas, 2);
+
+    const hallazgosArr = inf.datos_inspeccion.hallazgos;
+    if (Array.isArray(hallazgosArr) && hallazgosArr.length > 0) {
+      subtitulo(doc, "Hallazgos detectados");
+      parrafo(doc, hallazgosArr.map((h) => `• ${String(h).replace(/_/g, " ")}`).join("\n"));
       doc.moveDown(0.3);
     }
   }

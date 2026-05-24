@@ -4,12 +4,17 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { withAppUser } from "../db/withAppUser";
 import { requireAuth, requirePermission } from "../auth/middleware";
+import { crearDocumento, resolverNivel } from "../services/pdf/base";
+import { DataInformeTecnico, renderInformeTecnico } from "../services/pdf/documentos";
+import { sendEmail } from "../services/email";
 
 const router = Router();
 router.use(requireAuth);
 
 const decisionTecnicaEnum = z.enum(["reparar", "reconstruir", "mantenimiento", "no_viable"]);
 const estadoInformeEnum = z.enum(["borrador", "en_revision", "aprobado", "rechazado"]);
+
+const datosInspeccionSchema = z.record(z.unknown()).nullable().optional();
 
 const createSchema = z.object({
   expediente_id: z.number().int().positive(),
@@ -18,6 +23,7 @@ const createSchema = z.object({
   diagnostico_completo: z.string().optional().nullable(),
   decision_tecnica: decisionTecnicaEnum.optional().nullable(),
   justificacion: z.string().optional().nullable(),
+  datos_inspeccion: datosInspeccionSchema,
 });
 
 const updateSchema = z.object({
@@ -26,6 +32,15 @@ const updateSchema = z.object({
   justificacion: z.string().optional().nullable(),
   archivo_pdf_url: z.string().optional().nullable(),
   estado: estadoInformeEnum.optional(),
+  datos_inspeccion: datosInspeccionSchema,
+});
+
+const enviarEmailSchema = z.object({
+  to: z.string().email().max(255),
+  cc: z.string().email().max(255).optional().nullable(),
+  asunto: z.string().max(200).optional(),
+  mensaje: z.string().max(5000).optional(),
+  nivel: z.number().int().min(1).max(4).optional(),
 });
 
 async function generarNumeroInforme(tx: Prisma.TransactionClient, year: number): Promise<string> {
@@ -94,6 +109,7 @@ router.post("/", requirePermission("expedientes", "write"), async (req, res) => 
         diagnostico_completo: d.diagnostico_completo ?? null,
         decision_tecnica: d.decision_tecnica ?? null,
         justificacion: d.justificacion ?? null,
+        datos_inspeccion: (d.datos_inspeccion as Prisma.InputJsonValue | undefined) ?? undefined,
         estado: "borrador",
         creado_por: userId,
         actualizado_por: userId,
@@ -134,6 +150,10 @@ router.patch("/:id", requirePermission("expedientes", "write"), async (req, res)
       if (d.archivo_pdf_url !== undefined) {
         await tx.$executeRaw`UPDATE comercial.informes_tecnicos SET archivo_pdf_url = ${d.archivo_pdf_url} WHERE id = ${id}`;
       }
+      if (d.datos_inspeccion !== undefined) {
+        const jsonStr = d.datos_inspeccion ? JSON.stringify(d.datos_inspeccion) : null;
+        await tx.$executeRaw`UPDATE comercial.informes_tecnicos SET datos_inspeccion = ${jsonStr}::jsonb WHERE id = ${id}`;
+      }
       if (d.estado !== undefined) {
         await tx.$executeRaw`UPDATE comercial.informes_tecnicos SET estado = ${d.estado} WHERE id = ${id}`;
         if (d.estado === "aprobado") {
@@ -154,6 +174,94 @@ router.patch("/:id", requirePermission("expedientes", "write"), async (req, res)
       return;
     }
     throw err;
+  }
+});
+
+// -------------------------------------------------------------------
+// POST /api/informes-tecnicos/:id/enviar-email
+// Genera el PDF en memoria y lo envia adjunto al destinatario indicado.
+// -------------------------------------------------------------------
+async function generarPdfBuffer(
+  inf: DataInformeTecnico & { created_at?: Date | null },
+  nivel: 1 | 2 | 3 | 4,
+): Promise<Buffer> {
+  const doc = crearDocumento({
+    documento: "INFORME TÉCNICO",
+    codigo: inf.numero,
+    fecha: inf.created_at ?? new Date(),
+    nivel,
+  });
+
+  const chunks: Buffer[] = [];
+  const finished: Promise<Buffer> = new Promise((resolve, reject) => {
+    doc.on("data", (c: Buffer) => chunks.push(c));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+  });
+
+  renderInformeTecnico(doc, inf, nivel);
+  doc.end();
+  return finished;
+}
+
+router.post("/:id/enviar-email", requirePermission("expedientes", "write"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  const parsed = enviarEmailSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  const { to, cc, asunto, mensaje, nivel: nivelPedido } = parsed.data;
+
+  const inf = await prisma.informes_tecnicos.findUnique({
+    where: { id },
+    include: {
+      expedientes: { include: { clientes: { select: { razon_social: true } } } },
+      visitas_tecnicas: true,
+    },
+  });
+  if (!inf) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+
+  const { nivel } = resolverNivel(nivelPedido, req.user!.rol_nombre, req.user!.es_super_admin);
+  const buffer = await generarPdfBuffer(
+    inf as unknown as DataInformeTecnico & { created_at?: Date | null },
+    nivel,
+  );
+
+  const cliente = inf.expedientes.clientes?.razon_social ?? "—";
+  const subject = asunto?.trim() || `[TECHTRAFO] Informe técnico ${inf.numero}`;
+  const cuerpoTexto = (mensaje?.trim() || `Adjuntamos el informe técnico ${inf.numero} para el expediente ${inf.expedientes.codigo} (${cliente}).\n\nSaludos cordiales,\nEquipo técnico TECHTRAFO`);
+  const cuerpoHtml = `<p>${cuerpoTexto.replace(/\n/g, "<br>")}</p>`;
+
+  try {
+    const result = await sendEmail({
+      to,
+      cc: cc ?? undefined,
+      subject,
+      text: cuerpoTexto,
+      html: cuerpoHtml,
+      attachments: [{
+        filename: `${inf.numero}.pdf`,
+        content: buffer,
+        contentType: "application/pdf",
+      }],
+    });
+    res.json({
+      status: result.dryRun ? "dry_run" : "enviado",
+      message_id: result.messageId ?? null,
+      destinatario: to,
+      adjunto_kb: Math.round(buffer.length / 1024),
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: "smtp_error", message: msg.slice(0, 500) });
   }
 });
 

@@ -10,11 +10,19 @@
 import nodemailer, { Transporter } from "nodemailer";
 import { env } from "../config/env";
 
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+}
+
 export interface SendEmailInput {
   to: string;
+  cc?: string;
   subject: string;
   html?: string;
   text?: string;
+  attachments?: EmailAttachment[];
 }
 
 let cached: Transporter | null = null;
@@ -56,9 +64,11 @@ export async function sendEmail(input: SendEmailInput): Promise<{ dryRun: boolea
   const info = await tx.sendMail({
     from: env.SMTP_FROM,
     to: input.to,
+    cc: input.cc,
     subject: input.subject,
     text: input.text,
     html: input.html,
+    attachments: input.attachments,
   });
   return { dryRun: false, messageId: info.messageId };
 }
