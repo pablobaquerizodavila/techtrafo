@@ -152,4 +152,81 @@ router.get("/me", requireAuth, (req, res) => {
   res.json({ user: req.user });
 });
 
+// -------------------------------------------------------------------
+// PATCH /api/auth/me  -  usuario edita SU propio perfil (sin email, rol, activo)
+// -------------------------------------------------------------------
+const updateProfileSchema = z.object({
+  nombres: z.string().min(1).max(100).optional(),
+  apellidos: z.string().min(1).max(100).optional(),
+  telefono: z.string().max(20).optional().nullable(),
+});
+
+router.patch("/me", requireAuth, async (req, res) => {
+  const parsed = updateProfileSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  const d = parsed.data;
+  const userId = req.user!.id;
+
+  if (d.nombres !== undefined) {
+    await prisma.$executeRaw`UPDATE core.usuarios SET nombres = ${d.nombres} WHERE id = ${userId}::uuid`;
+  }
+  if (d.apellidos !== undefined) {
+    await prisma.$executeRaw`UPDATE core.usuarios SET apellidos = ${d.apellidos} WHERE id = ${userId}::uuid`;
+  }
+  if (d.telefono !== undefined) {
+    await prisma.$executeRaw`UPDATE core.usuarios SET telefono = ${d.telefono} WHERE id = ${userId}::uuid`;
+  }
+  await prisma.$executeRaw`UPDATE core.usuarios SET updated_at = NOW() WHERE id = ${userId}::uuid`;
+
+  const updated = await prisma.usuarios.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, nombres: true, apellidos: true, telefono: true },
+  });
+  res.json({ data: updated });
+});
+
+// -------------------------------------------------------------------
+// POST /api/auth/change-password  -  usuario cambia SU propio password
+// -------------------------------------------------------------------
+const changePasswordSchema = z.object({
+  current_password: z.string().min(1),
+  new_password: z.string().min(8, "Minimo 8 caracteres").max(128),
+});
+
+router.post("/change-password", requireAuth, async (req, res) => {
+  const parsed = changePasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  const userId = req.user!.id;
+  const me = await prisma.usuarios.findUnique({
+    where: { id: userId },
+    select: { password_hash: true },
+  });
+  if (!me) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+  const ok = await verifyPassword(parsed.data.current_password, me.password_hash);
+  if (!ok) {
+    res.status(401).json({ error: "current_password_invalida" });
+    return;
+  }
+  if (parsed.data.current_password === parsed.data.new_password) {
+    res.status(400).json({ error: "password_igual_a_la_actual" });
+    return;
+  }
+  const password_hash = await hashPassword(parsed.data.new_password);
+  await prisma.$executeRaw`
+    UPDATE core.usuarios
+       SET password_hash = ${password_hash}, updated_at = NOW()
+     WHERE id = ${userId}::uuid
+  `;
+  res.json({ status: "password_actualizada" });
+});
+
 export default router;

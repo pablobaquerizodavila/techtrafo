@@ -134,6 +134,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <div className="font-medium truncate">{user.nombres} {user.apellidos}</div>
               <div className="text-muted-foreground">{user.rol_nombre ?? "sin rol"}</div>
             </div>
+            <Link href="/perfil" className="mb-1 block rounded px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground">
+              Mi perfil
+            </Link>
             <LogoutButton />
           </div>
         ) : (

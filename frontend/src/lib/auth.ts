@@ -45,6 +45,22 @@ export async function register(payload: RegisterPayload): Promise<{ status: stri
   return api.post("/api/auth/register", payload);
 }
 
+export interface UpdateProfilePayload {
+  nombres?: string;
+  apellidos?: string;
+  telefono?: string | null;
+}
+
+export async function updateMyProfile(payload: UpdateProfilePayload): Promise<{ data: {
+  id: string; email: string; nombres: string; apellidos: string; telefono: string | null;
+} }> {
+  return api.patch("/api/auth/me", payload);
+}
+
+export async function changeMyPassword(current_password: string, new_password: string): Promise<{ status: string }> {
+  return api.post("/api/auth/change-password", { current_password, new_password });
+}
+
 /**
  * Verifica si el usuario tiene un permiso especifico.
  * Acepta los 3 formatos: granular (modulo.accion), por area (modulo), comodin (all).

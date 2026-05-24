@@ -67,10 +67,15 @@ export async function rechazarUsuario(id: string, motivo: string): Promise<{ sta
 }
 
 export async function updateUsuarioAdmin(id: string, payload: {
+  email?: string;
   nombres?: string; apellidos?: string; telefono?: string | null;
   rol_id?: number | null; activo?: boolean;
 }): Promise<{ data: UsuarioAdmin }> {
   return api.patch(`/api/admin/usuarios/${id}`, payload);
+}
+
+export async function resetPasswordUsuarioAdmin(id: string, new_password: string): Promise<{ status: string }> {
+  return api.post(`/api/admin/usuarios/${id}/password`, { new_password });
 }
 
 // ---------- Roles ----------

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { requireAuth, requirePermission, requireSuperAdmin } from "../auth/middleware";
+import { hashPassword } from "../auth/password";
 
 const router = Router();
 
@@ -31,12 +32,17 @@ const rechazarSchema = z.object({
 });
 
 const updateUsuarioSchema = z.object({
+  email: z.string().email().max(255).optional(),
   nombres: z.string().min(1).max(100).optional(),
   apellidos: z.string().min(1).max(100).optional(),
   telefono: z.string().max(20).optional().nullable(),
   rol_id: z.number().int().positive().optional().nullable(),
   cliente_id: z.number().int().positive().optional().nullable(),
   activo: z.boolean().optional(),
+});
+
+const resetPasswordSchema = z.object({
+  new_password: z.string().min(8, "Minimo 8 caracteres").max(128),
 });
 
 const updateRolPermisosSchema = z.object({
@@ -234,7 +240,19 @@ router.patch("/usuarios/:id", requirePermission("admin", "usuarios"), async (req
     }
   }
 
+  // Email es unique: validar conflicto ANTES de tocar la fila
+  if (d.email !== undefined && d.email !== target.email) {
+    const conflict = await prisma.usuarios.findUnique({ where: { email: d.email }, select: { id: true } });
+    if (conflict && conflict.id !== id) {
+      res.status(409).json({ error: "email_en_uso" });
+      return;
+    }
+  }
+
   // Aplicar cambios via SQL directo (campos UUID en aprobado_por evitan Prisma update typed)
+  if (d.email !== undefined) {
+    await prisma.$executeRaw`UPDATE core.usuarios SET email = ${d.email} WHERE id = ${id}::uuid`;
+  }
   if (d.nombres !== undefined) {
     await prisma.$executeRaw`UPDATE core.usuarios SET nombres = ${d.nombres} WHERE id = ${id}::uuid`;
   }
@@ -265,6 +283,39 @@ router.patch("/usuarios/:id", requirePermission("admin", "usuarios"), async (req
     },
   });
   res.json({ data: updated });
+});
+
+// Reset password administrativo. Misma proteccion que PATCH: solo super_admin
+// puede resetear el password de otro super_admin. No notifica al usuario:
+// el admin comunica el password nuevo fuera de banda.
+router.post("/usuarios/:id/password", requirePermission("admin", "usuarios"), async (req, res) => {
+  const id = req.params.id;
+  const parsed = resetPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
+    return;
+  }
+
+  const target = await prisma.usuarios.findUnique({
+    where: { id },
+    include: { roles: { select: { es_super_admin: true } } },
+  });
+  if (!target) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+  if (target.roles?.es_super_admin && !req.user!.es_super_admin) {
+    res.status(403).json({ error: "super_admin_required_to_reset_super_admin" });
+    return;
+  }
+
+  const password_hash = await hashPassword(parsed.data.new_password);
+  await prisma.$executeRaw`
+    UPDATE core.usuarios
+       SET password_hash = ${password_hash}, updated_at = NOW()
+     WHERE id = ${id}::uuid
+  `;
+  res.json({ status: "password_reset" });
 });
 
 // ===================================================================
