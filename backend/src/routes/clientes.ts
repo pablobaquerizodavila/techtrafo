@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db/client";
 import { withAppUser } from "../db/withAppUser";
-import { requireAuth } from "../auth/middleware";
+import { requireAuth, requirePermission } from "../auth/middleware";
 
 const router = Router();
 
@@ -56,7 +56,7 @@ const ORDER_FIELDS = new Set(["created_at", "razon_social", "id"]);
 // -------------------------------------------------------------------
 // GET /api/clientes  -  lista paginada
 // -------------------------------------------------------------------
-router.get("/", async (req, res) => {
+router.get("/", requirePermission("clientes", "read"), async (req, res) => {
   const parsed = listQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid_query", details: parsed.error.flatten().fieldErrors });
@@ -110,7 +110,7 @@ router.get("/", async (req, res) => {
 // -------------------------------------------------------------------
 // GET /api/clientes/:id  -  detalle con contactos
 // -------------------------------------------------------------------
-router.get("/:id", async (req, res) => {
+router.get("/:id", requirePermission("clientes", "read"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     res.status(400).json({ error: "invalid_id" });
@@ -138,7 +138,7 @@ router.get("/:id", async (req, res) => {
 // -------------------------------------------------------------------
 // POST /api/clientes  -  crear
 // -------------------------------------------------------------------
-router.post("/", async (req, res) => {
+router.post("/", requirePermission("clientes", "write"), async (req, res) => {
   const parsed = clienteCreateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
@@ -169,7 +169,7 @@ router.post("/", async (req, res) => {
 // -------------------------------------------------------------------
 // PATCH /api/clientes/:id  -  actualizar parcial
 // -------------------------------------------------------------------
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", requirePermission("clientes", "write"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     res.status(400).json({ error: "invalid_id" });
@@ -210,7 +210,7 @@ router.patch("/:id", async (req, res) => {
 // -------------------------------------------------------------------
 // DELETE /api/clientes/:id  -  soft delete (estado='archivado')
 // -------------------------------------------------------------------
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requirePermission("clientes", "delete"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     res.status(400).json({ error: "invalid_id" });

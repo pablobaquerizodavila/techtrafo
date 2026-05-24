@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { withAppUser } from "../db/withAppUser";
-import { requireAuth } from "../auth/middleware";
+import { requireAuth, requirePermission } from "../auth/middleware";
 
 const router = Router();
 router.use(requireAuth);
@@ -166,7 +166,7 @@ async function snapshotearRevision(
 // -------------------------------------------------------------------
 // GET /api/cotizaciones  -  lista paginada
 // -------------------------------------------------------------------
-router.get("/", async (req, res) => {
+router.get("/", requirePermission("cotizaciones", "read"), async (req, res) => {
   const parsed = listQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid_query", details: parsed.error.flatten().fieldErrors });
@@ -208,7 +208,7 @@ router.get("/", async (req, res) => {
 // -------------------------------------------------------------------
 // GET /api/cotizaciones/:id  -  detalle con lineas y revisiones
 // -------------------------------------------------------------------
-router.get("/:id", async (req, res) => {
+router.get("/:id", requirePermission("cotizaciones", "read"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     res.status(400).json({ error: "invalid_id" });
@@ -236,7 +236,7 @@ router.get("/:id", async (req, res) => {
 // -------------------------------------------------------------------
 // POST /api/cotizaciones  -  crear (cabecera + lineas en transaccion)
 // -------------------------------------------------------------------
-router.post("/", async (req, res) => {
+router.post("/", requirePermission("cotizaciones", "write"), async (req, res) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
@@ -320,7 +320,7 @@ router.post("/", async (req, res) => {
 // -------------------------------------------------------------------
 // PATCH /api/cotizaciones/:id  -  editar (snapshot automatico si ya enviada)
 // -------------------------------------------------------------------
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", requirePermission("cotizaciones", "write"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     res.status(400).json({ error: "invalid_id" });
@@ -459,7 +459,7 @@ router.patch("/:id", async (req, res) => {
 // -------------------------------------------------------------------
 // POST /api/cotizaciones/:id/transicion  -  cambiar estado
 // -------------------------------------------------------------------
-router.post("/:id/transicion", async (req, res) => {
+router.post("/:id/transicion", requirePermission("cotizaciones", "aprobar"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     res.status(400).json({ error: "invalid_id" });
@@ -543,7 +543,7 @@ router.post("/:id/transicion", async (req, res) => {
 // -------------------------------------------------------------------
 // DELETE /api/cotizaciones/:id  -  soft delete (cancelar)
 // -------------------------------------------------------------------
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requirePermission("cotizaciones", "delete"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     res.status(400).json({ error: "invalid_id" });

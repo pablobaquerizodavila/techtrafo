@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { withAppUser } from "../db/withAppUser";
-import { requireAuth } from "../auth/middleware";
+import { requireAuth, requirePermission } from "../auth/middleware";
 
 const router = Router();
 router.use(requireAuth);
@@ -30,7 +30,7 @@ const categoriaUpdateSchema = categoriaCreateSchema.partial().extend({
   estado: estadoCatBasicoEnum.optional(),
 });
 
-router.get("/categorias", async (req, res) => {
+router.get("/categorias", requirePermission("inventario", "read"), async (req, res) => {
   const incluirInactivos = req.query.include_inactivos === "true";
   const data = await prisma.categorias_item.findMany({
     where: incluirInactivos ? {} : { estado: "activo" },
@@ -39,7 +39,7 @@ router.get("/categorias", async (req, res) => {
   res.json({ data });
 });
 
-router.post("/categorias", async (req, res) => {
+router.post("/categorias", requirePermission("inventario", "write"), async (req, res) => {
   const parsed = categoriaCreateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
@@ -62,7 +62,7 @@ router.post("/categorias", async (req, res) => {
   }
 });
 
-router.patch("/categorias/:id", async (req, res) => {
+router.patch("/categorias/:id", requirePermission("inventario", "write"), async (req, res) => {
   const id = parseId(req.params.id);
   if (id === null) {
     res.status(400).json({ error: "invalid_id" });
@@ -91,7 +91,7 @@ router.patch("/categorias/:id", async (req, res) => {
   }
 });
 
-router.delete("/categorias/:id", async (req, res) => {
+router.delete("/categorias/:id", requirePermission("inventario", "delete"), async (req, res) => {
   const id = parseId(req.params.id);
   if (id === null) {
     res.status(400).json({ error: "invalid_id" });
@@ -136,7 +136,7 @@ const ubicacionUpdateSchema = ubicacionCreateSchema.partial().extend({
   estado: estadoCatBasicoEnum.optional(),
 });
 
-router.get("/ubicaciones", async (req, res) => {
+router.get("/ubicaciones", requirePermission("inventario", "read"), async (req, res) => {
   const incluirInactivos = req.query.include_inactivos === "true";
   const data = await prisma.ubicaciones.findMany({
     where: incluirInactivos ? {} : { estado: "activo" },
@@ -145,7 +145,7 @@ router.get("/ubicaciones", async (req, res) => {
   res.json({ data });
 });
 
-router.post("/ubicaciones", async (req, res) => {
+router.post("/ubicaciones", requirePermission("inventario", "write"), async (req, res) => {
   const parsed = ubicacionCreateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
@@ -168,7 +168,7 @@ router.post("/ubicaciones", async (req, res) => {
   }
 });
 
-router.patch("/ubicaciones/:id", async (req, res) => {
+router.patch("/ubicaciones/:id", requirePermission("inventario", "write"), async (req, res) => {
   const id = parseId(req.params.id);
   if (id === null) {
     res.status(400).json({ error: "invalid_id" });
@@ -201,7 +201,7 @@ router.patch("/ubicaciones/:id", async (req, res) => {
   }
 });
 
-router.delete("/ubicaciones/:id", async (req, res) => {
+router.delete("/ubicaciones/:id", requirePermission("inventario", "delete"), async (req, res) => {
   const id = parseId(req.params.id);
   if (id === null) {
     res.status(400).json({ error: "invalid_id" });
@@ -300,7 +300,7 @@ const itemListQuerySchema = z.object({
   estado: estadoItemEnum.optional(),
 });
 
-router.get("/items", async (req, res) => {
+router.get("/items", requirePermission("inventario", "read"), async (req, res) => {
   const parsed = itemListQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid_query", details: parsed.error.flatten().fieldErrors });
@@ -338,7 +338,7 @@ router.get("/items", async (req, res) => {
   res.json({ data, pagination: { page, limit, total, total_pages: Math.ceil(total / limit) } });
 });
 
-router.get("/items/:id", async (req, res) => {
+router.get("/items/:id", requirePermission("inventario", "read"), async (req, res) => {
   const id = parseId(req.params.id);
   if (id === null) {
     res.status(400).json({ error: "invalid_id" });
@@ -368,7 +368,7 @@ router.get("/items/:id", async (req, res) => {
   res.json({ data: { ...item, stock_total } });
 });
 
-router.post("/items", async (req, res) => {
+router.post("/items", requirePermission("inventario", "write"), async (req, res) => {
   const parsed = itemCreateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
@@ -392,7 +392,7 @@ router.post("/items", async (req, res) => {
   }
 });
 
-router.patch("/items/:id", async (req, res) => {
+router.patch("/items/:id", requirePermission("inventario", "write"), async (req, res) => {
   const id = parseId(req.params.id);
   if (id === null) {
     res.status(400).json({ error: "invalid_id" });
@@ -426,7 +426,7 @@ router.patch("/items/:id", async (req, res) => {
   }
 });
 
-router.delete("/items/:id", async (req, res) => {
+router.delete("/items/:id", requirePermission("inventario", "delete"), async (req, res) => {
   const id = parseId(req.params.id);
   if (id === null) {
     res.status(400).json({ error: "invalid_id" });
@@ -472,7 +472,7 @@ const stockListQuerySchema = z.object({
   con_cantidad: z.enum(["true", "false"]).optional(),
 });
 
-router.get("/stock", async (req, res) => {
+router.get("/stock", requirePermission("inventario", "read"), async (req, res) => {
   const parsed = stockListQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid_query", details: parsed.error.flatten().fieldErrors });
@@ -505,7 +505,7 @@ router.get("/stock", async (req, res) => {
   res.json({ data });
 });
 
-router.get("/stock/alertas", async (_req, res) => {
+router.get("/stock/alertas", requirePermission("inventario", "read"), async (_req, res) => {
   // 1. Items con stock total < punto_reorden (que controlen stock)
   const alertasReorden = await prisma.$queryRaw<
     Array<{ item_id: bigint; codigo_interno: string; nombre: string; unidad_medida: string; punto_reorden: string; stock_actual: string }>
@@ -612,7 +612,7 @@ const movListQuerySchema = z.object({
   hasta: z.string().optional(),
 });
 
-router.get("/movimientos", async (req, res) => {
+router.get("/movimientos", requirePermission("inventario", "read"), async (req, res) => {
   const parsed = movListQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid_query", details: parsed.error.flatten().fieldErrors });
@@ -650,7 +650,7 @@ router.get("/movimientos", async (req, res) => {
   res.json({ data, pagination: { page, limit, total, total_pages: Math.ceil(total / limit) } });
 });
 
-router.post("/movimientos", async (req, res) => {
+router.post("/movimientos", requirePermission("movimientos", "crear"), async (req, res) => {
   const parsed = movCreateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
@@ -748,7 +748,7 @@ const loteCreateSchema = z.object({
   observaciones: z.string().optional().nullable(),
 });
 
-router.get("/lotes", async (req, res) => {
+router.get("/lotes", requirePermission("inventario", "read"), async (req, res) => {
   const item_id = req.query.item_id ? Number(req.query.item_id) : undefined;
   const data = await prisma.lotes.findMany({
     where: item_id ? { item_id } : {},
@@ -759,7 +759,7 @@ router.get("/lotes", async (req, res) => {
   res.json({ data });
 });
 
-router.post("/lotes", async (req, res) => {
+router.post("/lotes", requirePermission("inventario", "write"), async (req, res) => {
   const parsed = loteCreateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });

@@ -72,9 +72,17 @@ app.use((_req, res) => {
 
 // Error handler
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error(err);
-  res.status(500).json({ error: "internal_error", message: err.message });
+app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  // ID corto para correlacionar con logs server-side sin filtrar detalles al cliente.
+  const errorId = Math.random().toString(36).slice(2, 10);
+  console.error(`[${errorId}] ${req.method} ${req.path}:`, err);
+  // En produccion NO devolver err.message (puede contener detalles de schema,
+  // queries Prisma, valores de columnas, etc.). Solo el ID para soporte.
+  if (env.NODE_ENV === "production") {
+    res.status(500).json({ error: "internal_error", error_id: errorId });
+  } else {
+    res.status(500).json({ error: "internal_error", error_id: errorId, message: err.message });
+  }
 });
 
 const server = app.listen(env.PORT, () => {

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { withAppUser } from "../db/withAppUser";
-import { requireAuth } from "../auth/middleware";
+import { requireAuth, requirePermission } from "../auth/middleware";
 
 const router = Router();
 router.use(requireAuth);
@@ -94,7 +94,7 @@ async function generarCodigoContrato(tx: Prisma.TransactionClient, year: number)
 // ===================================================================
 // GET /api/contratos
 // ===================================================================
-router.get("/", async (req, res) => {
+router.get("/", requirePermission("contratos", "read"), async (req, res) => {
   const parsed = listQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid_query", details: parsed.error.flatten().fieldErrors });
@@ -136,7 +136,7 @@ router.get("/", async (req, res) => {
 // ===================================================================
 // GET /api/contratos/:id  -  detalle con plan de pagos
 // ===================================================================
-router.get("/:id", async (req, res) => {
+router.get("/:id", requirePermission("contratos", "read"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     res.status(400).json({ error: "invalid_id" });
@@ -172,7 +172,7 @@ router.get("/:id", async (req, res) => {
 // ===================================================================
 // POST /api/contratos  -  crear desde cotizacion aprobada
 // ===================================================================
-router.post("/", async (req, res) => {
+router.post("/", requirePermission("contratos", "write"), async (req, res) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
@@ -275,7 +275,7 @@ router.post("/", async (req, res) => {
 // ===================================================================
 // PATCH /api/contratos/:id  -  editar cabecera (no pagos)
 // ===================================================================
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", requirePermission("contratos", "write"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     res.status(400).json({ error: "invalid_id" });
@@ -355,7 +355,7 @@ router.patch("/:id", async (req, res) => {
 // ===================================================================
 // POST /api/contratos/:id/transicion
 // ===================================================================
-router.post("/:id/transicion", async (req, res) => {
+router.post("/:id/transicion", requirePermission("contratos", "write"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     res.status(400).json({ error: "invalid_id" });
@@ -427,7 +427,7 @@ router.post("/:id/transicion", async (req, res) => {
 // ===================================================================
 // DELETE /api/contratos/:id  -  cancelar (si no tiene pagos cobrados)
 // ===================================================================
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requirePermission("contratos", "delete"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     res.status(400).json({ error: "invalid_id" });
@@ -475,7 +475,7 @@ router.delete("/:id", async (req, res) => {
 // ===================================================================
 // POST /api/contratos/:id/pagos  -  agregar pago al plan
 // ===================================================================
-router.post("/:id/pagos", async (req, res) => {
+router.post("/:id/pagos", requirePermission("contratos", "cobrar"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     res.status(400).json({ error: "invalid_id" });
@@ -533,7 +533,7 @@ router.post("/:id/pagos", async (req, res) => {
 // ===================================================================
 // PATCH /api/contratos/:id/pagos/:pagoId  -  registrar cobro o editar
 // ===================================================================
-router.patch("/:id/pagos/:pagoId", async (req, res) => {
+router.patch("/:id/pagos/:pagoId", requirePermission("contratos", "cobrar"), async (req, res) => {
   const id = Number(req.params.id);
   const pagoId = Number(req.params.pagoId);
   if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(pagoId) || pagoId <= 0) {
@@ -612,7 +612,7 @@ router.patch("/:id/pagos/:pagoId", async (req, res) => {
 // ===================================================================
 // DELETE /api/contratos/:id/pagos/:pagoId  -  eliminar pago (si pendiente)
 // ===================================================================
-router.delete("/:id/pagos/:pagoId", async (req, res) => {
+router.delete("/:id/pagos/:pagoId", requirePermission("contratos", "cobrar"), async (req, res) => {
   const id = Number(req.params.id);
   const pagoId = Number(req.params.pagoId);
   if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(pagoId) || pagoId <= 0) {

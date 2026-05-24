@@ -214,7 +214,7 @@ router.patch("/usuarios/:id", requirePermission("admin", "usuarios"), async (req
 
   const target = await prisma.usuarios.findUnique({
     where: { id },
-    include: { roles: { select: { es_super_admin: true } } },
+    include: { roles: { select: { es_super_admin: true, permisos: true } } },
   });
   if (!target) {
     res.status(404).json({ error: "not_found" });
@@ -227,16 +227,50 @@ router.patch("/usuarios/:id", requirePermission("admin", "usuarios"), async (req
     return;
   }
 
-  // Solo super_admin puede asignar rol super_admin
+  // C2 — Self-escalation guard: nadie puede tocarse su propio rol_id o activo
+  // ni siquiera super_admin (evita lock-out accidental dejandose sin permisos).
+  // Para hacerlo, usar otra cuenta super_admin o el comando admin CLI futuro.
+  if (id === req.user!.id) {
+    if (d.rol_id !== undefined) {
+      res.status(403).json({ error: "self_rol_change_prohibited" });
+      return;
+    }
+    if (d.activo !== undefined) {
+      res.status(403).json({ error: "self_activo_change_prohibited" });
+      return;
+    }
+  }
+
+  // Validar nuevo rol y prevenir escalada lateral hacia roles mas permisivos
   if (d.rol_id !== undefined && d.rol_id !== null) {
     const nuevoRol = await prisma.roles.findUnique({ where: { id: d.rol_id } });
     if (!nuevoRol) {
       res.status(400).json({ error: "rol_no_existe" });
       return;
     }
+    // Solo super_admin puede asignar rol super_admin
     if (nuevoRol.es_super_admin && !req.user!.es_super_admin) {
       res.status(403).json({ error: "super_admin_required" });
       return;
+    }
+    // C2 — Escalada lateral: actor no super NO puede asignar un rol con permisos
+    // que el actor mismo no tenga. Compara JSONB de permisos del rol del actor
+    // con el del rol que esta tratando de asignar.
+    if (!req.user!.es_super_admin) {
+      const myPerms = (req.user!.permisos ?? {}) as Record<string, boolean>;
+      const targetPerms = (nuevoRol.permisos ?? {}) as Record<string, boolean>;
+      const allComodin = myPerms.all === true;
+      if (!allComodin) {
+        // Cada permiso del nuevo rol debe estar tambien en el del actor (granular o modulo)
+        for (const [perm, v] of Object.entries(targetPerms)) {
+          if (!v) continue;
+          const modulo = perm.split(".")[0];
+          if (myPerms[perm] === true) continue;
+          if (myPerms[modulo] === true) continue;
+          res.status(403).json({ error: "rol_con_permisos_que_actor_no_tiene", permiso_faltante: perm });
+          return;
+        }
+      }
     }
   }
 
@@ -298,7 +332,7 @@ router.post("/usuarios/:id/password", requirePermission("admin", "usuarios"), as
 
   const target = await prisma.usuarios.findUnique({
     where: { id },
-    include: { roles: { select: { es_super_admin: true } } },
+    include: { roles: { select: { es_super_admin: true, permisos: true } } },
   });
   if (!target) {
     res.status(404).json({ error: "not_found" });
@@ -307,6 +341,19 @@ router.post("/usuarios/:id/password", requirePermission("admin", "usuarios"), as
   if (target.roles?.es_super_admin && !req.user!.es_super_admin) {
     res.status(403).json({ error: "super_admin_required_to_reset_super_admin" });
     return;
+  }
+
+  // C2/H3 — Si el target tiene permisos amplios (admin.* o all) y el actor
+  // no es super_admin, exigir super_admin. Evita que un admin con admin.usuarios
+  // tome cuenta de otro admin con mas privilegios.
+  if (!req.user!.es_super_admin) {
+    const targetPerms = (target.roles?.permisos as Record<string, boolean> | undefined) ?? {};
+    const peligrosos = ["all", "admin", "admin.usuarios", "admin.roles"];
+    const tienePermisoSensible = peligrosos.some((k) => targetPerms[k] === true);
+    if (tienePermisoSensible) {
+      res.status(403).json({ error: "super_admin_required_para_resetear_admin" });
+      return;
+    }
   }
 
   const password_hash = await hashPassword(parsed.data.new_password);

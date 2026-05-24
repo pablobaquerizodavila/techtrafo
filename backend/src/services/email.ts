@@ -39,15 +39,24 @@ function getTransporter(): Transporter | null {
     return null;
   }
   if (cached) return cached;
+  // TLS: solo aceptar cert autofirmado contra hosts LAN (Synology MailPlus).
+  // Contra cualquier host externo (gmail/sendgrid/ses), exigir cert valido
+  // para evitar MITM por config heredada.
+  const isLanHost = /^192\.168\.\d+\.\d+$/.test(env.SMTP_HOST) ||
+                    /^10\.\d+\.\d+\.\d+$/.test(env.SMTP_HOST) ||
+                    /^172\.(1[6-9]|2[0-9]|3[01])\.\d+\.\d+$/.test(env.SMTP_HOST);
+
   cached = nodemailer.createTransport({
     host: env.SMTP_HOST,
     port: env.SMTP_PORT,
     secure: env.SMTP_SECURE,
     auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
-    // Synology MailPlus suele usar cert autofirmado en LAN; en produccion
-    // contra un host con cert valido esto no hace daño.
-    tls: { rejectUnauthorized: false },
+    tls: { rejectUnauthorized: !isLanHost },
   });
+
+  if (isLanHost) {
+    console.warn(`[email] SMTP host ${env.SMTP_HOST} es LAN — cert verification deshabilitada (autofirmado de Synology).`);
+  }
   return cached;
 }
 
