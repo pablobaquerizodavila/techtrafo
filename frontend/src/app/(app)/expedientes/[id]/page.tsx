@@ -46,10 +46,12 @@ import {
   getExpediente,
   iniciarHito,
   reabrirHitoAnterior,
+  reactivarExpediente,
   rechazarHito,
   reintentarHito,
   updateHitoSla,
 } from "@/lib/expedientes";
+import { AuthUser, getCurrentUser, hasPermission } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { RolAdmin, listRolesAdmin } from "@/lib/admin";
 
@@ -77,6 +79,12 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
   >({ kind: "closed" });
   const [savingRechazoAccion, setSavingRechazoAccion] = useState(false);
   const [rolesGerencia, setRolesGerencia] = useState<RolAdmin[]>([]);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [reactivando, setReactivando] = useState(false);
+
+  useEffect(() => {
+    getCurrentUser().then(setCurrentUser).catch(() => setCurrentUser(null));
+  }, []);
 
   useEffect(() => {
     listRolesAdmin()
@@ -249,6 +257,22 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
     }
   }
 
+  async function handleReactivarExpediente() {
+    if (!expediente) return;
+    if (!window.confirm(`Reactivar el expediente ${expediente.codigo}? Vuelve a estado activo y se borra el motivo de cierre.`)) return;
+    setReactivando(true);
+    try {
+      await reactivarExpediente(expediente.id);
+      toast.success(`Expediente ${expediente.codigo} reactivado`);
+      load();
+    } catch (err) {
+      const code = err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error";
+      toast.error(code);
+    } finally {
+      setReactivando(false);
+    }
+  }
+
   async function handleCancelarExpedienteSubmit() {
     if (!expediente || rechazoDialog.kind !== "cancelar") return;
     if (!rechazoDialog.motivo.trim()) {
@@ -339,6 +363,13 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
             <Badge variant={estadoExpedienteVariant(expediente.estado)} className="text-base">
               {expediente.estado.toUpperCase()}
             </Badge>
+            {["cancelado", "ganado", "perdido"].includes(expediente.estado)
+              && hasPermission(currentUser, "expedientes", "reactivar") && (
+              <Button size="sm" variant="outline" onClick={handleReactivarExpediente} disabled={reactivando}>
+                <RotateCcw className="mr-1 h-3.5 w-3.5" />
+                {reactivando ? "Reactivando..." : "Reactivar"}
+              </Button>
+            )}
           </div>
         </div>
       </header>

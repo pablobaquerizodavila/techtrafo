@@ -874,6 +874,49 @@ router.post("/:id/cancelar", requirePermission("expedientes", "write"), async (r
 });
 
 // ===================================================================
+// POST /api/expedientes/:id/reactivar
+// Reactiva un expediente que estaba en estado terminal
+// (cancelado / ganado / perdido) volviendolo a 'activo'.
+// Permiso: expedientes.reactivar (asignado a presidencia, gerencia_general,
+// gerencia_comercial). Limpia motivo_cierre y fecha_cierre.
+// ===================================================================
+router.post("/:id/reactivar", requirePermission("expedientes", "reactivar"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  const userId = req.user!.id;
+  try {
+    await withAppUser(userId, async (tx) => {
+      const exp = await tx.expedientes.findUnique({ where: { id } });
+      if (!exp) throw new Error("not_found");
+      const terminales = ["cancelado", "ganado", "perdido"];
+      if (!terminales.includes(exp.estado)) {
+        throw new Error("no_terminal");
+      }
+
+      await tx.$executeRaw`
+        UPDATE comercial.expedientes
+           SET estado = 'activo',
+               motivo_cierre = NULL,
+               fecha_cierre = NULL,
+               actualizado_por = ${userId}::uuid,
+               updated_at = NOW()
+         WHERE id = ${id}
+      `;
+    });
+    res.json({ status: "reactivado", expediente_id: id });
+  } catch (err) {
+    if (err instanceof Error) {
+      if (err.message === "not_found") { res.status(404).json({ error: "not_found" }); return; }
+      if (err.message === "no_terminal") { res.status(409).json({ error: "expediente_no_esta_en_estado_terminal" }); return; }
+    }
+    throw err;
+  }
+});
+
+// ===================================================================
 // GET /api/expedientes/dashboard/resumen
 // KPIs para el tablero principal
 // ===================================================================

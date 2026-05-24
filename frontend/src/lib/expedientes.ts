@@ -178,6 +178,10 @@ export async function cancelarExpediente(expId: number, motivo: string): Promise
   return api.post(`/api/expedientes/${expId}/cancelar`, { motivo });
 }
 
+export async function reactivarExpediente(expId: number): Promise<{ status: string; expediente_id: number }> {
+  return api.post(`/api/expedientes/${expId}/reactivar`);
+}
+
 // Helpers de UI
 export function estadoHitoVariant(estado: EstadoHito, estancado: boolean): "success" | "default" | "warning" | "destructive" | "muted" {
   if (estancado) return "destructive";

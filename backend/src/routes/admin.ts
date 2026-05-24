@@ -565,7 +565,7 @@ router.get("/permisos/catalogo", (_req, res) => {
       { modulo: "contratos", acciones: ["read", "write", "delete", "cobrar"] },
       { modulo: "inventario", acciones: ["read", "write", "delete"] },
       { modulo: "movimientos", acciones: ["crear"] },
-      { modulo: "expedientes", acciones: ["read", "write", "aprobar"] },
+      { modulo: "expedientes", acciones: ["read", "write", "aprobar", "reactivar"] },
       { modulo: "ot", acciones: ["read", "write", "aprobar"] },
       { modulo: "admin", acciones: ["usuarios", "roles"] },
     ],
