@@ -1,0 +1,17 @@
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB TECHTRAFO
+    uid: influx-techtrafo
+    type: influxdb
+    access: proxy
+    url: http://techtrafo-influxdb:8086
+    jsonData:
+      version: Flux
+      organization: ${INFLUX_ORG}
+      defaultBucket: ${INFLUX_BUCKET}
+      tlsSkipVerify: true
+    secureJsonData:
+      token: ${INFLUX_ADMIN_TOKEN}
+    isDefault: false
+    editable: false

@@ -1,0 +1,10 @@
+{
+  "name": "techtrafo-simulador-scada",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Genera telemetria simulada de un transformador demo y la publica via MQTT.",
+  "main": "simulador.js",
+  "dependencies": {
+    "mqtt": "^5.3.5"
+  }
+}

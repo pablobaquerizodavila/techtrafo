@@ -1,14 +1,14 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-23 · v0.7.0 · FASE 6 cerrada**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-23 · v0.8.0 · FASE 7 cerrada**.
 
 ---
 
 ## 1. Estado del proyecto en 30 segundos
 
 - **Empresa**: TECHTRAFO — fabricación, reparación y mantenimiento de transformadores eléctricos (150 kVA → 10 MVA), Samborondón, Ecuador.
-- **Versión actual**: `v0.7.0` (FASE 6 completa). FASE 4 plus, FASE 5 (portal cliente) y FASE 6 (Grafana provisioned con 3 dashboards) cerradas.
-- **Próximo trabajo**: backlog en sección 8 (SCADA InfluxDB, hardening nginx, garantía 4to dashboard).
+- **Versión actual**: `v0.8.0` (FASE 7 completa). FASE 4 plus, FASE 5, FASE 6 (4 dashboards business), hardening nginx, y FASE 7 (SCADA híbrida con simulador) cerradas.
+- **Próximo trabajo**: cuando llegue hardware real → reemplazar simulador por gateway IoT. Ver ADR-004.
 - **Repo**: https://github.com/pablobaquerizodavila/techtrafo (branch `main`)
 
 ## 2. Topología real (no la del CLAUDE.md genérico)
@@ -30,12 +30,15 @@ NAS Synology DS1821+ 192.168.0.116 (DSM 7.3.2)
       (NO tiene techtrafo.com configurado — usamos notificaciones@medicvip.org para email)
 
 PC Ubuntu 192.168.0.23 (Docker Compose stack)
-  ├─ techtrafo-api       Express+TS+Prisma  :3000  (worker notificaciones in-process)
-  ├─ techtrafo-web       Next.js 15 App Router :3002
-  ├─ techtrafo-postgres  PostgreSQL 16.14 :5432 (datos de negocio)
-  ├─ techtrafo-redis     :6379
-  ├─ techtrafo-grafana   :3001 (provisionado, sin dashboards)
-  └─ techtrafo-nginx     proxy local + health
+  ├─ techtrafo-api        Express+TS+Prisma  :3000  (workers: notificaciones + scada-bridge in-process)
+  ├─ techtrafo-web        Next.js 15 App Router :3002
+  ├─ techtrafo-postgres   PostgreSQL 16.14 :5432 (datos de negocio)
+  ├─ techtrafo-redis      :6379
+  ├─ techtrafo-grafana    :3001 (5 dashboards provisioned, datasources Postgres + Influx)
+  ├─ techtrafo-influxdb   :8086 (telemetria SCADA, retention 30d)
+  ├─ techtrafo-mosquitto  :1883 interno (MQTT broker, sin port host)
+  ├─ techtrafo-simulador  perfil "simulador" — publica lecturas demo (apagar cuando haya hardware)
+  └─ techtrafo-nginx      proxy local + health
 ```
 
 Volúmenes Docker importantes:
@@ -181,10 +184,23 @@ techtrafo/
 - Para editar un dashboard: la UI permite editar y "guardar como JSON". Bajar el JSON actualizado a `infrastructure/docker/grafana/dashboards/` y subir via pscp.
 - `updateIntervalSeconds: 30` en providers.yaml → cambios al JSON se reflejan automático sin restart.
 
+### FASE 6 plus — Dashboard Garantías — CERRADA (2026-05-23)
+- `garantias-posventa`: KPIs vigentes/por vencer/reclamos + tabla próximas a vencer.
+
+### Hardening nginx — CERRADO (2026-05-23)
+- Snippet `infrastructure/nginx/block-credential-scans.conf` incluido en panel/api/portal vhosts.
+- 0 scans llegan al backend.
+
+### FASE 7 — SCADA híbrida con simulador — CERRADA (2026-05-23)
+- ADR-004: Opción C híbrida con simulador puente.
+- InfluxDB 2.7 + Mosquitto MQTT 2 corriendo en compose. Datasource Influx provisioned en Grafana.
+- Bridge MQTT→Influx embebido en API (`backend/src/workers/scada-bridge.ts`). Toggle: `SCADA_BRIDGE_ENABLED`.
+- Simulador en container aparte (perfil `simulador`) publica 8 variables c/10s.
+- Dashboard `scada-transformador` con time series de temperatura/V/I/vibración/humedad.
+- Contrato MQTT: `techtrafo/transformador/<equipo_id>/<variable>` + payload `{valor, unidad, ts}`. Cuando llegue hardware real, basta apagar el simulador y conectar gateway al mismo topic.
+
 ### Backlog pendiente
-- 4to dashboard Garantías / Posventa (la vista `posventa.v_garantias_por_vencer` ya existe; el worker la procesa).
-- Series temporales SCADA en InfluxDB (provisionado, sin uso aún).
-- Hardening nginx en VM .7 contra scans de credenciales (chip lateral).
+- (sin hitos críticos abiertos)
 
 ## 9. Gotchas / errores recurrentes
 

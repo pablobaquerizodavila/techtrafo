@@ -31,6 +31,16 @@ const envSchema = z.object({
   // ../../uploads en /uploads. Migrable a MinIO en el futuro.
   UPLOAD_DIR: z.string().default("/uploads"),
   UPLOAD_MAX_BYTES: z.coerce.number().int().positive().default(20 * 1024 * 1024), // 20 MB default
+
+  // SCADA bridge MQTT -> InfluxDB (FASE 7). Si SCADA_BRIDGE_ENABLED=false el
+  // worker queda dormido y el API arranca igual.
+  SCADA_BRIDGE_ENABLED: z.coerce.boolean().default(false),
+  MQTT_URL: z.string().default("mqtt://techtrafo-mosquitto:1883"),
+  MQTT_TOPIC: z.string().default("techtrafo/transformador/+/+"),
+  INFLUX_URL: z.string().url().default("http://techtrafo-influxdb:8086"),
+  INFLUX_TOKEN: z.string().default(""),
+  INFLUX_ORG: z.string().default("techtrafo"),
+  INFLUX_BUCKET: z.string().default("telemetria"),
 });
 
 const parsed = envSchema.safeParse(process.env);

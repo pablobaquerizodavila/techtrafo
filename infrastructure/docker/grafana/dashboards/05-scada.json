@@ -1,0 +1,175 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {"type": "influxdb", "uid": "influx-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "°C",
+            "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line",
+            "fillOpacity": 15, "gradientMode": "opacity",
+            "hideFrom": {"legend": false, "tooltip": false, "viz": false},
+            "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5,
+            "scaleDistribution": {"type": "linear"}, "showPoints": "never",
+            "spanNulls": true, "stacking": {"group": "A", "mode": "none"},
+            "thresholdsStyle": {"mode": "off"}
+          },
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 75}, {"color": "red", "value": 85}]},
+          "unit": "celsius"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "id": 1,
+      "options": {
+        "legend": {"calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "influxdb", "uid": "influx-techtrafo"},
+        "query": "from(bucket: \"telemetria\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"telemetria\")\n  |> filter(fn: (r) => r.variable == \"temperatura_aceite\" or r.variable == \"temperatura_ambiente\")\n  |> filter(fn: (r) => r._field == \"valor\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\", \"variable\"])",
+        "refId": "A"
+      }],
+      "title": "Temperatura (aceite vs ambiente)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "influx-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "V",
+            "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line",
+            "fillOpacity": 10, "gradientMode": "none",
+            "hideFrom": {"legend": false, "tooltip": false, "viz": false},
+            "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5,
+            "scaleDistribution": {"type": "linear"}, "showPoints": "never",
+            "spanNulls": true, "stacking": {"group": "A", "mode": "none"},
+            "thresholdsStyle": {"mode": "off"}
+          },
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "unit": "volt"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "id": 2,
+      "options": {
+        "legend": {"calcs": ["last", "mean"], "displayMode": "table", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "influxdb", "uid": "influx-techtrafo"},
+        "query": "from(bucket: \"telemetria\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"telemetria\")\n  |> filter(fn: (r) => r.variable == \"voltaje_primario\" or r.variable == \"voltaje_secundario\")\n  |> filter(fn: (r) => r._field == \"valor\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\", \"variable\"])",
+        "refId": "A"
+      }],
+      "title": "Voltaje (primario y secundario)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "influx-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "A",
+            "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line",
+            "fillOpacity": 10, "gradientMode": "none",
+            "hideFrom": {"legend": false, "tooltip": false, "viz": false},
+            "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5,
+            "scaleDistribution": {"type": "linear"}, "showPoints": "never",
+            "spanNulls": true, "stacking": {"group": "A", "mode": "none"},
+            "thresholdsStyle": {"mode": "off"}
+          },
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "unit": "amp"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "id": 3,
+      "options": {
+        "legend": {"calcs": ["last", "mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "influxdb", "uid": "influx-techtrafo"},
+        "query": "from(bucket: \"telemetria\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"telemetria\")\n  |> filter(fn: (r) => r.variable == \"corriente_primario\" or r.variable == \"corriente_secundario\")\n  |> filter(fn: (r) => r._field == \"valor\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\", \"variable\"])",
+        "refId": "A"
+      }],
+      "title": "Corriente (primario y secundario)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "influx-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "",
+            "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line",
+            "fillOpacity": 10, "gradientMode": "none",
+            "hideFrom": {"legend": false, "tooltip": false, "viz": false},
+            "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5,
+            "scaleDistribution": {"type": "linear"}, "showPoints": "never",
+            "spanNulls": true, "stacking": {"group": "A", "mode": "none"},
+            "thresholdsStyle": {"mode": "off"}
+          },
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}
+        },
+        "overrides": [
+          {"matcher": {"id": "byFrameRefID", "options": "A"}, "properties": [{"id": "unit", "value": "velocityms"}]},
+          {"matcher": {"id": "byFrameRefID", "options": "B"}, "properties": [{"id": "unit", "value": "humidity"}]}
+        ]
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "id": 4,
+      "options": {
+        "legend": {"calcs": ["last", "mean"], "displayMode": "table", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [
+        {
+          "datasource": {"type": "influxdb", "uid": "influx-techtrafo"},
+          "query": "from(bucket: \"telemetria\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"telemetria\")\n  |> filter(fn: (r) => r.variable == \"vibracion\")\n  |> filter(fn: (r) => r._field == \"valor\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\", \"variable\"])",
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "influxdb", "uid": "influx-techtrafo"},
+          "query": "from(bucket: \"telemetria\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"telemetria\")\n  |> filter(fn: (r) => r.variable == \"humedad\")\n  |> filter(fn: (r) => r._field == \"valor\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\", \"variable\"])",
+          "refId": "B"
+        }
+      ],
+      "title": "Vibración (mm/s) y Humedad (%HR)",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["techtrafo", "scada", "telemetria"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "SCADA — Transformador (simulador)",
+  "uid": "scada-transformador",
+  "version": 1,
+  "weekStart": ""
+}

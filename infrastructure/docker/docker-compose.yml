@@ -78,6 +78,10 @@ services:
       GF_SERVER_ROOT_URL: "http://192.168.0.23:3001"
       # Pass-through para resolver ${POSTGRES_PASSWORD} en provisioning/datasources/postgres.yaml
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Pass-through para resolver ${INFLUX_ADMIN_TOKEN} en provisioning/datasources/influx.yaml
+      INFLUX_ADMIN_TOKEN: ${INFLUX_ADMIN_TOKEN}
+      INFLUX_ORG: ${INFLUX_ORG:-techtrafo}
+      INFLUX_BUCKET: ${INFLUX_BUCKET:-telemetria}
     volumes:
       - /opt/techtrafo/grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
@@ -118,6 +122,25 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3002,http://192.168.0.23:3002}
+      # SMTP (notificaciones 4.D). Si SMTP_HOST queda vacio el worker entra en dry-run.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-TECHTRAFO <noreply@techtrafo.com>}
+      PANEL_URL: ${PANEL_URL:-https://panel.techtrafo.com}
+      NOTIF_WORKER_INTERVAL_SECONDS: ${NOTIF_WORKER_INTERVAL_SECONDS:-300}
+      UPLOAD_DIR: ${UPLOAD_DIR:-/uploads}
+      UPLOAD_MAX_BYTES: ${UPLOAD_MAX_BYTES:-20971520}
+      # SCADA (bridge MQTT->Influx corre dentro del API)
+      MQTT_URL: ${MQTT_URL:-mqtt://techtrafo-mosquitto:1883}
+      MQTT_TOPIC: ${MQTT_TOPIC:-techtrafo/transformador/+/+}
+      INFLUX_URL: ${INFLUX_URL:-http://techtrafo-influxdb:8086}
+      INFLUX_TOKEN: ${INFLUX_ADMIN_TOKEN}
+      INFLUX_ORG: ${INFLUX_ORG:-techtrafo}
+      INFLUX_BUCKET: ${INFLUX_BUCKET:-telemetria}
+      SCADA_BRIDGE_ENABLED: ${SCADA_BRIDGE_ENABLED:-true}
     volumes:
       - ../../backend:/app
       - /app/node_modules
@@ -148,6 +171,69 @@ services:
       - "3002:3002"
     depends_on:
       - api
+
+  # ===================================================================
+  # SCADA stack (FASE 7 - simulador hoy, hardware real cuando aterrice)
+  # ===================================================================
+
+  influxdb:
+    image: influxdb:2.7
+    container_name: techtrafo-influxdb
+    restart: unless-stopped
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUX_ADMIN_USER:-admin}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUX_ADMIN_PASSWORD}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUX_ORG:-techtrafo}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUX_BUCKET:-telemetria}
+      DOCKER_INFLUXDB_INIT_RETENTION: 30d
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUX_ADMIN_TOKEN}
+    volumes:
+      - /opt/techtrafo/influxdb-data:/var/lib/influxdb2
+      - /opt/techtrafo/influxdb-config:/etc/influxdb2
+    networks:
+      - techtrafo_net
+    ports:
+      - "127.0.0.1:8086:8086"
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: techtrafo-mosquitto
+    restart: unless-stopped
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - /opt/techtrafo/mosquitto-data:/mosquitto/data
+      - /opt/techtrafo/mosquitto-logs:/mosquitto/log
+    networks:
+      - techtrafo_net
+    # Sin port mapping al host: solo accesible desde la red docker.
+    # Si en el futuro hay un gateway externo, agregar "1883:1883" y auth.
+
+  simulador:
+    image: node:20-alpine
+    container_name: techtrafo-simulador
+    restart: unless-stopped
+    working_dir: /app
+    # npm install al arrancar (idempotente con package-lock una vez generado).
+    # Cuando llegue hardware real, este servicio se apaga sin perfil simulador.
+    command: ["sh", "-c", "npm install --no-audit --no-fund --omit=dev && node simulador.js"]
+    environment:
+      MQTT_URL: mqtt://techtrafo-mosquitto:1883
+      EQUIPO_ID: ${SIMULADOR_EQUIPO_ID:-TRF-DEMO-001}
+      INTERVALO_MS: ${SIMULADOR_INTERVALO_MS:-10000}
+    volumes:
+      - ./simulador:/app
+    networks:
+      - techtrafo_net
+    depends_on:
+      - mosquitto
+    profiles:
+      - simulador
 
 networks:
   techtrafo_net:
