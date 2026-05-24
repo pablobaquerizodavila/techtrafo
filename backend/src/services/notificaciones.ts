@@ -13,13 +13,20 @@
  */
 import { prisma } from "../db/client";
 import {
+  templateGarantiaPorVencer,
   templateHitoEsperaAprobacion,
   templateHitoEstancado,
   templateHitoResolucion,
   ExpedienteContextoEmail,
 } from "./email";
 
-export type TipoNotificacion = "hito_estancado" | "hito_espera_aprobacion" | "hito_aprobado" | "hito_rechazado";
+export type TipoNotificacion =
+  | "hito_estancado"
+  | "hito_espera_aprobacion"
+  | "hito_aprobado"
+  | "hito_rechazado"
+  | "garantia_vence_30d"
+  | "garantia_vence_7d";
 
 interface CreateInput {
   tipo: TipoNotificacion;
@@ -197,4 +204,49 @@ export async function notificarEstancamiento(hitoId: number, horas: number, sla:
       contexto: { hito_id: hitoId, expediente_id: ctx.expediente_id, horas, sla },
     });
   }
+}
+
+/**
+ * Garantia proxima a vencer. Notifica al cliente (email registrado en clientes).
+ *
+ * Idempotente por (garantia_id + umbral): el worker se asegura de no encolar
+ * dos veces el mismo aviso (30d o 7d) para la misma garantia.
+ */
+export interface GarantiaPorVencerInput {
+  garantia_id: number;
+  garantia_codigo: string;
+  cliente_email: string | null;
+  cliente_nombre: string;
+  transformador_codigo: string | null;
+  transformador_marca: string | null;
+  fecha_fin: Date;
+  dias_restantes: number;
+  umbral: 30 | 7;
+}
+
+export async function notificarGarantiaPorVencer(input: GarantiaPorVencerInput): Promise<boolean> {
+  if (!input.cliente_email) return false;
+  const tpl = templateGarantiaPorVencer({
+    garantia_codigo: input.garantia_codigo,
+    cliente_nombre: input.cliente_nombre,
+    transformador_codigo: input.transformador_codigo,
+    transformador_marca: input.transformador_marca,
+    fecha_fin: input.fecha_fin,
+    dias_restantes: input.dias_restantes,
+    umbral: input.umbral,
+  });
+  const creada = await crear({
+    tipo: input.umbral === 30 ? "garantia_vence_30d" : "garantia_vence_7d",
+    destinatario_email: input.cliente_email,
+    asunto: tpl.subject,
+    cuerpo_html: tpl.html,
+    cuerpo_texto: tpl.text,
+    contexto: {
+      garantia_id: input.garantia_id,
+      garantia_codigo: input.garantia_codigo,
+      dias_restantes: input.dias_restantes,
+      umbral: input.umbral,
+    },
+  });
+  return creada !== null;
 }

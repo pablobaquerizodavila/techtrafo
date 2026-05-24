@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Toaster, toast } from "sonner";
+import { PdfButton } from "../../pdf-button";
 import {
   Expediente,
   ExpedienteHito,
@@ -445,21 +446,24 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
             <ul className="space-y-2">
               {informes.map((i) => (
                 <li key={i.id} className="rounded-md border p-3 text-sm">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <p className="font-mono font-medium">{i.numero}</p>
-                    <Badge
-                      variant={
-                        i.estado === "aprobado"
-                          ? "success"
-                          : i.estado === "rechazado"
-                            ? "destructive"
-                            : i.estado === "en_revision"
-                              ? "warning"
-                              : "muted"
-                      }
-                    >
-                      {i.estado}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={
+                          i.estado === "aprobado"
+                            ? "success"
+                            : i.estado === "rechazado"
+                              ? "destructive"
+                              : i.estado === "en_revision"
+                                ? "warning"
+                                : "muted"
+                        }
+                      >
+                        {i.estado}
+                      </Badge>
+                      <PdfButton recurso="informe-tecnico" id={i.id} />
+                    </div>
                   </div>
                   {i.decision_tecnica && (
                     <p className="mt-1 text-xs">

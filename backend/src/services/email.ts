@@ -155,3 +155,33 @@ export function templateHitoResolucion(
   const text = `Hito "${c.hito_nombre}" ${verbo} por ${c.aprobador} en expediente ${c.expediente_codigo}. ${c.motivo ? `Motivo: ${c.motivo}. ` : ""}${url}`;
   return { subject, html, text };
 }
+
+export function templateGarantiaPorVencer(c: {
+  garantia_codigo: string;
+  cliente_nombre: string;
+  transformador_codigo: string | null;
+  transformador_marca: string | null;
+  fecha_fin: Date;
+  dias_restantes: number;
+  umbral: 30 | 7;
+}) {
+  const fechaStr = c.fecha_fin.toISOString().slice(0, 10);
+  const equipo = c.transformador_codigo
+    ? `${c.transformador_codigo}${c.transformador_marca ? ` (${c.transformador_marca})` : ""}`
+    : "su transformador";
+  const tono = c.umbral === 7 ? "Última semana antes del vencimiento" : "Faltan 30 días para el vencimiento";
+  const subject = `[TECHTRAFO] Garantía ${c.garantia_codigo} vence en ${c.dias_restantes} día${c.dias_restantes === 1 ? "" : "s"}`;
+  const html = layout(
+    `Garantía por vencer · ${tono}`,
+    `<p>Estimado/a <strong>${c.cliente_nombre}</strong>,</p>
+     <p>Le recordamos que la garantía de ${equipo} está próxima a vencer:</p>
+     <ul>
+       <li><strong>Garantía:</strong> ${c.garantia_codigo}</li>
+       <li><strong>Fecha de vencimiento:</strong> ${fechaStr}</li>
+       <li><strong>Días restantes:</strong> ${c.dias_restantes}</li>
+     </ul>
+     <p>Si desea renovar la cobertura o coordinar una inspección preventiva, responda a este aviso o contacte a su asesor TECHTRAFO.</p>`,
+  );
+  const text = `Garantia ${c.garantia_codigo} de ${c.cliente_nombre} vence el ${fechaStr} (${c.dias_restantes} dias). Equipo: ${equipo}.`;
+  return { subject, html, text };
+}
