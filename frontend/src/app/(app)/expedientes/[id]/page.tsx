@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Cronometro, TiempoTotal } from "@/components/cronometro";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -347,6 +348,7 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
+                        <Cronometro startIso={h.fecha_inicio} endIso={h.fecha_fin} />
                         {h.estancado && (
                           <Badge variant="destructive" className="text-xs">
                             <AlertTriangle className="mr-1 h-3 w-3" />
@@ -416,6 +418,12 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
             );
           })}
         </div>
+
+        {hitos.length > 0 && (
+          <div className="mt-4">
+            <TiempoTotal hitos={hitos} />
+          </div>
+        )}
       </section>
 
       {/* Visitas tecnicas + informes */}
