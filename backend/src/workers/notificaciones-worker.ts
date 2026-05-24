@@ -30,10 +30,14 @@ interface EstancadoRow {
 }
 
 async function detectarEstancamientos() {
+  // Solo expedientes activos: si fue cancelado / ganado / perdido, los hitos
+  // que quedaron en_curso ya no necesitan accion. La vista los sigue marcando
+  // como estancados (por SLA al momento del cierre) — los excluimos aqui.
   const rows = await prisma.$queryRaw<EstancadoRow[]>`
     SELECT expediente_id, hito_id, hito_codigo, horas_transcurridas, sla_horas
       FROM comercial.v_expediente_pipeline
      WHERE estancado = true
+       AND expediente_estado = 'activo'
   `;
 
   if (rows.length === 0) return { detectados: 0, encolados: 0 };
@@ -128,6 +132,23 @@ async function detectarGarantiasPorVencer() {
 }
 
 async function procesarPendientes() {
+  // Antes de procesar, marcar como omitidas las notificaciones cuyo expediente
+  // pasó a estado terminal entre la creación y este tick. Asi no enviamos un
+  // email tarde de algo que ya no aplica. Se marca enviado=true con error
+  // descriptivo para auditoria y no reintentos.
+  await prisma.$executeRaw`
+    UPDATE core.notificaciones n
+       SET enviado = true,
+           fecha_envio = NOW(),
+           error = 'omitida: expediente en estado terminal'
+     WHERE n.enviado = false
+       AND EXISTS (
+         SELECT 1 FROM comercial.expedientes e
+          WHERE e.id = NULLIF(n.contexto->>'expediente_id', '')::bigint
+            AND e.estado IN ('cancelado','ganado','perdido')
+       )
+  `;
+
   const pendientes = await prisma.notificaciones.findMany({
     where: { enviado: false, intento_count: { lt: MAX_INTENTOS } },
     orderBy: { created_at: "asc" },
