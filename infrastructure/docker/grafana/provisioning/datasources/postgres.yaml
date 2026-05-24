@@ -12,9 +12,11 @@ datasources:
     type: postgres
     access: proxy
     url: postgres:5432
-    user: techtrafo_admin
+    # Fix H4 auditoria: usar grafana_ro (SELECT-only en comercial/posventa/produccion)
+    # en lugar de techtrafo_admin (DB superuser). Migration 017 crea el rol.
+    user: grafana_ro
     secureJsonData:
-      password: ${POSTGRES_PASSWORD}
+      password: ${GRAFANA_DB_PASSWORD}
     jsonData:
       database: techtrafo
       sslmode: disable

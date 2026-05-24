@@ -8,6 +8,17 @@
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 
+// Fix H3 auditoria: cookie CSRF (no HttpOnly) seteada por backend en login.
+// La leemos aca y la mandamos como header X-CSRF-Token en cada mutation.
+const CSRF_HEADER_NAME = "X-CSRF-Token";
+const CSRF_COOKIE_REGEX = /(?:^|;\s*)techtrafo_csrf=([^;]+)/;
+
+function getCsrfTokenFromCookie(): string | null {
+  if (typeof document === "undefined") return null; // SSR
+  const match = document.cookie.match(CSRF_COOKIE_REGEX);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 export class ApiError extends Error {
   status: number;
   body: unknown;
@@ -28,6 +39,18 @@ export async function apiFetch<T = unknown>(path: string, options: ApiOptions = 
   const headers = new Headers(options.headers ?? {});
   if (options.body !== undefined && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
+  }
+
+  // CSRF: en mutations leemos la cookie y la mandamos como header. El backend
+  // valida en csrfProtection. Skipea GET/HEAD/OPTIONS y rutas exentas como
+  // /auth/login (no hay sesion previa).
+  const method = (options.method ?? "GET").toUpperCase();
+  const isMutation = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
+  if (isMutation) {
+    const csrf = getCsrfTokenFromCookie();
+    if (csrf && !headers.has(CSRF_HEADER_NAME)) {
+      headers.set(CSRF_HEADER_NAME, csrf);
+    }
   }
 
   const init: RequestInit = {

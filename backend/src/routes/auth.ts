@@ -4,6 +4,8 @@ import { prisma } from "../db/client";
 import { hashPassword, verifyPassword } from "../auth/password";
 import { signToken, AUTH_COOKIE_NAME } from "../auth/jwt";
 import { requireAuth } from "../auth/middleware";
+import { loginLimiter, registerLimiter, changePasswordLimiter } from "../auth/rate-limit";
+import { setCsrfCookie, clearCsrfCookie } from "../auth/csrf";
 import { env } from "../config/env";
 
 const router = Router();
@@ -35,7 +37,7 @@ const cookieOptions = {
 // -------------------------------------------------------------------
 // POST /api/auth/register  -  publico, crea usuario en estado pendiente
 // -------------------------------------------------------------------
-router.post("/register", async (req, res) => {
+router.post("/register", registerLimiter, async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
@@ -78,7 +80,7 @@ router.post("/register", async (req, res) => {
 // -------------------------------------------------------------------
 // POST /api/auth/login  -  rechaza si no esta aprobado
 // -------------------------------------------------------------------
-router.post("/login", async (req, res) => {
+router.post("/login", loginLimiter, async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
@@ -127,6 +129,9 @@ router.post("/login", async (req, res) => {
 
   const token = signToken({ sub: usuario.id });
   res.cookie(AUTH_COOKIE_NAME, token, cookieOptions);
+  // Fix H3 auditoria: setear cookie CSRF (no HttpOnly) en cada login. El
+  // frontend la lee y la envia como header X-CSRF-Token en cada mutation.
+  setCsrfCookie(res);
 
   res.json({
     user: {
@@ -145,6 +150,7 @@ router.post("/login", async (req, res) => {
 
 router.post("/logout", (_req, res) => {
   res.clearCookie(AUTH_COOKIE_NAME, cookieOptions);
+  clearCsrfCookie(res);
   res.json({ ok: true });
 });
 
@@ -196,7 +202,7 @@ const changePasswordSchema = z.object({
   new_password: z.string().min(8, "Minimo 8 caracteres").max(128),
 });
 
-router.post("/change-password", requireAuth, async (req, res) => {
+router.post("/change-password", changePasswordLimiter, requireAuth, async (req, res) => {
   const parsed = changePasswordSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });

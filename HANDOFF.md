@@ -1,14 +1,14 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-24 · v0.10.1 · 4 CRITICAL de la auditoría de seguridad fixeados**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-24 · v0.11.0 · 3 HIGH de auditoría cerrados (rate limit + CSRF + Grafana DB readonly)**.
 
 ---
 
 ## 1. Estado del proyecto en 30 segundos
 
 - **Empresa**: TECHTRAFO — fabricación, reparación y mantenimiento de transformadores eléctricos (150 kVA → 10 MVA), Samborondón, Ecuador.
-- **Versión actual**: `v0.10.1`. Día de avance grande (2026-05-23 → 24). Cerradas: FASE 4 plus, FASE 5 (portal cliente), FASE 6 (4 dashboards), hardening nginx, FASE 7 (SCADA), FASE 8 (alerting), admin user management, self-service perfil, edición SLA, cronómetros, form visita técnica → informe → email, varias alert rules SCADA, fix roles aprobadores, fix dropdown clientes, **auditoría de seguridad + 4 CRITICAL fixeados** (IDOR masivo, self-escalation, TLS SMTP, error leak).
-- **Próximo trabajo**: HIGH/MEDIUM de la auditoría pendientes (rate limit, CSRF, Grafana DB readonly user, etc.). Iterar campos del form de visita técnica (Pablo dijo "luego lo iremos modificando"). Backlog en sección 8.
+- **Versión actual**: `v0.11.0`. Día de avance grande (2026-05-23 → 24). Cerradas: FASE 4 plus, FASE 5 (portal cliente), FASE 6 (4 dashboards), hardening nginx, FASE 7 (SCADA), FASE 8 (alerting), admin user management, self-service perfil, edición SLA, cronómetros, form visita técnica → informe → email, varias alert rules SCADA, fix roles aprobadores, fix dropdown clientes, **auditoría de seguridad + 4 CRITICAL fixeados** (IDOR, self-escalation, TLS SMTP, error leak) + **3 HIGH cerrados** (rate limit, CSRF double-submit, Grafana DB readonly user).
+- **Próximo trabajo**: MEDIUM/LOW de la auditoría (path/CRLF en evidencias, morgan loggea Authorization, GET /admin/roles expone permisos, JWT sin revocation list). Decisión sobre H5 (mosquitto auth) y H6 (grafana port mapping) — ambos mitigados por aislamiento. Iterar campos del form de visita técnica. Backlog en sección 8.
 - **Repo**: https://github.com/pablobaquerizodavila/techtrafo (branch `main`)
 
 ## 2. Topología real (no la del CLAUDE.md genérico)
@@ -250,18 +250,22 @@ El sub-agente `security-auditor` corrió y encontró 4 CRITICAL + 6 HIGH + 7 MED
 - **C3 SMTP TLS**: `rejectUnauthorized: false` ahora solo se aplica si SMTP_HOST está en rangos RFC1918 (LAN). Hosts externos exigen cert válido.
 - **C4 error leak**: en `NODE_ENV=production` el handler global de errores ya no devuelve `err.message` al cliente, solo `error_id` correlacionable con logs.
 
-HIGH/MEDIUM pendientes (no bloqueantes para uso interno actual sin datos reales):
-- H2 rate limit (login, change-password, reset, enviar-email)
-- H3 CSRF token (hoy solo SameSite=Lax)
-- H4 Grafana usa `techtrafo_admin` (DB superuser); crear `grafana_ro` con SELECT only
-- H5 Mosquitto sin auth (mitigado por aislamiento de red docker)
-- H6 Port mapping a host de DBs (Postgres/Redis/Influx en 127.0.0.1)
+HIGH cerrados en v0.11.0:
+- **H2 rate limit (login/register/change-password/enviar-email)** — express-rate-limit + trust proxy=1. Limites por IP. Validado 401→429 al 11vo intento.
+- **H3 CSRF token** — double-submit cookie. Backend `auth/csrf.ts` + frontend `lib/api.ts` agrega header X-CSRF-Token. **OJO sesiones activas al deploy: necesitan logout+login para que el panel reciba la nueva cookie**.
+- **H4 Grafana DB readonly user** — migration 017, rol `grafana_ro` SELECT-only en comercial/posventa/produccion (sin core). Datasource y compose actualizados.
+
+HIGH con mitigación (decisión: no aplicar todavía):
+- **H5 Mosquitto sin auth** — sigue mitigado por aislamiento de red docker (sin port mapping al host). Aplicar cuando llegue hardware externo: agregar passwd file + allow_anonymous false + TLS.
+- **H6 Port mapping DBs** — Postgres/Redis/Influx ya bindeados a `127.0.0.1` desde antes. Grafana queda en `0.0.0.0:3001` por elección (acceso LAN al panel de dashboards). Si se quisiera restringir a SSH tunnel: cambiar a `127.0.0.1:3001:3000`.
+
+MEDIUM/LOW pendientes (no bloqueantes para uso interno actual sin datos reales):
 - M1 path/CRLF en evidencias download
 - M3 morgan combined loggea Authorization headers
 - M5 GET /api/admin/roles expone permisos completos
 - M7 JWT sin revocation list (8h tras robo de cookie)
 
-Decisión de Pablo: hoy NO se aplican porque no hay clientes ni datos reales. Recordatorio para el futuro: **NO abrir portal.techtrafo.com a clientes externos hasta que los HIGH estén cerrados** (especialmente H2 y H3).
+Decisión de Pablo: los CRITICAL+HIGH cerrados YA habilitan abrir `portal.techtrafo.com` a clientes externos cuando se quiera. Los MEDIUM se atacan en una pasada posterior antes de la GA real con varios clientes.
 
 ### Backlog pendiente
 - (sin hitos críticos abiertos)

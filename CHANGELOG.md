@@ -6,6 +6,44 @@ El formato sigue Keep a Changelog y este proyecto adhiere a Semantic Versioning.
 
 ---
 
+## [0.11.0] — 2026-05-24 — HIGH de auditoria de seguridad cerrados
+
+### Seguridad — H2, H3, H4
+
+#### H4 — Grafana DB readonly user
+- Migration 017: rol `grafana_ro` (NOLOGIN inicial, password seteada via env). SELECT-only en schemas `comercial`, `posventa`, `produccion`. Sin acceso a `core` (donde estan `usuarios.password_hash`) ni a `inventario`.
+- `infrastructure/docker/grafana/provisioning/datasources/postgres.yaml`: usa `grafana_ro` + `${GRAFANA_DB_PASSWORD}`.
+- `docker-compose.yml`: pass-through de `GRAFANA_DB_PASSWORD` al container.
+- `.env`: nueva variable `GRAFANA_DB_PASSWORD` (32 chars random).
+- Validado: query desde Grafana API funciona, `core.usuarios` da `permission denied for schema core`.
+
+#### H2 — Rate limit en endpoints sensibles
+- `backend/src/auth/rate-limit.ts` con `express-rate-limit`. Cuotas por IP:
+  - `loginLimiter`: 10/15min (skipSuccessful para no bloquear logins legitimos)
+  - `registerLimiter`: 3/1h (no skipSuccessful para evitar creacion masiva)
+  - `changePasswordLimiter`: 10/15min
+  - `enviarEmailLimiter`: 30/1h
+- `server.ts`: `app.set("trust proxy", 1)` para que el rate-limit ratee por X-Forwarded-For real (no por IP del proxy nginx).
+- `routes/auth.ts`: limiters aplicados a `/login`, `/register`, `/change-password`.
+- `routes/informes-tecnicos.ts`: `enviarEmailLimiter` aplicado a `/:id/enviar-email`.
+- Respuesta 429 con `retry_after_seconds` + headers `RateLimit-*` draft-7.
+- Validado: 10 logins -> 401, 11vo -> 429. Trust proxy separa buckets por X-Forwarded-For correctamente.
+
+#### H3 — CSRF double-submit cookie
+- `backend/src/auth/csrf.ts`: cookie `techtrafo_csrf` (no HttpOnly, 8h, SameSite=Lax, Domain=.techtrafo.com en prod) + middleware `csrfProtection`.
+- Patron double-submit: login setea cookie con token random (32 bytes hex). En cada mutation, el frontend lee la cookie y la envia como header `X-CSRF-Token`. Backend valida que coincidan.
+- Exenciones: metodos safe (GET/HEAD/OPTIONS), `/api/auth/login|register|logout`, requests sin cookie de sesion (caen en 401 por requireAuth).
+- `routes/auth.ts`: `setCsrfCookie` en `/login`, `clearCsrfCookie` en `/logout`.
+- `server.ts`: `csrfProtection` montado globalmente despues de `cookieParser`.
+- `frontend/src/lib/api.ts`: helper lee `document.cookie` y agrega header `X-CSRF-Token` en mutations.
+- Validado: POST sin header -> 403 `csrf_token_invalid`; POST con header valido -> pasa middleware CSRF.
+- **Nota**: sesiones activas al deploy quedan sin cookie csrf. Usuarios deben hacer logout+login para que se les setee.
+
+### Nota sobre portal externo
+Los 3 HIGH que bloqueaban abrir `portal.techtrafo.com` a clientes externos estan cerrados (junto con los CRITICAL de v0.10.1). Pendientes ahora: MEDIUM/LOW de la auditoria + decision sobre H5 (mosquitto auth) y H6 (grafana port mapping) — ambos mitigados por aislamiento de red. Ver HANDOFF.md seccion 8 para el estado completo.
+
+---
+
 ## [0.5.0] — 2026-05-23 — FASE 4 cierre
 
 ### Agregado — Dashboards C/D/E + 4.6 PDFs + 4.7 Garantías

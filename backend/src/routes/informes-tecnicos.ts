@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { withAppUser } from "../db/withAppUser";
 import { requireAuth, requirePermission } from "../auth/middleware";
+import { enviarEmailLimiter } from "../auth/rate-limit";
 import { crearDocumento, resolverNivel } from "../services/pdf/base";
 import { DataInformeTecnico, renderInformeTecnico } from "../services/pdf/documentos";
 import { sendEmail } from "../services/email";
@@ -204,7 +205,7 @@ async function generarPdfBuffer(
   return finished;
 }
 
-router.post("/:id/enviar-email", requirePermission("expedientes", "write"), async (req, res) => {
+router.post("/:id/enviar-email", enviarEmailLimiter, requirePermission("expedientes", "write"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     res.status(400).json({ error: "invalid_id" });

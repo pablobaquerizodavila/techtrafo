@@ -26,10 +26,18 @@ import auditoriaRouter from "./routes/auditoria";
 import pdfRouter from "./routes/pdf";
 import garantiasRouter from "./routes/garantias";
 import { prisma } from "./db/client";
+import { csrfProtection } from "./auth/csrf";
 import { startNotificacionesWorker, stopNotificacionesWorker } from "./workers/notificaciones-worker";
 import { startScadaBridge, stopScadaBridge } from "./workers/scada-bridge";
 
 const app = express();
+
+// trust proxy: el API esta detras de nginx en VM .7 que setea X-Forwarded-For.
+// Sin esto, express-rate-limit ratearia por la IP del proxy y un atacante
+// veria un solo "bucket" compartido por todos. Valor 1 = confiar en 1 hop.
+// Seguro porque :3000 solo se alcanza vía nginx en la topologia actual.
+// Fix H2 auditoria.
+app.set("trust proxy", 1);
 
 // Middlewares base
 app.use(helmet());
@@ -42,6 +50,11 @@ app.use(
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
+
+// Fix H3 auditoria: CSRF double-submit cookie. Debe ir DESPUES de cookieParser
+// (lee cookies) y ANTES de las rutas. Skipea GET/HEAD/OPTIONS, login/register/logout
+// y requests sin sesion (donde requireAuth respondera 401).
+app.use(csrfProtection);
 
 // Rutas
 app.use("/api", healthRouter);

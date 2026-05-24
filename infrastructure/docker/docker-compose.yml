@@ -84,8 +84,10 @@ services:
       GF_SMTP_FROM_ADDRESS: ${SMTP_FROM_ADDRESS:-notificaciones@medicvip.org}
       GF_SMTP_FROM_NAME: TECHTRAFO Alerting
       GF_SMTP_SKIP_VERIFY: "true"
-      # Pass-through para resolver ${POSTGRES_PASSWORD} en provisioning/datasources/postgres.yaml
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Pass-through para resolver ${GRAFANA_DB_PASSWORD} en provisioning/datasources/postgres.yaml
+      # Fix H4 auditoria: usar grafana_ro (SELECT-only en comercial/posventa/produccion)
+      # en lugar de techtrafo_admin (DB superuser). Migration 017 crea el rol.
+      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD}
       # Pass-through para resolver ${INFLUX_ADMIN_TOKEN} en provisioning/datasources/influx.yaml
       INFLUX_ADMIN_TOKEN: ${INFLUX_ADMIN_TOKEN}
       INFLUX_ORG: ${INFLUX_ORG:-techtrafo}
