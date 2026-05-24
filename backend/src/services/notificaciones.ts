@@ -13,6 +13,7 @@
  */
 import { prisma } from "../db/client";
 import {
+  templateEscalacionHito,
   templateGarantiaPorVencer,
   templateHitoEsperaAprobacion,
   templateHitoEstancado,
@@ -25,6 +26,7 @@ export type TipoNotificacion =
   | "hito_espera_aprobacion"
   | "hito_aprobado"
   | "hito_rechazado"
+  | "hito_escalado"
   | "garantia_vence_30d"
   | "garantia_vence_7d";
 
@@ -204,6 +206,100 @@ export async function notificarEstancamiento(hitoId: number, horas: number, sla:
       contexto: { hito_id: hitoId, expediente_id: ctx.expediente_id, horas, sla },
     });
   }
+}
+
+/**
+ * Hito rechazado fue escalado a otro rol. Notifica a todos los usuarios
+ * aprobados con ese rol_destino_id.
+ *
+ * Si rol_destino_id es null, busca el rol "gerencia_comercial" por nombre
+ * (fallback razonable para escalaciones de visita tecnica). Si tampoco
+ * existe, no notifica a nadie y devuelve 0.
+ */
+export async function notificarEscalacionHito(
+  hitoId: number,
+  mensaje: string,
+  rolDestinoId: number | null,
+  escaladoPorUserId: string,
+): Promise<number> {
+  const hito = await prisma.expediente_hitos.findUnique({
+    where: { id: hitoId },
+    include: {
+      expedientes: {
+        select: {
+          id: true,
+          codigo: true,
+          clientes: { select: { razon_social: true } },
+        },
+      },
+    },
+  });
+  if (!hito || !hito.expedientes) return 0;
+
+  // Resolver rol destino
+  let rolDestino: { id: number; nombre: string } | null = null;
+  if (rolDestinoId !== null) {
+    rolDestino = await prisma.roles.findUnique({
+      where: { id: rolDestinoId },
+      select: { id: true, nombre: true },
+    });
+  }
+  if (!rolDestino) {
+    rolDestino = await prisma.roles.findFirst({
+      where: { nombre: "gerencia_comercial", activo: true },
+      select: { id: true, nombre: true },
+    });
+  }
+  if (!rolDestino) return 0;
+
+  const destinatarios = await prisma.usuarios.findMany({
+    where: { rol_id: rolDestino.id, estado_aprobacion: "aprobado", activo: true },
+    select: { id: true, email: true },
+  });
+  if (destinatarios.length === 0) return 0;
+
+  const escaladoPor = await prisma.usuarios.findUnique({
+    where: { id: escaladoPorUserId },
+    select: { nombres: true, apellidos: true, email: true },
+  });
+  const escaladoPorLabel = escaladoPor
+    ? `${escaladoPor.nombres} ${escaladoPor.apellidos}`
+    : "un usuario del equipo";
+
+  const ctx: ExpedienteContextoEmail = {
+    expediente_id: hito.expedientes.id,
+    expediente_codigo: hito.expedientes.codigo,
+    cliente_nombre: hito.expedientes.clientes?.razon_social ?? "—",
+    hito_nombre: hito.nombre,
+  };
+
+  let creadas = 0;
+  for (const u of destinatarios) {
+    if (!u.email) continue;
+    const tpl = templateEscalacionHito({
+      ...ctx,
+      mensaje,
+      escalado_por: escaladoPorLabel,
+      rol_destino: rolDestino.nombre,
+    });
+    const created = await crear({
+      tipo: "hito_escalado",
+      destinatario_id: u.id,
+      destinatario_email: u.email,
+      asunto: tpl.subject,
+      cuerpo_html: tpl.html,
+      cuerpo_texto: tpl.text,
+      contexto: {
+        hito_id: hitoId,
+        expediente_id: ctx.expediente_id,
+        rol_destino_id: rolDestino.id,
+        mensaje,
+        escalado_por_user_id: escaladoPorUserId,
+      },
+    });
+    if (created) creadas++;
+  }
+  return creadas;
 }
 
 /**

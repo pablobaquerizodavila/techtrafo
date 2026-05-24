@@ -51,6 +51,7 @@ import {
   updateHitoSla,
 } from "@/lib/expedientes";
 import { ApiError } from "@/lib/api";
+import { RolAdmin, listRolesAdmin } from "@/lib/admin";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -71,10 +72,20 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
   const [rechazoDialog, setRechazoDialog] = useState<
     | { kind: "closed" }
     | { kind: "reabrir-anterior"; hito: ExpedienteHito; hitoAnteriorId: number | null }
-    | { kind: "escalar"; hito: ExpedienteHito; mensaje: string }
+    | { kind: "escalar"; hito: ExpedienteHito; mensaje: string; rolDestinoId: number | null }
     | { kind: "cancelar"; motivo: string }
   >({ kind: "closed" });
   const [savingRechazoAccion, setSavingRechazoAccion] = useState(false);
+  const [rolesGerencia, setRolesGerencia] = useState<RolAdmin[]>([]);
+
+  useEffect(() => {
+    listRolesAdmin()
+      .then((r) => {
+        const gerencias = r.data.filter((x) => x.activo && x.nombre.startsWith("gerencia"));
+        setRolesGerencia(gerencias);
+      })
+      .catch(() => setRolesGerencia([]));
+  }, []);
 
   useEffect(() => {
     params.then(({ id }) => setId(Number(id)));
@@ -215,10 +226,19 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
       toast.error("Escribí un mensaje para la escalación");
       return;
     }
+    if (!rechazoDialog.rolDestinoId) {
+      toast.error("Seleccioná a qué rol escalar");
+      return;
+    }
     setSavingRechazoAccion(true);
     try {
-      await escalarHito(expediente.id, rechazoDialog.hito.id, rechazoDialog.mensaje.trim());
-      toast.success("Hito escalado");
+      await escalarHito(
+        expediente.id,
+        rechazoDialog.hito.id,
+        rechazoDialog.mensaje.trim(),
+        rechazoDialog.rolDestinoId,
+      );
+      toast.success("Hito escalado · email encolado a los destinatarios");
       setRechazoDialog({ kind: "closed" });
       load();
     } catch (err) {
@@ -487,7 +507,10 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
                           <Button size="sm" variant="outline" onClick={() => setRechazoDialog({ kind: "reabrir-anterior", hito: h, hitoAnteriorId: null })} disabled={savingRechazoAccion}>
                             <Undo2 className="mr-1 h-3.5 w-3.5" /> Volver a un hito anterior
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => setRechazoDialog({ kind: "escalar", hito: h, mensaje: "" })} disabled={savingRechazoAccion}>
+                          <Button size="sm" variant="outline" onClick={() => {
+                            const defaultRol = rolesGerencia.find((r) => r.nombre === "gerencia_comercial") ?? rolesGerencia[0] ?? null;
+                            setRechazoDialog({ kind: "escalar", hito: h, mensaje: "", rolDestinoId: defaultRol?.id ?? null });
+                          }} disabled={savingRechazoAccion}>
                             <ArrowUpToLine className="mr-1 h-3.5 w-3.5" /> Escalar
                           </Button>
                           <Button size="sm" variant="destructive" onClick={() => setRechazoDialog({ kind: "cancelar", motivo: h.motivo_rechazo ?? "" })} disabled={savingRechazoAccion}>
@@ -754,6 +777,26 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
               )}
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="esc_rol">Escalar a *</Label>
+            <select
+              id="esc_rol"
+              className="w-full rounded border bg-background px-2 py-1.5 text-sm"
+              value={rechazoDialog.kind === "escalar" && rechazoDialog.rolDestinoId !== null ? String(rechazoDialog.rolDestinoId) : ""}
+              onChange={(e) => {
+                if (rechazoDialog.kind !== "escalar") return;
+                setRechazoDialog({ ...rechazoDialog, rolDestinoId: e.target.value ? Number(e.target.value) : null });
+              }}
+            >
+              <option value="">— Seleccionar —</option>
+              {rolesGerencia.map((r) => (
+                <option key={r.id} value={r.id}>{r.nombre}</option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Todos los usuarios aprobados con este rol recibirán un email con el contexto del hito y tu mensaje. El worker de notificaciones lo procesa en máximo 5 minutos.
+            </p>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="esc_msg">Mensaje para la escalación *</Label>
             <textarea

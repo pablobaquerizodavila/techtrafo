@@ -175,6 +175,31 @@ export function templateHitoResolucion(
   return { subject, html, text };
 }
 
+export function templateEscalacionHito(c: ExpedienteContextoEmail & {
+  mensaje: string;
+  escalado_por: string;
+  rol_destino: string;
+}) {
+  const url = `${env.PANEL_URL}/expedientes/${c.expediente_id}`;
+  const subject = `[TECHTRAFO] Escalación: ${c.hito_nombre} (${c.expediente_codigo})`;
+  const html = layout(
+    "Hito escalado a tu rol",
+    `<p>Un hito fue escalado a tu rol <strong>${c.rol_destino}</strong> para que decidas el próximo paso:</p>
+     <ul>
+       <li><strong>Expediente:</strong> ${c.expediente_codigo} (${c.cliente_nombre})</li>
+       <li><strong>Hito:</strong> ${c.hito_nombre}</li>
+       <li><strong>Escalado por:</strong> ${c.escalado_por}</li>
+     </ul>
+     <p><strong>Mensaje:</strong></p>
+     <blockquote style="border-left:3px solid #cbd5e1;padding-left:12px;color:#475569;white-space:pre-wrap;">${c.mensaje}</blockquote>
+     <p>Abrí el expediente para revisar el contexto y decidir.</p>`,
+    url,
+    "Abrir expediente",
+  );
+  const text = `Hito "${c.hito_nombre}" del expediente ${c.expediente_codigo} (${c.cliente_nombre}) fue escalado a ${c.rol_destino} por ${c.escalado_por}. Mensaje: ${c.mensaje}. Ver: ${url}`;
+  return { subject, html, text };
+}
+
 export function templateGarantiaPorVencer(c: {
   garantia_codigo: string;
   cliente_nombre: string;

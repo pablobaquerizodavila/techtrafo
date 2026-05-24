@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { withAppUser } from "../db/withAppUser";
 import { requireAuth, requirePermission } from "../auth/middleware";
-import { notificarHitoEsperaAprobacion, notificarResolucionHito } from "../services/notificaciones";
+import { notificarEscalacionHito, notificarHitoEsperaAprobacion, notificarResolucionHito } from "../services/notificaciones";
 
 const router = Router();
 router.use(requireAuth);
@@ -798,8 +798,19 @@ router.post("/:id/hitos/:hitoId/escalar", requirePermission("expedientes", "writ
          WHERE id = ${hitoId}
       `;
     });
-    // TODO: enviar email a usuarios del rol_destino_id (fuera de scope de este endpoint).
-    res.json({ status: "escalado", hito_id: hitoId });
+    // Encolar notificaciones a los usuarios del rol destino. El worker
+    // de notificaciones las procesa en el proximo tick (max 5 min).
+    const notifsCreadas = await notificarEscalacionHito(
+      hitoId,
+      mensaje,
+      rol_destino_id ?? null,
+      userId,
+    );
+    res.json({
+      status: "escalado",
+      hito_id: hitoId,
+      notificaciones_encoladas: notifsCreadas,
+    });
   } catch (err) {
     if (err instanceof Error) {
       if (err.message === "not_found") { res.status(404).json({ error: "not_found" }); return; }
