@@ -847,11 +847,15 @@ router.post("/:id/cancelar", requirePermission("expedientes", "write"), async (r
     await withAppUser(userId, async (tx) => {
       const exp = await tx.expedientes.findUnique({ where: { id } });
       if (!exp) throw new Error("not_found");
-      if (exp.estado === "cerrado") throw new Error("ya_cerrado");
+      // El enum SQL de expedientes.estado es: activo|ganado|perdido|cancelado.
+      // 'cancelado' = no viable / cerrado por el equipo.
+      if (exp.estado === "cancelado" || exp.estado === "ganado" || exp.estado === "perdido") {
+        throw new Error("ya_cerrado");
+      }
 
       await tx.$executeRaw`
         UPDATE comercial.expedientes
-           SET estado = 'cerrado',
+           SET estado = 'cancelado',
                motivo_cierre = ${motivo},
                fecha_cierre = NOW(),
                actualizado_por = ${userId}::uuid,
