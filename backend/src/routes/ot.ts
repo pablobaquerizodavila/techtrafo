@@ -41,7 +41,7 @@ const updateSchema = z.object({
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(25),
+  limit: z.coerce.number().int().positive().max(500).default(25),
   q: z.string().trim().optional(),
   estado: estadoOtEnum.optional(),
   tipo_ruta: tipoRutaEnum.optional(),
