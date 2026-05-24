@@ -430,6 +430,50 @@ router.post("/:id/completar", requirePermission("ot", "write"), async (req, res)
     res.status(r.error === "not_found" ? 404 : 409).json({ error: r.error });
     return;
   }
+
+  // Auto-crear garantía si la OT tiene transformador y cliente vinculado (4.7)
+  // Duración default: 12 meses para reparación/mantenimiento, 24 para fabricación.
+  // No falla la transición si la creación de garantía falla.
+  try {
+    const ot = await prisma.ot.findUnique({
+      where: { id },
+      include: { contratos: { select: { cliente_id: true, id: true } } },
+    });
+    if (ot?.transformador_id && ot.contratos?.cliente_id) {
+      const meses = ot.tipo_ruta === "fabricacion" ? 24 : 12;
+      const inicio = new Date();
+      const fin = new Date(inicio); fin.setMonth(fin.getMonth() + meses);
+      const year = new Date().getFullYear();
+      await withAppUser(req.user!.id, async (tx) => {
+        // Generar codigo
+        const prefix = `GAR-${year}-`;
+        const rs = await tx.$queryRaw<{ max_num: number | null }[]>`
+          SELECT COALESCE(MAX(CAST(SPLIT_PART(codigo, '-', 3) AS INTEGER)), 0) AS max_num
+          FROM posventa.garantias WHERE codigo LIKE ${prefix + "%"}
+        `;
+        const codigo = `${prefix}${String((rs[0]?.max_num ?? 0) + 1).padStart(4, "0")}`;
+        await tx.garantias.create({
+          data: {
+            codigo,
+            cliente_id: ot.contratos!.cliente_id,
+            transformador_id: Number(ot.transformador_id),
+            contrato_id: ot.contratos!.id,
+            ot_id_origen: id,
+            fecha_inicio: inicio,
+            fecha_fin: fin,
+            duracion_meses: meses,
+            alcance: `Garantía estándar de ${meses} meses sobre los trabajos ejecutados en la OT ${ot.codigo}.`,
+            estado: "vigente",
+            creado_por: req.user!.id,
+            actualizado_por: req.user!.id,
+          },
+        });
+      });
+    }
+  } catch (err) {
+    console.error("[ot/completar] auto-garantia fallo:", err);
+  }
+
   res.json({ data: await prisma.ot.findUnique({ where: { id } }) });
 });
 

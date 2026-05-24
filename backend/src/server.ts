@@ -24,6 +24,7 @@ import portalRouter from "./routes/portal";
 import evidenciasRouter from "./routes/evidencias";
 import auditoriaRouter from "./routes/auditoria";
 import pdfRouter from "./routes/pdf";
+import garantiasRouter from "./routes/garantias";
 import { prisma } from "./db/client";
 import { startNotificacionesWorker, stopNotificacionesWorker } from "./workers/notificaciones-worker";
 
@@ -61,6 +62,7 @@ app.use("/api/portal", portalRouter);
 app.use("/api/ot", evidenciasRouter);     // /:id/evidencias[...]
 app.use("/api/auditoria", auditoriaRouter); // /ot/:id, /expediente/:id
 app.use("/api/pdf", pdfRouter); // /cotizacion/:id, /contrato/:id, /ot/:id, /informe-tecnico/:id
+app.use("/api/garantias", garantiasRouter); // + /:id/reclamos[...]
 
 // 404 fallback
 app.use((_req, res) => {

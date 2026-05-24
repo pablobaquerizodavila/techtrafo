@@ -512,7 +512,7 @@ model series {
   usuarios_series_creado_porTousuarios      usuarios?           @relation("series_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
   items                                     items               @relation(fields: [item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   ot                                        ot?                 @relation(fields: [ot_id_origen], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  garantias                                 garantias?
+  garantias                                 garantias[]
 
   @@unique([item_id, numero_serie])
   @@index([estado], map: "idx_series_estado")
@@ -562,29 +562,35 @@ model ubicaciones {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model garantias {
-  id                                           BigInt        @id @default(autoincrement())
-  codigo                                       String?       @unique @db.VarChar(30)
-  serie_id                                     BigInt        @unique
+  id                                           BigInt           @id @default(autoincrement())
+  codigo                                       String?          @unique @db.VarChar(30)
+  serie_id                                     BigInt?
   contrato_id                                  BigInt?
   cliente_id                                   BigInt
-  fecha_emision                                DateTime      @default(dbgenerated("CURRENT_DATE")) @db.Date
-  fecha_inicio                                 DateTime      @db.Date
-  fecha_fin                                    DateTime      @db.Date
+  fecha_emision                                DateTime         @default(dbgenerated("CURRENT_DATE")) @db.Date
+  fecha_inicio                                 DateTime         @db.Date
+  fecha_fin                                    DateTime         @db.Date
   duracion_meses                               Int
   alcance                                      String?
   condiciones                                  String?
-  estado                                       String        @default("vigente") @db.VarChar(20)
+  estado                                       String           @default("vigente") @db.VarChar(20)
   motivo_estado                                String?
-  creado_por                                   String?       @db.Uuid
-  actualizado_por                              String?       @db.Uuid
-  created_at                                   DateTime?     @default(now()) @db.Timestamptz(6)
-  updated_at                                   DateTime?     @default(now()) @db.Timestamptz(6)
+  creado_por                                   String?          @db.Uuid
+  actualizado_por                              String?          @db.Uuid
+  created_at                                   DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at                                   DateTime?        @default(now()) @db.Timestamptz(6)
+  transformador_id                             BigInt?
+  notif_vencimiento_30d_enviada                Boolean          @default(false)
+  notif_vencimiento_7d_enviada                 Boolean          @default(false)
+  ot_id_origen                                 BigInt?
   expedientes                                  expedientes[]
-  usuarios_garantias_actualizado_porTousuarios usuarios?     @relation("garantias_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  clientes                                     clientes      @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  contratos                                    contratos?    @relation(fields: [contrato_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  usuarios_garantias_creado_porTousuarios      usuarios?     @relation("garantias_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  series                                       series        @relation(fields: [serie_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_garantias_actualizado_porTousuarios usuarios?        @relation("garantias_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  clientes                                     clientes         @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  contratos                                    contratos?       @relation(fields: [contrato_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_garantias_creado_porTousuarios      usuarios?        @relation("garantias_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ot                                           ot?              @relation(fields: [ot_id_origen], references: [id], onUpdate: NoAction)
+  series                                       series?          @relation(fields: [serie_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  transformadores                              transformadores? @relation(fields: [transformador_id], references: [id], onUpdate: NoAction)
   reclamos                                     reclamos[]
 
   @@index([cliente_id], map: "idx_garantias_cliente")
@@ -683,6 +689,7 @@ model ot {
   transformador_id                      BigInt?
   expedientes                           expedientes[]
   series                                series[]
+  garantias                             garantias[]
   intervenciones                        intervenciones[]
   usuarios_ot_actualizado_porTousuarios usuarios?         @relation("ot_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
   contratos                             contratos         @relation(fields: [contrato_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -1009,6 +1016,7 @@ model transformadores {
   created_at                                         DateTime?     @default(now()) @db.Timestamptz(6)
   updated_at                                         DateTime?     @default(now()) @db.Timestamptz(6)
   expedientes                                        expedientes[]
+  garantias                                          garantias[]
   ot                                                 ot[]
   usuarios_transformadores_actualizado_porTousuarios usuarios?     @relation("transformadores_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
   clientes                                           clientes?     @relation(fields: [cliente_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
