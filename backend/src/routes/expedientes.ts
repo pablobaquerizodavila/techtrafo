@@ -96,6 +96,7 @@ router.get("/", requirePermission("expedientes", "read"), async (req, res) => {
         hito_codigo, hito_nombre, horas_transcurridas, sla_horas
       FROM comercial.v_expediente_pipeline
       WHERE estancado = true
+        AND expediente_estado = 'activo'
       ORDER BY horas_transcurridas DESC
       LIMIT ${limit}
     `;
@@ -927,6 +928,7 @@ router.get("/dashboard/resumen", requirePermission("expedientes", "read"), async
       SELECT COUNT(DISTINCT expediente_id) AS count
       FROM comercial.v_expediente_pipeline
       WHERE estancado = true
+        AND expediente_estado = 'activo'
     `,
     prisma.expedientes.groupBy({
       by: ["estado"],
