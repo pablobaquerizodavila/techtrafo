@@ -1,14 +1,14 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-23 · v0.8.0 · FASE 7 cerrada**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-23 · v0.9.0 · FASE 8 cerrada**.
 
 ---
 
 ## 1. Estado del proyecto en 30 segundos
 
 - **Empresa**: TECHTRAFO — fabricación, reparación y mantenimiento de transformadores eléctricos (150 kVA → 10 MVA), Samborondón, Ecuador.
-- **Versión actual**: `v0.8.0` (FASE 7 completa). FASE 4 plus, FASE 5, FASE 6 (4 dashboards business), hardening nginx, y FASE 7 (SCADA híbrida con simulador) cerradas.
-- **Próximo trabajo**: cuando llegue hardware real → reemplazar simulador por gateway IoT. Ver ADR-004.
+- **Versión actual**: `v0.9.0` (FASE 8 completa). FASE 4 plus, FASE 5, FASE 6, hardening, FASE 7 (SCADA), y FASE 8 (Grafana alerting con email) cerradas.
+- **Próximo trabajo**: cuando llegue hardware real → reemplazar simulador por gateway IoT. Ver ADR-004. Sumar reglas de alerting según necesidad (umbrales V/I/vibración, garantías por vencer, reclamos).
 - **Repo**: https://github.com/pablobaquerizodavila/techtrafo (branch `main`)
 
 ## 2. Topología real (no la del CLAUDE.md genérico)
@@ -198,6 +198,16 @@ techtrafo/
 - Simulador en container aparte (perfil `simulador`) publica 8 variables c/10s.
 - Dashboard `scada-transformador` con time series de temperatura/V/I/vibración/humedad.
 - Contrato MQTT: `techtrafo/transformador/<equipo_id>/<variable>` + payload `{valor, unidad, ts}`. Cuando llegue hardware real, basta apagar el simulador y conectar gateway al mismo topic.
+
+### FASE 8 — Grafana Alerting con email — CERRADA (2026-05-23)
+- SMTP configurado en Grafana (`GF_SMTP_*` en compose, reusa cuenta MailPlus).
+- Contact point `pablo-email` → pablobaquerizodavila@gmail.com (provisioned).
+- Notification policy default (group_wait 30s, group_interval 5m, repeat 4h).
+- 2 alert rules provisioned (folder TECHTRAFO):
+  - `alert-scada-temp-aceite`: Influx Flux, temperatura_aceite > 80°C por 1m → critical
+  - `alert-comercial-hitos-estancados`: Postgres, COUNT(v_expediente_pipeline WHERE estancado) > 0 por 2m → warning
+- Validado end-to-end con email real recibido.
+- Provisioning yamls en `infrastructure/docker/grafana/provisioning/alerting/`.
 
 ### Backlog pendiente
 - (sin hitos críticos abiertos)

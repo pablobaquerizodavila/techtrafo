@@ -1,0 +1,146 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: SCADA
+    folder: TECHTRAFO
+    interval: 1m
+    rules:
+      - uid: alert-scada-temp-aceite
+        title: Temperatura aceite > 80C
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: influx-techtrafo
+            model:
+              datasource:
+                type: influxdb
+                uid: influx-techtrafo
+              query: |
+                from(bucket: "telemetria")
+                  |> range(start: -5m)
+                  |> filter(fn: (r) => r._measurement == "telemetria")
+                  |> filter(fn: (r) => r.variable == "temperatura_aceite")
+                  |> filter(fn: (r) => r._field == "valor")
+                  |> last()
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              type: reduce
+              reducer: last
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 80
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              refId: C
+        noDataState: NoData
+        execErrState: Error
+        for: 1m
+        annotations:
+          summary: "Temperatura del aceite por encima del umbral seguro"
+          description: "La temperatura del aceite del transformador supero 80C durante mas de 1 minuto. Valor actual: {{ $values.B.Value }} C. Revisar refrigeracion y carga del equipo."
+        labels:
+          severity: critical
+          modulo: scada
+
+  - orgId: 1
+    name: Comercial
+    folder: TECHTRAFO
+    interval: 2m
+    rules:
+      - uid: alert-comercial-hitos-estancados
+        title: Hitos estancados detectados
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: postgres-techtrafo
+            model:
+              datasource:
+                type: postgres
+                uid: postgres-techtrafo
+              format: table
+              rawQuery: true
+              rawSql: "SELECT COUNT(*)::float AS valor FROM comercial.v_expediente_pipeline WHERE estancado = true"
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              type: reduce
+              reducer: last
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              refId: C
+        noDataState: NoData
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: "Hay hitos estancados en el pipeline comercial"
+          description: "Existen {{ $values.B.Value }} hitos con SLA vencido en comercial.v_expediente_pipeline. Revisar el detalle en el dashboard Comercial / Pipeline."
+        labels:
+          severity: warning
+          modulo: comercial

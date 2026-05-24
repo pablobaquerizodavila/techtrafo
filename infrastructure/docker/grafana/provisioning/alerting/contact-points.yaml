@@ -1,0 +1,12 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: pablo-email
+    receivers:
+      - uid: contact-pablo-gmail
+        type: email
+        settings:
+          addresses: pablobaquerizodavila@gmail.com
+          singleEmail: false
+        disableResolveMessage: false
