@@ -75,6 +75,214 @@ groups:
           severity: critical
           modulo: scada
 
+      - uid: alert-scada-voltaje-primario-fuera-rango
+        title: Voltaje primario fuera de rango (+-5%)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: influx-techtrafo
+            model:
+              datasource:
+                type: influxdb
+                uid: influx-techtrafo
+              query: |
+                from(bucket: "telemetria")
+                  |> range(start: -5m)
+                  |> filter(fn: (r) => r._measurement == "telemetria")
+                  |> filter(fn: (r) => r.variable == "voltaje_primario")
+                  |> filter(fn: (r) => r._field == "valor")
+                  |> last()
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              type: reduce
+              reducer: last
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: outside_range
+                    params:
+                      - 13110
+                      - 14490
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              refId: C
+        noDataState: NoData
+        execErrState: Error
+        for: 1m
+        annotations:
+          summary: "Voltaje primario fuera del rango operacional"
+          description: "El voltaje primario salio del rango +-5% (13110V - 14490V) durante mas de 1 minuto. Valor actual: {{ $values.B.Value }} V. Verificar conexion de la red."
+        labels:
+          severity: warning
+          modulo: scada
+
+      - uid: alert-scada-corriente-sobrecarga
+        title: Sobrecarga en corriente secundaria
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: influx-techtrafo
+            model:
+              datasource:
+                type: influxdb
+                uid: influx-techtrafo
+              query: |
+                from(bucket: "telemetria")
+                  |> range(start: -2m)
+                  |> filter(fn: (r) => r._measurement == "telemetria")
+                  |> filter(fn: (r) => r.variable == "corriente_secundario")
+                  |> filter(fn: (r) => r._field == "valor")
+                  |> last()
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              type: reduce
+              reducer: last
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 1100
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              refId: C
+        noDataState: NoData
+        execErrState: Error
+        for: 30s
+        annotations:
+          summary: "Sobrecarga sostenida en corriente secundaria"
+          description: "La corriente secundaria supero 1100A durante mas de 30 segundos. Valor actual: {{ $values.B.Value }} A. Revisar carga conectada y abrir interruptor si persiste."
+        labels:
+          severity: critical
+          modulo: scada
+
+      - uid: alert-scada-vibracion-alta
+        title: Vibracion mecanica alta
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: influx-techtrafo
+            model:
+              datasource:
+                type: influxdb
+                uid: influx-techtrafo
+              query: |
+                from(bucket: "telemetria")
+                  |> range(start: -5m)
+                  |> filter(fn: (r) => r._measurement == "telemetria")
+                  |> filter(fn: (r) => r.variable == "vibracion")
+                  |> filter(fn: (r) => r._field == "valor")
+                  |> last()
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              type: reduce
+              reducer: last
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 0
+              to: 0
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 5
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              refId: C
+        noDataState: NoData
+        execErrState: Error
+        for: 1m
+        annotations:
+          summary: "Vibracion mecanica por encima del umbral"
+          description: "La vibracion del transformador supero 5 mm/s durante mas de 1 minuto. Valor actual: {{ $values.B.Value }} mm/s. Posible falla mecanica o desbalance — programar inspeccion."
+        labels:
+          severity: warning
+          modulo: scada
+
   - orgId: 1
     name: Comercial
     folder: TECHTRAFO
