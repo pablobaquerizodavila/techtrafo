@@ -21,6 +21,7 @@ import { TiemposReprocesosPanel } from "./tiempos-reprocesos-panel";
 import { GanttOT } from "./gantt";
 import { EvidenciasPanel } from "./evidencias-panel";
 import { AuditoriaPanel } from "./auditoria-panel";
+import { PdfButton } from "../../pdf-button";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -215,6 +216,7 @@ export default function OTDetallePage({ params }: PageProps) {
             )}
             <Badge variant={prioridadVariant(ot.prioridad)}>{ot.prioridad}</Badge>
             <Badge variant={estadoOTVariant(ot.estado)} className="text-base">{ot.estado.toUpperCase()}</Badge>
+            <PdfButton recurso="ot" id={ot.id} />
           </div>
         </div>
       </header>

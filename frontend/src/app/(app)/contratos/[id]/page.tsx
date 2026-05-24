@@ -39,6 +39,7 @@ import {
   updatePago,
 } from "@/lib/contratos";
 import { ApiError } from "@/lib/api";
+import { PdfButton } from "../../pdf-button";
 
 interface PageProps { params: Promise<{ id: string }> }
 
@@ -162,9 +163,12 @@ export default function ContratoDetallePage({ params }: PageProps) {
               {" · desde "}<Link href={`/cotizaciones/${contrato.cotizacion_id}`} className="text-primary hover:underline font-mono">{contrato.cotizaciones?.codigo}</Link>
             </p>
           </div>
-          <Badge variant={estadoContratoVariant(contrato.estado)} className="text-base">
-            {contrato.estado.toUpperCase()}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant={estadoContratoVariant(contrato.estado)} className="text-base">
+              {contrato.estado.toUpperCase()}
+            </Badge>
+            <PdfButton recurso="contrato" id={contrato.id} />
+          </div>
         </div>
       </header>
 

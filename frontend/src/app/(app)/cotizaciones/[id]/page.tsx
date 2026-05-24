@@ -18,6 +18,7 @@ import {
 } from "@/lib/cotizaciones";
 import { ApiError } from "@/lib/api";
 import { CotizacionForm } from "../cotizacion-form";
+import { PdfButton } from "../../pdf-button";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -128,9 +129,12 @@ export default function CotizacionDetallePage({ params }: PageProps) {
               {" · "}revision {cotizacion.revision_actual}
             </p>
           </div>
-          <Badge variant={estadoVariant(cotizacion.estado)} className="text-base">
-            {cotizacion.estado.toUpperCase()}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant={estadoVariant(cotizacion.estado)} className="text-base">
+              {cotizacion.estado.toUpperCase()}
+            </Badge>
+            <PdfButton recurso="cotizacion" id={cotizacion.id} />
+          </div>
         </div>
       </header>
 
