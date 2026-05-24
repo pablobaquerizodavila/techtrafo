@@ -1,14 +1,14 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-24 · v0.10.0 · sesión grande, varios módulos cerrados**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-24 · v0.10.1 · 4 CRITICAL de la auditoría de seguridad fixeados**.
 
 ---
 
 ## 1. Estado del proyecto en 30 segundos
 
 - **Empresa**: TECHTRAFO — fabricación, reparación y mantenimiento de transformadores eléctricos (150 kVA → 10 MVA), Samborondón, Ecuador.
-- **Versión actual**: `v0.10.0`. Día de avance grande (2026-05-23 → 24). Cerradas: FASE 4 plus, FASE 5 (portal cliente), FASE 6 (4 dashboards), hardening nginx, FASE 7 (SCADA), FASE 8 (alerting), admin user management, self-service perfil, edición SLA, cronómetros, form visita técnica → informe → email, varias alert rules SCADA, fix roles aprobadores, fix dropdown clientes.
-- **Próximo trabajo**: iterar campos del form de visita técnica (Pablo dijo "luego lo iremos modificando"). Backlog en sección 8.
+- **Versión actual**: `v0.10.1`. Día de avance grande (2026-05-23 → 24). Cerradas: FASE 4 plus, FASE 5 (portal cliente), FASE 6 (4 dashboards), hardening nginx, FASE 7 (SCADA), FASE 8 (alerting), admin user management, self-service perfil, edición SLA, cronómetros, form visita técnica → informe → email, varias alert rules SCADA, fix roles aprobadores, fix dropdown clientes, **auditoría de seguridad + 4 CRITICAL fixeados** (IDOR masivo, self-escalation, TLS SMTP, error leak).
+- **Próximo trabajo**: HIGH/MEDIUM de la auditoría pendientes (rate limit, CSRF, Grafana DB readonly user, etc.). Iterar campos del form de visita técnica (Pablo dijo "luego lo iremos modificando"). Backlog en sección 8.
 - **Repo**: https://github.com/pablobaquerizodavila/techtrafo (branch `main`)
 
 ## 2. Topología real (no la del CLAUDE.md genérico)
@@ -241,6 +241,27 @@ techtrafo/
 ### Fixes de la sesión (2026-05-23 → 24)
 - Backend `listX max(100)` → `max(500)` en 9 routers (admin/clientes/contratos/cotizaciones/expedientes/inventario/ot/transformadores). Causaba dropdown vacío en forms que piden `limit: 200`.
 - Roles aprobadores con permisos faltantes: agregué `expedientes.read` + `expedientes.aprobar` a `ingeniero_diagnostico`, `jefe_planta`, `qa`. Aprobaban hitos del catálogo pero no podían abrir el expediente.
+
+### Auditoría de seguridad — CRITICAL fixeados (2026-05-24, v0.10.1)
+El sub-agente `security-auditor` corrió y encontró 4 CRITICAL + 6 HIGH + 7 MEDIUM + 8 LOW. Los 4 CRITICAL se fixearon:
+
+- **C1 IDOR masivo**: routers `clientes`, `cotizaciones`, `contratos`, `inventario` solo tenían `requireAuth` (sin `requirePermission`). Un cliente con su JWT veía recursos de TODOS los clientes. Agregué `requirePermission` a las 39 rutas afectadas.
+- **C2 self-escalation**: en `PATCH /admin/usuarios/:id`, un admin no-super podía cambiarse su propio rol a uno con `all: true` o asignar a otros un rol con más permisos que los propios. Agregué guards: (a) prohibe modificar rol_id/activo de uno mismo, (b) actor no-super no puede asignar rol con permisos que no tiene, (c) reset-password protege roles con permisos sensibles (`all`, `admin*`).
+- **C3 SMTP TLS**: `rejectUnauthorized: false` ahora solo se aplica si SMTP_HOST está en rangos RFC1918 (LAN). Hosts externos exigen cert válido.
+- **C4 error leak**: en `NODE_ENV=production` el handler global de errores ya no devuelve `err.message` al cliente, solo `error_id` correlacionable con logs.
+
+HIGH/MEDIUM pendientes (no bloqueantes para uso interno actual sin datos reales):
+- H2 rate limit (login, change-password, reset, enviar-email)
+- H3 CSRF token (hoy solo SameSite=Lax)
+- H4 Grafana usa `techtrafo_admin` (DB superuser); crear `grafana_ro` con SELECT only
+- H5 Mosquitto sin auth (mitigado por aislamiento de red docker)
+- H6 Port mapping a host de DBs (Postgres/Redis/Influx en 127.0.0.1)
+- M1 path/CRLF en evidencias download
+- M3 morgan combined loggea Authorization headers
+- M5 GET /api/admin/roles expone permisos completos
+- M7 JWT sin revocation list (8h tras robo de cookie)
+
+Decisión de Pablo: hoy NO se aplican porque no hay clientes ni datos reales. Recordatorio para el futuro: **NO abrir portal.techtrafo.com a clientes externos hasta que los HIGH estén cerrados** (especialmente H2 y H3).
 
 ### Backlog pendiente
 - (sin hitos críticos abiertos)
