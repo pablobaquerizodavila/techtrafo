@@ -2,8 +2,8 @@
 
 > Plataforma de gestión empresarial para TECHTRAFO, empresa dedicada a la reparación, mantenimiento, ensamblaje y fabricación de transformadores eléctricos de 150 kVA hasta 10 MVA en Samborondón, Ecuador.
 
-![Estado](https://img.shields.io/badge/estado-FASE%204%20en%20curso-orange)
-![Versión](https://img.shields.io/badge/versión-0.4.5-blue)
+![Estado](https://img.shields.io/badge/estado-FASE%204%20completa-success)
+![Versión](https://img.shields.io/badge/versión-0.5.0-blue)
 ![Licencia](https://img.shields.io/badge/licencia-privada-red)
 
 **URLs públicas:**
@@ -20,21 +20,22 @@ Sistema digital integral que orquesta toda la operación de TECHTRAFO desde el p
 **Cubre hoy:**
 - **Comercial** — clientes, cotizaciones con revisiones, contratos con plan de pagos
 - **Expedientes** — hoja de ruta del pedido del cliente con 15 hitos auditables y gates de aprobación
-- **Producción** — Órdenes de Trabajo (OT) con pipelines de pasos por tipo de ruta (9 / 11 / 6 pasos para reparación / fabricación / mantenimiento) y gates de QA
+- **Producción** — Órdenes de Trabajo (OT) con pipelines de pasos por tipo de ruta (9 / 11 / 6 pasos para reparación / fabricación / mantenimiento) y gates de QA, **Gantt visual** plan vs real, **evidencias** (fotos / PDFs) por paso y **trazabilidad** completa de cambios
 - **Catálogo de transformadores** — equipos del cliente con características técnicas completas (capacidad, tipo, tensiones, conexión, dimensiones) e historial trazable por intervención
+- **Áreas, causas de demora, reprocesos, tiempos-hombre** — productividad real por área y por responsable
 - **Bodega** — categorías, ítems, ubicaciones, stock con lotes y series, kárdex
 - **Notificaciones email** — alertas SMTP automáticas para estancamientos, gates esperando aprobación y resoluciones (relay vía Synology MailPlus con DKIM)
-- **Dashboard ejecutivo de producción** — KPIs, semáforo de fases, matriz comparativa OT + expedientes, alertas activas
+- **Dashboard ejecutivo de producción** — KPIs, semáforo de fases, matriz comparativa OT + expedientes, alertas activas, capacidad por área, causas de demora, productividad
+- **Generación de PDFs** — cotización / contrato / OT / informe técnico con **4 niveles de detalle visible** (N1 cliente resumen, N2 cliente detallado, N3 interno comercial con márgenes, N4 interno completo con auditoría) y validación server-side por rol
+- **Portal cliente** — vista limpia en `/portal` con timeline simplificado, mapping interno→externo, KPIs propios sin info sensible
+- **Garantías + reclamos + intervenciones** — CRUD completo con auto-creación al completar OT, alertas por vencer 30d, gestión de reclamos y dictámenes
 - **Roles y permisos granulares** — `modulo.accion` configurables desde UI + super_admin bypass
 
 **Provisionado para fases siguientes:**
-- Áreas de producción + causas de demora + tiempos-hombre (migration 013)
-- Gantt y evidencias (fotos / PDFs) por OT
-- PDFs de cotización / contrato / OT con 4 niveles de detalle visible
-- Vista cliente externa (portal.techtrafo.com — FASE 5)
-- Garantías y posventa
+- FASE 5 — Portal cliente en subdomain propio `portal.techtrafo.com`
+- FASE 6 — Dashboards Grafana sobre PostgreSQL
 - Series temporales SCADA en InfluxDB
-- Object storage para archivos en MinIO
+- Object storage para archivos en MinIO (hoy filesystem local en `/uploads`)
 
 ## Arquitectura
 
@@ -79,19 +80,23 @@ PC Ubuntu 192.168.0.23  (Docker Compose stack)
 
 ### Modelo de datos
 
-5 schemas en PostgreSQL, ~30 tablas + 3 vistas:
+5 schemas en PostgreSQL, ~40 tablas + 7 vistas (al cierre FASE 4):
 
 | Schema | Tablas principales | Qué contiene |
 |---|---|---|
-| `core` | roles, usuarios, configuracion, auditoria, notificaciones | Auth, audit log, cola de email |
-| `comercial` | clientes, cliente_contactos, cotizaciones, cotizacion_lineas, cotizacion_revisiones, contratos, contrato_pagos, **expedientes, expediente_hitos, hito_plantillas, visitas_tecnicas, informes_tecnicos** | Pipeline comercial completo + hoja de ruta del pedido |
+| `core` | roles, **usuarios (con `cliente_id` opcional)**, configuracion, auditoria, notificaciones | Auth, audit log, cola de email |
+| `comercial` | clientes, cliente_contactos, cotizaciones, cotizacion_lineas, cotizacion_revisiones, contratos, contrato_pagos, expedientes, expediente_hitos, hito_plantillas, visitas_tecnicas, informes_tecnicos, **hito_estados_cliente** | Pipeline comercial + hoja de ruta + mapping para portal cliente |
 | `inventario` | categorias_item, ubicaciones, items, lotes, series, stock, movimientos_stock | Bodega con trazabilidad por lote/serie |
-| `produccion` | ot, ot_pasos, ot_evidencias, **paso_plantillas, transformadores** + vista `v_transformador_historial` | OT con pasos y gates + catálogo de equipos del cliente |
-| `posventa` | garantias, reclamos, intervenciones | Garantías hasta 3 años (provisionado) |
+| `produccion` | ot, ot_pasos, ot_evidencias, paso_plantillas, transformadores, **areas, causas_demora, reprocesos, tiempos_trabajo** | OT con pasos y gates + transformadores + áreas/causas/tiempos |
+| `posventa` | garantias (con FK opcional a transformadores), reclamos, intervenciones | Garantías + reclamos + dictámenes |
 
 **Vistas críticas:**
 - `comercial.v_expediente_pipeline` — calcula `estancado` en runtime comparando `horas_transcurridas` vs `sla_horas`
 - `produccion.v_transformador_historial` — todas las OT por equipo con duración real
+- `produccion.v_carga_por_area` — pasos en curso / pendientes / completados últimos 30d por área
+- `produccion.v_productividad_responsable` — horas + OT + pasos completados por usuario en 30d
+- `produccion.v_causas_demora_agregado` — incidencias y días perdidos por causa
+- `posventa.v_garantias_por_vencer` — vigentes a ≤ 30 días
 
 **Convenciones**: `created_at`/`updated_at` en inglés; `creado_por`/`actualizado_por` UUID a `core.usuarios`; BIGSERIAL para PKs de negocio (UUID solo en usuarios); naming snake_case plural; soft-delete vía columna `estado`.
 
@@ -197,7 +202,7 @@ Bloques principales:
 - **SMTP** (4.D): `SMTP_HOST=192.168.0.116`, `SMTP_PORT=465`, `SMTP_SECURE=true`, `SMTP_USER=notificaciones`, `SMTP_PASS=***`, `SMTP_FROM="TECHTRAFO Notificaciones <notificaciones@medicvip.org>"`
 - **Panel**: `PANEL_URL=https://panel.techtrafo.com`, `NOTIF_WORKER_INTERVAL_SECONDS=300`
 
-## API endpoints actuales (v0.4.5)
+## API endpoints actuales (v0.5.0)
 
 ### Public
 | Método | Ruta | Descripción |
@@ -218,10 +223,15 @@ Bloques principales:
 | Expedientes | `/api/expedientes` | CRUD + `/:id/hitos/:hitoId/{iniciar,aprobar,rechazar}` + `/dashboard/resumen` |
 | Visitas técnicas | `/api/visitas-tecnicas` | CRUD |
 | Informes técnicos | `/api/informes-tecnicos` | CRUD con auto-numeración INF-YYYY-NNNN |
-| OT | `/api/ot` | CRUD + transiciones + `/:id/pasos/:pasoId/{iniciar,completar,rechazar,saltar}` + `/dashboard/resumen` |
+| OT | `/api/ot` | CRUD + transiciones + `/:id/pasos/:pasoId/{iniciar,completar,rechazar,saltar}` + `/:id/gantt` + `/:id/evidencias` (POST/GET/DELETE) + `/dashboard/resumen` |
 | Transformadores | `/api/transformadores` | CRUD + `/cliente/:id` + historial agregado |
-| Producción (dashboard) | `/api/produccion/dashboard` | KPIs + semáforo + matriz + alertas + rankings |
+| Producción (dashboard) | `/api/produccion/dashboard` | KPIs + semáforo + matriz + alertas + rankings + capacidad/causas/productividad reales |
+| Producción (catálogos) | `/api/produccion/{areas,causas-demora,tiempos,reprocesos}` | CRUD de áreas, causas, registro de horas-hombre y reprocesos |
+| Garantías | `/api/garantias` | CRUD + `/:id/reclamos[/:rId/intervenciones]` + `/dashboard/resumen` |
 | Notificaciones | `/api/notificaciones` | Bandeja del usuario + `/resumen` |
+| Portal cliente | `/api/portal/{mis-expedientes,expediente/:id,mis-transformadores,resumen}` | Filtrado por cliente_id del usuario, sin info sensible |
+| PDFs | `/api/pdf/{cotizacion,contrato,ot,informe-tecnico}/:id?nivel=N` | 4 niveles validados server-side por rol |
+| Auditoría | `/api/auditoria/{ot,expediente}/:id` | Historial completo de cambios |
 | Admin | `/api/admin/{usuarios,roles,permisos/catalogo}` | Gestión usuarios + roles + catálogo de permisos |
 
 ## Estado del proyecto
@@ -248,28 +258,27 @@ Bloques principales:
 - **3.6** Vista de clientes (tabla, filtros, modal CRUD, toasts)
 - **3.7** Reverse proxy + DNS + SSL en `panel.techtrafo.com` y `api.techtrafo.com`
 
-### FASE 4 — Módulos de operación (EN CURSO — v0.4.5)
+### FASE 4 — Módulos de operación (COMPLETADA — v0.5.0)
 - **4.1** API y vista de cotizaciones con revisiones y transiciones de estado ✅
 - **4.3** API y vista de inventario (catálogo + stock + movimientos) ✅
 - **4.4** API y vista de contratos con plan de pagos ✅
 - **4.5** API y vista de OT con pipeline de pasos y gates ✅
+- **4.6** Generación de PDFs con 4 niveles de detalle (PDFKit) validados server-side por rol ✅
+- **4.7** Garantías + reclamos + intervenciones con auto-creación al completar OT, alertas por vencer 30d ✅
 - **4.8** Roles super_admin + estado_aprobacion + CRUD admin (usuarios, roles) ✅
 - **4.A** Migration 010: expedientes + hitos + visitas + informes técnicos ✅
 - **4.B** API completa de expedientes / visitas / informes ✅
-- **4.C** UI tablero de expedientes (Kanban + pipeline gráfico + aprobaciones inline) ✅
-- **4.D** Notificaciones email vía Synology MailPlus con worker in-process (estancamientos, esperando aprobación, resoluciones) ✅
-- **Dashboard A** — Dashboard ejecutivo de producción `/produccion` (KPIs + semáforo + matriz + alertas) ✅
-- **Dashboard B** — Migration 012 transformadores + UI + integración con OT (capacidad real en matriz) ✅
-- **Dashboard C** — Migration 013 áreas + causas_demora + tiempos_trabajo 🔜
-- **Dashboard D** — Roles adicionales + vista cliente (= 4.E) 🔜
-- **Dashboard E** — Gantt + evidencias UI + trazabilidad 🔜
-- **4.6** Generación de PDFs con 4 niveles de detalle visible 🔜
-- **4.7** Garantías 🔜
+- **4.C** UI tablero de expedientes (pipeline gráfico + aprobaciones inline) ✅
+- **4.D** Notificaciones email vía Synology MailPlus con worker in-process ✅
+- **Dashboard A** — Dashboard ejecutivo de producción `/produccion` ✅
+- **Dashboard B** — Migration 012 transformadores + UI + integración con OT ✅
+- **Dashboard C** — Migration 013 áreas + causas_demora + reprocesos + tiempos_trabajo ✅
+- **Dashboard D** — Rol auditor + vista cliente `/portal` con mapping estados internos→externos ✅
+- **Dashboard E** — Gantt SVG + evidencias UI (fotos / PDFs) + trazabilidad de auditoría ✅
 
-### FASE 5 — Portal cliente (PENDIENTE)
-- Subdomain `portal.techtrafo.com`
-- Vista de cliente externa con timeline simplificado y mapping estados internos → externos
-- Información filtrada (sin costos, productividad, demoras internas)
+### FASE 5 — Portal cliente externo (PENDIENTE)
+- Subdomain `portal.techtrafo.com` con DNS + reverse proxy propios
+- (La vista `/portal` ya funciona en `panel.techtrafo.com` desde FASE 4 — Dashboard D)
 
 ### FASE 6 — Dashboards Grafana (PENDIENTE)
 - KPIs financieros y de planta sobre PostgreSQL

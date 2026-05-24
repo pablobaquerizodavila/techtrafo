@@ -6,6 +6,81 @@ El formato sigue Keep a Changelog y este proyecto adhiere a Semantic Versioning.
 
 ---
 
+## [0.5.0] — 2026-05-23 — FASE 4 cierre
+
+### Agregado — Dashboards C/D/E + 4.6 PDFs + 4.7 Garantías
+
+#### Dashboard C — Áreas, causas de demora, reprocesos, tiempos
+- Migration 013: 4 tablas nuevas + 3 vistas agregadas (`v_carga_por_area`, `v_productividad_responsable`, `v_causas_demora_agregado`).
+- Catálogo de 11 áreas seedeadas (ingeniería, compras, núcleo, bobinado, ensamble, tanque, pintura, secado, pruebas, despacho, servicio) con color hex y orden visual.
+- 10 causas de demora tipificadas en 6 categorías (materiales, personal, calidad, técnica, cliente, operativa).
+- `produccion.reprocesos` con `dias_perdidos` + `costo_estimado` opcional + flag resuelto.
+- `produccion.tiempos_trabajo` (horas-hombre por usuario/OT/paso/área).
+- FK `ot_pasos.area_id` + `ot_pasos.causa_demora_id` con asignación automática de áreas a los pasos ya instanciados vía CTE.
+- Dashboard `/produccion`: los 3 bloques DUMMY del fondo (capacidad, causas, productividad) **pasaron a data real** desde las nuevas vistas.
+- UI: dialog "Registrar tiempo" + dialog "Reportar reproceso" en detalle de OT con resolución inline.
+
+#### Dashboard D — Roles + vista cliente con mapping
+- Migration 014: `usuarios.cliente_id` (FK opcional a `comercial.clientes`).
+- Rol `auditor` agregado (solo lectura, sin info sensible).
+- `comercial.hito_estados_cliente`: 15 mappings hito_codigo → label_cliente con emoji (editable a futuro).
+- `routes/portal.ts` con 4 endpoints protegidos por `requireClienteId`. Filtran TODO por `cliente_id` del usuario y devuelven solo hitos `visible_cliente=true` con mapping ejecutivo.
+- `/portal` y `/portal/expediente/[id]` con vista limpia (sin responsables, demoras, reprocesos, costos internos).
+- Sidebar simplificado automático para rol cliente: solo "Mi cuenta" + Notificaciones.
+- `/dashboard` redirige a `/portal` si el usuario es cliente.
+
+#### Dashboard E — Gantt + Evidencias + Trazabilidad
+- `services/email.ts`: nada. (Multer es nuevo).
+- `routes/evidencias.ts`: subir/listar/descargar/eliminar archivos por OT y paso con multer (filesystem local `/uploads/evidencias/{ot_id}/`). Validación de mime types, límite 20 MB configurable, path traversal protection. Ruta guardada RELATIVA al UPLOAD_DIR para portabilidad futura a MinIO.
+- `routes/auditoria.ts`: GET `/ot/:id` y `/expediente/:id` combinan `core.auditoria` con cambios sobre pasos, evidencias, tiempos y reprocesos.
+- `/api/ot/:id/gantt`: distribuye pasos sobre el rango planeado y devuelve plan vs real.
+- Frontend: `GanttOT` componente SVG puro (sin libs) con barras plan vs real coloreadas por estado, línea "HOY", tooltips. `EvidenciasPanel` con galería de fotos + lightbox + lista de PDFs. `AuditoriaPanel` colapsable con diff visual antes/después.
+- `docker-compose.yml`: nuevo volumen `../../uploads:/uploads` montado al api.
+
+#### 4.6 — Generación de PDFs con 4 niveles de detalle
+- Stack: **PDFKit** (lightweight, sin Chromium).
+- `services/pdf/base.ts`: helpers reutilizables (cabecera corporativa con franja oscura, pie con marca de nivel y aviso CONFIDENCIAL si N≥3, paleta TECHTRAFO, tablas zebra, totales destacados).
+- `services/pdf/documentos.ts`: 4 generadores (cotización, contrato, OT, informe técnico).
+- `routes/pdf.ts`: 4 endpoints `GET /api/pdf/{recurso}/:id?nivel=N`.
+- **Validación server-side del nivel**: cliente max=2, interno no-super_admin max=3, super_admin max=4. Aunque el query pida N=4 se entrega el nivel permitido.
+- Por nivel:
+  - N1: cabecera + cliente + total único + condiciones
+  - N2: + tabla detallada con líneas, IVA, descuento global, plan de pagos, pasos
+  - N3: + costo unitario + margen por línea + notas internas + resultados de gates QA + recomendación destacada
+  - N4: + historial de revisiones + auditoría completa
+- Frontend: `PdfButton` dropdown con descripción visual por nivel, integrado en cotización/contrato/OT.
+
+#### 4.7 — Garantías + reclamos + intervenciones
+- Migration 015: `posventa.garantias.transformador_id` (FK opcional) + `serie_id` opcional + CHECK que exige al menos uno + `ot_id_origen` para trazar origen.
+- Vista `v_garantias_por_vencer` para alertas (vigentes ≤ 30 días).
+- `routes/garantias.ts`: CRUD con código `GAR-YYYY-NNNN` auto + dashboard/resumen con 4 KPIs.
+- Reclamos anidados con `REC-YYYY-NNNN` auto, severidad (baja/media/alta/crítica), canal de entrada (telefono/email/whatsapp/visita/web), cerrar exige resolución + setea fecha_cierre + dictaminado_por.
+- Intervenciones con número auto-incremental por reclamo (visita_diagnostico/reparacion/reemplazo/calibracion/asesoria/otro) + resultado (exitoso/parcial/fallido).
+- **Auto-creación de garantía al completar OT**: 12 meses para reparación/mantenimiento, 24 para fabricación. Si falla, no rompe la transición (try/catch + log).
+- UI: `/garantias` listado con KPIs clickables como filtro, highlight amarillo de filas ≤ 30 días. `/garantias/[id]` detalle con stats banner (días restantes coloreado), reclamos en cards con severidad, botones inline "+ intervención" y "cerrar" con dialog de resolución.
+
+### Mejorado
+- Sidebar agrega entry "🛡️ Garantías" + "⚡ Transformadores" + "📊 Dashboard producción".
+- `/dashboard` reescrito: accesos rápidos por permiso + roadmap (antes era placeholder de FASE 3 desactualizado).
+- `SessionExpiredButton` cliente que limpia cookie y hace hard navigation a `/login` (resuelve loop dashboard↔login cuando JWT expira).
+- Middleware con validación de forma JWT antes de redirigir desde `/login` (heurística defensiva).
+- Matriz comparativa del dashboard producción muestra capacidad real en kVA/MVA desde transformador vinculado (ya no chip DUMMY).
+- Dashboard producción muestra responsables, áreas y causas reales (los 3 bloques DUMMY pasaron a producción).
+
+### Infraestructura
+- `docker-compose.yml`: volumen `../../uploads:/uploads` para evidencias + env `UPLOAD_DIR`.
+- Backup workflow consolidado con varios snapshots en `/home/techtrafo/backups/`.
+- Migrations 011, 012, 013, 014, 015 aplicadas en prod.
+- Bump version 0.3.0 → 0.5.0 en backend y frontend.
+
+### Notas técnicas
+- **Total de migrations: 15** (001 → 015).
+- **Endpoints REST agregados en FASE 4**: ~60 nuevos endpoints sobre 12 routers.
+- **Tablas DB al cierre**: ~40 tablas + 7 vistas agregadas.
+- **Permisos granulares**: 8 módulos × N acciones (clientes, cotizaciones, contratos, inventario, expedientes, ot, admin, portal).
+
+---
+
 ## [0.4.5] — 2026-05-23
 
 ### Agregado — FASE 4: módulos de operación + Dashboard de producción

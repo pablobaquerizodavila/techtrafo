@@ -1,6 +1,6 @@
 {
   "name": "techtrafo-web",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "description": "TECHTRAFO panel web (Next.js + TypeScript + Tailwind + shadcn/ui)",
   "private": true,
   "engines": {
