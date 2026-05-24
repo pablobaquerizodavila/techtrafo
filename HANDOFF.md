@@ -1,16 +1,15 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-23 · v0.5.0 · FASE 4 cerrada**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-23 · v0.6.0 · FASE 5 cerrada**.
 
 ---
 
 ## 1. Estado del proyecto en 30 segundos
 
 - **Empresa**: TECHTRAFO — fabricación, reparación y mantenimiento de transformadores eléctricos (150 kVA → 10 MVA), Samborondón, Ecuador.
-- **Versión actual**: `v0.5.0` (FASE 4 completa). Tag git creado en `origin/main`.
-- **Próximo trabajo**: FASE 5 (portal cliente en subdomain propio) o FASE 6 (Grafana). El backlog también tiene cosas chicas pendientes: ver sección 8.
+- **Versión actual**: `v0.6.0` (FASE 5 completa). FASE 4 plus (botón PDF informe técnico + worker garantías 30d/7d) y FASE 5 (portal cliente en subdomain propio con SSL) cerradas.
+- **Próximo trabajo**: FASE 6 (Grafana). Backlog en sección 8.
 - **Repo**: https://github.com/pablobaquerizodavila/techtrafo (branch `main`)
-- **Último commit antes de este handoff**: `f638b6e` (release 0.5.0).
 
 ## 2. Topología real (no la del CLAUDE.md genérico)
 
@@ -18,8 +17,12 @@
 Internet (186.101.238.135)
   └─ NAT 80/443 → VM nginx 192.168.0.7 (Ubuntu 22.04 + Let's Encrypt)
       ├─ techtrafo.com / www       → NAS Web Station :80 (landing)
-      ├─ panel.techtrafo.com       → PC Ubuntu :3002 (frontend Next.js)
+      ├─ panel.techtrafo.com       → PC Ubuntu :3002 (frontend Next.js, panel interno)
+      ├─ portal.techtrafo.com      → PC Ubuntu :3002 (mismo container, middleware reescribe a /portal/*)
       └─ api.techtrafo.com         → PC Ubuntu :3000 (backend Express)
+
+  El cert SAN /etc/letsencrypt/live/panel.techtrafo.com/ cubre los 3 subdomains
+  (panel + api + portal). Renovación automática vía certbot timer.
 
 NAS Synology DS1821+ 192.168.0.116 (DSM 7.3.2)
   ├─ Web Station: techtrafo.com (landing comercial estática)
@@ -48,6 +51,7 @@ Volúmenes Docker importantes:
 | Host | Usuario | Password | Para qué |
 |---|---|---|---|
 | `192.168.0.23` (PC Ubuntu, Docker host) | `techtrafo` | `techtrafo$` | Operar contenedores, editar archivos del repo |
+| `192.168.0.7` (VM nginx, voip-panel-01) | `pbaquerizo` | `Groundunder8299$` | Editar nginx vhost en `/etc/nginx/sites-available/netvoice` (un solo archivo para todos los dominios — Netvoice, TECHTRAFO, MedicVIP, Siscormed). Sudo con password. |
 | `192.168.0.116` (NAS Synology) | `pbaquerizo` | `Groundunder8299*` | Inspeccionar/operar Synology, configurar MailPlus |
 | PostgreSQL en container | `techtrafo_admin` | `Cambiar_Esta_Password_Segura_2026` | Consultas DB directas |
 | Cuenta SMTP TECHTRAFO en MailPlus | `notificaciones` | `VpdFs5gpdZ49yvqs3KHjJ8bE` | Saliente desde el worker (alias `notificaciones@medicvip.org`) |
@@ -151,16 +155,21 @@ techtrafo/
 
 ## 8. Backlog pendiente (corto)
 
-### Pendiente "FASE 4 plus" (cosas chicas que quedaron)
-- Botón PDF en detalle de **informe técnico** (los otros 3 ya tienen).
-- Endpoint cron real para enviar emails de garantías por vencer 30d/7d (la vista `v_garantias_por_vencer` existe, pero el worker no lo está procesando todavía).
+### FASE 4 plus — CERRADA (2026-05-23)
+- Botón PDF agregado en detalle de informe técnico (dentro del listado del expediente).
+- Worker cron procesa `posventa.v_garantias_por_vencer` y encola email al cliente:
+  - umbral `7d` si `dias_restantes <= 7`, sino `30d` si `<= 30`
+  - idempotente por `(garantia_id, umbral)` — 1 sola notif por garantía y umbral en toda su vida
+  - destinatario: `clientes.email` (silencioso si NULL — se activa cuando el cliente tenga email)
 
-### FASE 5 — Portal cliente externo
-- Subdomain `portal.techtrafo.com`. La vista funcional ya existe en `panel.techtrafo.com/portal` desde Dashboard D.
-- Falta:
-  - DNS A record `portal.techtrafo.com` → IP pública
-  - Reverse proxy en VM nginx .7 con SSL Let's Encrypt
-  - Decisión: ¿misma app Next.js sirviendo `portal.techtrafo.com` con redirect interno a `/portal`, o app separada?
+### FASE 5 — Portal cliente externo — CERRADA (2026-05-23)
+- Subdomain `portal.techtrafo.com` en producción con SSL.
+- Arquitectura elegida: **misma app Next.js**, middleware reescribe por host.
+  - Cliente entra a `portal.techtrafo.com/expediente/5` → internamente sirve `/portal/expediente/5`.
+  - Paths internos (`/dashboard`, `/cotizaciones`, `/ot`, etc.) → redirect a `/` (no expone módulos admin).
+  - Post-login: si `Host` es portal → `/portal`, sino → `/dashboard`.
+- Cert SAN expandido para cubrir panel + api + portal (un solo cert, una sola renovación).
+- DNS A record creado en GoDaddy: `portal` → `186.101.238.135`.
 
 ### FASE 6 — Dashboards Grafana
 - Grafana ya está corriendo en `:3001` conectado a Postgres.
