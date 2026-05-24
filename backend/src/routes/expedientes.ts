@@ -646,6 +646,219 @@ router.post("/:id/hitos/:hitoId/rechazar", requirePermission("expedientes", "apr
 });
 
 // ===================================================================
+// POST /api/expedientes/:id/hitos/:hitoId/reintentar
+// Reabre un hito rechazado: vuelve a no_iniciado, limpia motivo_rechazo y
+// las fechas de aprobacion/fin. Util cuando el motivo del rechazo se
+// resolvio y se va a reagendar la actividad (ej. visita tecnica).
+// ===================================================================
+router.post("/:id/hitos/:hitoId/reintentar", requirePermission("expedientes", "write"), async (req, res) => {
+  const id = Number(req.params.id);
+  const hitoId = Number(req.params.hitoId);
+  if (!Number.isInteger(id) || !Number.isInteger(hitoId)) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  const userId = req.user!.id;
+  try {
+    await withAppUser(userId, async (tx) => {
+      const hito = await tx.expediente_hitos.findUnique({ where: { id: hitoId } });
+      if (!hito || Number(hito.expediente_id) !== id) throw new Error("not_found");
+      if (hito.estado !== "rechazado") throw new Error("solo_hito_rechazado");
+
+      await tx.$executeRaw`
+        UPDATE comercial.expediente_hitos
+           SET estado = 'no_iniciado',
+               motivo_rechazo = NULL,
+               fecha_fin = NULL,
+               aprobado_por = NULL,
+               fecha_aprobacion = NULL,
+               actualizado_por = ${userId}::uuid,
+               updated_at = NOW()
+         WHERE id = ${hitoId}
+      `;
+    });
+    const updated = await prisma.expediente_hitos.findUnique({ where: { id: hitoId } });
+    res.json({ data: updated });
+  } catch (err) {
+    if (err instanceof Error) {
+      if (err.message === "not_found") { res.status(404).json({ error: "not_found" }); return; }
+      if (err.message === "solo_hito_rechazado") { res.status(409).json({ error: "solo_hito_rechazado" }); return; }
+    }
+    throw err;
+  }
+});
+
+// ===================================================================
+// POST /api/expedientes/:id/hitos/:hitoId/reabrir-anterior
+// Reabre un hito anterior y limpia el actual rechazado. Util cuando el
+// rechazo de la visita revela que falta algo del hito previo
+// (ej. validacion de credito incompleta).
+// ===================================================================
+const reabrirAnteriorSchema = z.object({
+  hito_anterior_id: z.number().int().positive(),
+});
+
+router.post("/:id/hitos/:hitoId/reabrir-anterior", requirePermission("expedientes", "write"), async (req, res) => {
+  const id = Number(req.params.id);
+  const hitoId = Number(req.params.hitoId);
+  if (!Number.isInteger(id) || !Number.isInteger(hitoId)) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  const parsed = reabrirAnteriorSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  const userId = req.user!.id;
+  const { hito_anterior_id } = parsed.data;
+  try {
+    await withAppUser(userId, async (tx) => {
+      const actual = await tx.expediente_hitos.findUnique({ where: { id: hitoId } });
+      const anterior = await tx.expediente_hitos.findUnique({ where: { id: hito_anterior_id } });
+      if (!actual || Number(actual.expediente_id) !== id) throw new Error("not_found");
+      if (!anterior || Number(anterior.expediente_id) !== id) throw new Error("anterior_not_found");
+      if (anterior.orden >= actual.orden) throw new Error("hito_anterior_invalido");
+      if (actual.estado !== "rechazado") throw new Error("solo_hito_rechazado");
+
+      // Reabre ambos: anterior queda no_iniciado, actual tambien (vuelve a estar disponible)
+      await tx.$executeRaw`
+        UPDATE comercial.expediente_hitos
+           SET estado = 'no_iniciado',
+               motivo_rechazo = NULL,
+               fecha_fin = NULL,
+               aprobado_por = NULL,
+               fecha_aprobacion = NULL,
+               actualizado_por = ${userId}::uuid,
+               updated_at = NOW()
+         WHERE id IN (${hitoId}, ${hito_anterior_id})
+      `;
+    });
+    res.json({ status: "reabierto", hito_actual_id: hitoId, hito_anterior_id });
+  } catch (err) {
+    if (err instanceof Error) {
+      const map: Record<string, number> = {
+        not_found: 404, anterior_not_found: 404,
+        hito_anterior_invalido: 409, solo_hito_rechazado: 409,
+      };
+      const code = map[err.message];
+      if (code) { res.status(code).json({ error: err.message }); return; }
+    }
+    throw err;
+  }
+});
+
+// ===================================================================
+// POST /api/expedientes/:id/hitos/:hitoId/escalar
+// Marca el hito rechazado como escalado y notifica a un rol/usuario destino.
+// El hito se queda en estado rechazado, pero metadata.escalado=true y se
+// guarda quien y a quien fue escalado. La accion no avanza el pipeline:
+// queda en manos del receptor de la escalacion decidir el proximo paso.
+// ===================================================================
+const escalarSchema = z.object({
+  mensaje: z.string().min(1).max(2000),
+  rol_destino_id: z.number().int().positive().optional().nullable(),
+});
+
+router.post("/:id/hitos/:hitoId/escalar", requirePermission("expedientes", "write"), async (req, res) => {
+  const id = Number(req.params.id);
+  const hitoId = Number(req.params.hitoId);
+  if (!Number.isInteger(id) || !Number.isInteger(hitoId)) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  const parsed = escalarSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  const userId = req.user!.id;
+  const { mensaje, rol_destino_id } = parsed.data;
+  try {
+    await withAppUser(userId, async (tx) => {
+      const hito = await tx.expediente_hitos.findUnique({ where: { id: hitoId } });
+      if (!hito || Number(hito.expediente_id) !== id) throw new Error("not_found");
+      if (hito.estado !== "rechazado") throw new Error("solo_hito_rechazado");
+
+      const metadataActual = (hito.metadata as Record<string, unknown>) ?? {};
+      const metadataNueva = {
+        ...metadataActual,
+        escalado: true,
+        escalado_por: userId,
+        escalado_a_rol: rol_destino_id ?? null,
+        escalado_mensaje: mensaje,
+        escalado_at: new Date().toISOString(),
+      };
+      const metadataStr = JSON.stringify(metadataNueva);
+      await tx.$executeRaw`
+        UPDATE comercial.expediente_hitos
+           SET metadata = ${metadataStr}::jsonb,
+               actualizado_por = ${userId}::uuid,
+               updated_at = NOW()
+         WHERE id = ${hitoId}
+      `;
+    });
+    // TODO: enviar email a usuarios del rol_destino_id (fuera de scope de este endpoint).
+    res.json({ status: "escalado", hito_id: hitoId });
+  } catch (err) {
+    if (err instanceof Error) {
+      if (err.message === "not_found") { res.status(404).json({ error: "not_found" }); return; }
+      if (err.message === "solo_hito_rechazado") { res.status(409).json({ error: "solo_hito_rechazado" }); return; }
+    }
+    throw err;
+  }
+});
+
+// ===================================================================
+// POST /api/expedientes/:id/cancelar
+// Cierra el expediente como no viable / cancelado. NO toca hitos
+// individuales: queda el historial intacto para auditoria. El frontend
+// muestra el expediente como cerrado y bloquea acciones.
+// ===================================================================
+const cancelarSchema = z.object({
+  motivo: z.string().min(1).max(500),
+});
+
+router.post("/:id/cancelar", requirePermission("expedientes", "write"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  const parsed = cancelarSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  const userId = req.user!.id;
+  const { motivo } = parsed.data;
+  try {
+    await withAppUser(userId, async (tx) => {
+      const exp = await tx.expedientes.findUnique({ where: { id } });
+      if (!exp) throw new Error("not_found");
+      if (exp.estado === "cerrado") throw new Error("ya_cerrado");
+
+      await tx.$executeRaw`
+        UPDATE comercial.expedientes
+           SET estado = 'cerrado',
+               motivo_cierre = ${motivo},
+               fecha_cierre = NOW(),
+               actualizado_por = ${userId}::uuid,
+               updated_at = NOW()
+         WHERE id = ${id}
+      `;
+    });
+    res.json({ status: "cancelado", expediente_id: id });
+  } catch (err) {
+    if (err instanceof Error) {
+      if (err.message === "not_found") { res.status(404).json({ error: "not_found" }); return; }
+      if (err.message === "ya_cerrado") { res.status(409).json({ error: "ya_cerrado" }); return; }
+    }
+    throw err;
+  }
+});
+
+// ===================================================================
 // GET /api/expedientes/dashboard/resumen
 // KPIs para el tablero principal
 // ===================================================================

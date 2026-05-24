@@ -161,6 +161,23 @@ export async function updateHitoSla(expId: number, hitoId: number, sla_horas: nu
   return api.patch(`/api/expedientes/${expId}/hitos/${hitoId}`, { sla_horas });
 }
 
+// Acciones post-rechazo de un hito ---------------------------------
+export async function reintentarHito(expId: number, hitoId: number): Promise<{ data: ExpedienteHito }> {
+  return api.post(`/api/expedientes/${expId}/hitos/${hitoId}/reintentar`);
+}
+
+export async function reabrirHitoAnterior(expId: number, hitoId: number, hito_anterior_id: number): Promise<{ status: string }> {
+  return api.post(`/api/expedientes/${expId}/hitos/${hitoId}/reabrir-anterior`, { hito_anterior_id });
+}
+
+export async function escalarHito(expId: number, hitoId: number, mensaje: string, rol_destino_id?: number | null): Promise<{ status: string }> {
+  return api.post(`/api/expedientes/${expId}/hitos/${hitoId}/escalar`, { mensaje, rol_destino_id: rol_destino_id ?? null });
+}
+
+export async function cancelarExpediente(expId: number, motivo: string): Promise<{ status: string }> {
+  return api.post(`/api/expedientes/${expId}/cancelar`, { motivo });
+}
+
 // Helpers de UI
 export function estadoHitoVariant(estado: EstadoHito, estancado: boolean): "success" | "default" | "warning" | "destructive" | "muted" {
   if (estancado) return "destructive";

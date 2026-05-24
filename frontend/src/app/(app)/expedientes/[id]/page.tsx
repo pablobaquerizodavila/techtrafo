@@ -16,6 +16,10 @@ import {
   Mail,
   Phone,
   Clock,
+  RotateCcw,
+  Undo2,
+  ArrowUpToLine,
+  Ban,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,12 +38,16 @@ import {
   ExpedienteHito,
   aprobarHito,
   canalOrigenLabel,
+  cancelarExpediente,
+  escalarHito,
   estadoExpedienteVariant,
   estadoHitoIcon,
   estadoHitoVariant,
   getExpediente,
   iniciarHito,
+  reabrirHitoAnterior,
   rechazarHito,
+  reintentarHito,
   updateHitoSla,
 } from "@/lib/expedientes";
 import { ApiError } from "@/lib/api";
@@ -60,6 +68,13 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
   const [savingSla, setSavingSla] = useState(false);
   const [visitaFormOpen, setVisitaFormOpen] = useState(false);
   const [informeDialogId, setInformeDialogId] = useState<number | null>(null);
+  const [rechazoDialog, setRechazoDialog] = useState<
+    | { kind: "closed" }
+    | { kind: "reabrir-anterior"; hito: ExpedienteHito; hitoAnteriorId: number | null }
+    | { kind: "escalar"; hito: ExpedienteHito; mensaje: string }
+    | { kind: "cancelar"; motivo: string }
+  >({ kind: "closed" });
+  const [savingRechazoAccion, setSavingRechazoAccion] = useState(false);
 
   useEffect(() => {
     params.then(({ id }) => setId(Number(id)));
@@ -155,6 +170,82 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
       toast.error(code);
     } finally {
       setSavingSla(false);
+    }
+  }
+
+  async function handleReintentarHito(hito: ExpedienteHito) {
+    if (!expediente) return;
+    if (!window.confirm(`Reintentar el hito "${hito.nombre}"? Volvera a estado no iniciado y se borrara el motivo del rechazo.`)) return;
+    setSavingRechazoAccion(true);
+    try {
+      await reintentarHito(expediente.id, hito.id);
+      toast.success("Hito reabierto. Podes iniciarlo de nuevo.");
+      load();
+    } catch (err) {
+      const code = err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error";
+      toast.error(code);
+    } finally {
+      setSavingRechazoAccion(false);
+    }
+  }
+
+  async function handleReabrirAnteriorSubmit() {
+    if (!expediente || rechazoDialog.kind !== "reabrir-anterior") return;
+    if (!rechazoDialog.hitoAnteriorId) {
+      toast.error("Seleccioná el hito anterior a reabrir");
+      return;
+    }
+    setSavingRechazoAccion(true);
+    try {
+      await reabrirHitoAnterior(expediente.id, rechazoDialog.hito.id, rechazoDialog.hitoAnteriorId);
+      toast.success("Hitos reabiertos");
+      setRechazoDialog({ kind: "closed" });
+      load();
+    } catch (err) {
+      const code = err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error";
+      toast.error(code);
+    } finally {
+      setSavingRechazoAccion(false);
+    }
+  }
+
+  async function handleEscalarSubmit() {
+    if (!expediente || rechazoDialog.kind !== "escalar") return;
+    if (!rechazoDialog.mensaje.trim()) {
+      toast.error("Escribí un mensaje para la escalación");
+      return;
+    }
+    setSavingRechazoAccion(true);
+    try {
+      await escalarHito(expediente.id, rechazoDialog.hito.id, rechazoDialog.mensaje.trim());
+      toast.success("Hito escalado");
+      setRechazoDialog({ kind: "closed" });
+      load();
+    } catch (err) {
+      const code = err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error";
+      toast.error(code);
+    } finally {
+      setSavingRechazoAccion(false);
+    }
+  }
+
+  async function handleCancelarExpedienteSubmit() {
+    if (!expediente || rechazoDialog.kind !== "cancelar") return;
+    if (!rechazoDialog.motivo.trim()) {
+      toast.error("Escribí el motivo del cierre");
+      return;
+    }
+    setSavingRechazoAccion(true);
+    try {
+      await cancelarExpediente(expediente.id, rechazoDialog.motivo.trim());
+      toast.success("Expediente cerrado");
+      setRechazoDialog({ kind: "closed" });
+      load();
+    } catch (err) {
+      const code = err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error";
+      toast.error(code);
+    } finally {
+      setSavingRechazoAccion(false);
     }
   }
 
@@ -386,6 +477,25 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
                         <strong>Motivo rechazo:</strong> {h.motivo_rechazo}
                       </p>
                     )}
+                    {h.estado === "rechazado" && (
+                      <div className="mt-2 rounded-md border border-orange-300 bg-orange-50 p-3">
+                        <p className="mb-2 text-xs font-semibold text-orange-900">¿Cómo seguimos?</p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button size="sm" variant="outline" onClick={() => handleReintentarHito(h)} disabled={savingRechazoAccion}>
+                            <RotateCcw className="mr-1 h-3.5 w-3.5" /> Reintentar este hito
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setRechazoDialog({ kind: "reabrir-anterior", hito: h, hitoAnteriorId: null })} disabled={savingRechazoAccion}>
+                            <Undo2 className="mr-1 h-3.5 w-3.5" /> Volver a un hito anterior
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setRechazoDialog({ kind: "escalar", hito: h, mensaje: "" })} disabled={savingRechazoAccion}>
+                            <ArrowUpToLine className="mr-1 h-3.5 w-3.5" /> Escalar
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => setRechazoDialog({ kind: "cancelar", motivo: h.motivo_rechazo ?? "" })} disabled={savingRechazoAccion}>
+                            <Ban className="mr-1 h-3.5 w-3.5" /> Cerrar expediente
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                     {h.notas && (
                       <p className="mt-2 rounded bg-muted px-2 py-1 text-xs whitespace-pre-wrap">{h.notas}</p>
                     )}
@@ -584,6 +694,125 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
         onClose={() => setInformeDialogId(null)}
         informeId={informeDialogId}
       />
+
+      {/* Dialog reabrir hito anterior */}
+      <Dialog
+        open={rechazoDialog.kind === "reabrir-anterior"}
+        onOpenChange={(o) => !o && setRechazoDialog({ kind: "closed" })}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Volver a un hito anterior</DialogTitle>
+            <DialogDescription>
+              {rechazoDialog.kind === "reabrir-anterior" && (
+                <>Reabrir este hito ({rechazoDialog.hito.nombre}) y un hito anterior que necesite corrección.</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="hito_ant">Hito anterior a reabrir</Label>
+            <select
+              id="hito_ant"
+              className="w-full rounded border bg-background px-2 py-1.5 text-sm"
+              value={rechazoDialog.kind === "reabrir-anterior" && rechazoDialog.hitoAnteriorId !== null ? String(rechazoDialog.hitoAnteriorId) : ""}
+              onChange={(e) => {
+                if (rechazoDialog.kind !== "reabrir-anterior") return;
+                setRechazoDialog({ ...rechazoDialog, hitoAnteriorId: e.target.value ? Number(e.target.value) : null });
+              }}
+            >
+              <option value="">— Seleccionar —</option>
+              {expediente && rechazoDialog.kind === "reabrir-anterior" &&
+                hitos
+                  .filter((x) => x.orden < rechazoDialog.hito.orden)
+                  .map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {x.orden}. {x.nombre} ({x.estado})
+                    </option>
+                  ))}
+            </select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRechazoDialog({ kind: "closed" })} disabled={savingRechazoAccion}>Cancelar</Button>
+            <Button onClick={handleReabrirAnteriorSubmit} disabled={savingRechazoAccion}>
+              {savingRechazoAccion ? "Reabriendo..." : "Reabrir hitos"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog escalar */}
+      <Dialog
+        open={rechazoDialog.kind === "escalar"}
+        onOpenChange={(o) => !o && setRechazoDialog({ kind: "closed" })}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Escalar el hito</DialogTitle>
+            <DialogDescription>
+              {rechazoDialog.kind === "escalar" && (
+                <>Marca este hito como escalado a gerencia. Queda registrado en el historial con tu mensaje. El próximo paso lo decide quien lo recibe.</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="esc_msg">Mensaje para la escalación *</Label>
+            <textarea
+              id="esc_msg"
+              rows={4}
+              className="w-full rounded border bg-background px-2 py-1.5 text-sm"
+              placeholder="Ej: Cliente no permitió acceso al equipo. Requiere intervención comercial para coordinar visita."
+              value={rechazoDialog.kind === "escalar" ? rechazoDialog.mensaje : ""}
+              onChange={(e) => {
+                if (rechazoDialog.kind !== "escalar") return;
+                setRechazoDialog({ ...rechazoDialog, mensaje: e.target.value });
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRechazoDialog({ kind: "closed" })} disabled={savingRechazoAccion}>Cancelar</Button>
+            <Button onClick={handleEscalarSubmit} disabled={savingRechazoAccion}>
+              {savingRechazoAccion ? "Escalando..." : "Escalar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog cancelar expediente */}
+      <Dialog
+        open={rechazoDialog.kind === "cancelar"}
+        onOpenChange={(o) => !o && setRechazoDialog({ kind: "closed" })}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cerrar expediente</DialogTitle>
+            <DialogDescription>
+              {expediente && (
+                <>Cerrar el expediente <strong>{expediente.codigo}</strong> como no viable. La hoja de ruta queda como historial. Esta acción no se puede revertir desde la UI.</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="cancel_motivo">Motivo del cierre *</Label>
+            <textarea
+              id="cancel_motivo"
+              rows={3}
+              className="w-full rounded border bg-background px-2 py-1.5 text-sm"
+              placeholder="Ej: Equipo no viable según diagnóstico"
+              value={rechazoDialog.kind === "cancelar" ? rechazoDialog.motivo : ""}
+              onChange={(e) => {
+                if (rechazoDialog.kind !== "cancelar") return;
+                setRechazoDialog({ ...rechazoDialog, motivo: e.target.value });
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRechazoDialog({ kind: "closed" })} disabled={savingRechazoAccion}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleCancelarExpedienteSubmit} disabled={savingRechazoAccion}>
+              {savingRechazoAccion ? "Cerrando..." : "Cerrar expediente"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Toaster richColors position="top-right" />
     </div>
