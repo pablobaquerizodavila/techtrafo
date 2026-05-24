@@ -1,14 +1,14 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-23 · v0.9.0 · FASE 8 cerrada**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-24 · v0.10.0 · sesión grande, varios módulos cerrados**.
 
 ---
 
 ## 1. Estado del proyecto en 30 segundos
 
 - **Empresa**: TECHTRAFO — fabricación, reparación y mantenimiento de transformadores eléctricos (150 kVA → 10 MVA), Samborondón, Ecuador.
-- **Versión actual**: `v0.9.0` (FASE 8 completa). FASE 4 plus, FASE 5, FASE 6, hardening, FASE 7 (SCADA), y FASE 8 (Grafana alerting con email) cerradas.
-- **Próximo trabajo**: cuando llegue hardware real → reemplazar simulador por gateway IoT. Ver ADR-004. Sumar reglas de alerting según necesidad (umbrales V/I/vibración, garantías por vencer, reclamos).
+- **Versión actual**: `v0.10.0`. Día de avance grande (2026-05-23 → 24). Cerradas: FASE 4 plus, FASE 5 (portal cliente), FASE 6 (4 dashboards), hardening nginx, FASE 7 (SCADA), FASE 8 (alerting), admin user management, self-service perfil, edición SLA, cronómetros, form visita técnica → informe → email, varias alert rules SCADA, fix roles aprobadores, fix dropdown clientes.
+- **Próximo trabajo**: iterar campos del form de visita técnica (Pablo dijo "luego lo iremos modificando"). Backlog en sección 8.
 - **Repo**: https://github.com/pablobaquerizodavila/techtrafo (branch `main`)
 
 ## 2. Topología real (no la del CLAUDE.md genérico)
@@ -203,11 +203,44 @@ techtrafo/
 - SMTP configurado en Grafana (`GF_SMTP_*` en compose, reusa cuenta MailPlus).
 - Contact point `pablo-email` → pablobaquerizodavila@gmail.com (provisioned).
 - Notification policy default (group_wait 30s, group_interval 5m, repeat 4h).
-- 2 alert rules provisioned (folder TECHTRAFO):
-  - `alert-scada-temp-aceite`: Influx Flux, temperatura_aceite > 80°C por 1m → critical
-  - `alert-comercial-hitos-estancados`: Postgres, COUNT(v_expediente_pipeline WHERE estancado) > 0 por 2m → warning
+- 5 alert rules provisioned (folder TECHTRAFO):
+  - `alert-scada-temp-aceite` (critical, 1m): temperatura_aceite > 80°C
+  - `alert-scada-voltaje-primario-fuera-rango` (warning, 1m): outside [13110, 14490] V
+  - `alert-scada-corriente-sobrecarga` (critical, 30s): corriente_secundario > 1100 A
+  - `alert-scada-vibracion-alta` (warning, 1m): vibracion > 5 mm/s
+  - `alert-comercial-hitos-estancados` (warning, 2m): COUNT(v_expediente_pipeline WHERE estancado) > 0
 - Validado end-to-end con email real recibido.
 - Provisioning yamls en `infrastructure/docker/grafana/provisioning/alerting/`.
+
+### Admin user management + self-service — CERRADO (2026-05-23)
+- `PATCH /api/admin/usuarios/:id` con email + nombres/apellidos/telefono/rol_id/activo.
+- `POST /api/admin/usuarios/:id/password` (super_admin + permiso admin.usuarios).
+- `PATCH /api/auth/me` (self: solo nombres/apellidos/telefono).
+- `POST /api/auth/change-password` (self: current + new, min 8, ≠ actual).
+- UI: modal editar + reset en `/admin/usuarios`, página `/perfil` con form propio + cambio password.
+
+### Edición de SLAs — CERRADO (2026-05-23)
+- 2 niveles: plantilla maestra (super_admin) o por-hito en cada expediente (expedientes.write).
+- `GET/PATCH /api/admin/hito-plantillas[/:id]` y `PATCH /api/expedientes/:id/hitos/:hitoId`.
+- UI: `/admin/hito-plantillas` (tabla agrupada por tipo_servicio) + botón "SLA" por hito en detalle expediente.
+
+### Cronómetros hojas de ruta — CERRADO (2026-05-23)
+- Componente `<Cronometro startIso endIso>`: HH:MM:SS en vivo (con punto pulsante) si está en curso, fijo si tiene fin.
+- `<TiempoTotal hitos>`: sumatoria reactiva al final del listado de hitos.
+- Eficiente: setInterval solo se monta cuando hay algún hito vivo.
+
+### Form visita técnica → informe técnico + email — CERRADO (2026-05-24)
+- Migration 016: `datos_inspeccion JSONB` en `visitas_tecnicas` e `informes_tecnicos`. JSONB para iterar campos sin migrations.
+- Form estandarizado en `<VisitaTecnicaForm>` con 5 secciones (datos generales, estado, mediciones, hallazgos checkbox, decisión).
+- Al guardar visita con `estado=realizada` → auto-crea `informes_tecnicos` (idempotente por `visita_id`), código `INF-YYYY-NNNN`.
+- `<InformeTecnicoDialog>`: click en informe del listado abre vista con datos + botones PDF / Email.
+- `POST /api/informes-tecnicos/:id/enviar-email` adjunta el PDF generado en memoria, envía vía SMTP existente.
+- PDF renderer extendido para imprimir datos_inspeccion del JSONB.
+- **Campos del form son una propuesta inicial — Pablo dijo "luego lo iremos modificando"**. Editar `HALLAZGOS_OPCIONES` + dropdowns en `frontend/src/components/visita-tecnica-form.tsx` y `INSPECCION_FIELDS` en `backend/src/services/pdf/documentos.ts` + `LABELS` en `frontend/src/components/informe-tecnico-dialog.tsx`.
+
+### Fixes de la sesión (2026-05-23 → 24)
+- Backend `listX max(100)` → `max(500)` en 9 routers (admin/clientes/contratos/cotizaciones/expedientes/inventario/ot/transformadores). Causaba dropdown vacío en forms que piden `limit: 200`.
+- Roles aprobadores con permisos faltantes: agregué `expedientes.read` + `expedientes.aprobar` a `ingeniero_diagnostico`, `jefe_planta`, `qa`. Aprobaban hitos del catálogo pero no podían abrir el expediente.
 
 ### Backlog pendiente
 - (sin hitos críticos abiertos)
