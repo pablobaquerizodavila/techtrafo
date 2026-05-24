@@ -6,6 +6,47 @@ El formato sigue Keep a Changelog y este proyecto adhiere a Semantic Versioning.
 
 ---
 
+## [0.12.0] — 2026-05-24 — MEDIUM de auditoria cerrados
+
+### Seguridad — M1, M3, M5, M7
+
+#### M1 — Path traversal + CRLF en evidencias
+- `routes/evidencias.ts` GET /file: el check anterior usaba `path.join` que NO resuelve `..`. Ahora `path.resolve()` colapsa el path y se compara contra `uploadRoot + path.sep`. Defensa contra `ruta_archivo` con `..` (que no deberia llegar de cliente, pero sirve como defensa en profundidad si el DB se compromete).
+- Content-Disposition: filename ahora striplea `\r`, `\n` y `"`. Sin esto, un titulo malicioso podria inyectar headers (HTTP response splitting).
+- multer destination: ahora valida `otId` ANTES de crear el directorio. Antes, si llegaba `:id=../malicioso`, multer creaba el directorio fuera de baseDir (aunque el handler luego rechazaria el request, el directorio quedaba creado).
+- DELETE evidencia: mismo check anti-traversal en `unlinkSync`.
+
+#### M3 — Sanitizacion de URLs en morgan
+- `server.ts`: formato custom + `morgan.token("sanitized-url")` que redacta valores de query params sospechosos: `token`, `password`, `csrf`, `authorization`, `secret`, `api_key`/`apikey`, `jwt`. Antes el log podia contener secretos si alguien los pasaba en query string. Validado: `?token=SECRETO&password=hunter2&keep=ok` se loggea como `?token=[REDACTED]&password=[REDACTED]&keep=ok`.
+
+#### M5 — GET /admin/roles no expone permisos
+- `routes/admin.ts`: el campo `permisos` solo se devuelve si `req.user.es_super_admin === true`. Antes, cualquier usuario autenticado (incluido un cliente del portal) podia listar permisos completos de todos los roles -> facilita planning de escalation. Resto recibe `id, nombre, descripcion, es_super_admin, activo`.
+
+#### M7 — JWT revocation via token_version
+- Migration 018: `core.usuarios.token_version INTEGER NOT NULL DEFAULT 1`.
+- `auth/jwt.ts`: `JwtPayload` ahora incluye `tv: number`.
+- `auth/middleware.ts` `requireAuth`: compara `payload.tv` contra `usuario.token_version` actual en DB. Si difiere -> 401 `token_revoked`.
+- `routes/auth.ts`:
+  - `login`: firma JWT con `tv: usuario.token_version`.
+  - `logout`: ahora requiere auth e incrementa token_version (cierre de sesion GLOBAL, defensa contra cookie robada). Costo: deslogueo de otros dispositivos del mismo user.
+  - `change-password`: incrementa token_version al cambiar password.
+- `routes/admin.ts` reset password: incrementa token_version del target (forza logout en todos sus dispositivos).
+- Validado: login -> tv=1, request OK, logout -> tv=2, mismo cookie -> 401 token_revoked.
+
+### Auditoria de seguridad COMPLETADA
+- **0 CRITICAL** abiertos (4 cerrados en v0.10.1).
+- **0 HIGH** abiertos (3 cerrados en v0.11.0, H5/H6 mitigados por aislamiento).
+- **0 MEDIUM** con riesgo real abiertos (4 cerrados en v0.12.0).
+- El sistema esta listo para abrir `portal.techtrafo.com` a clientes externos cuando se quiera.
+
+### Nota operativa
+Esta version invalida todas las sesiones existentes al hacer deploy:
+- JWTs viejos no tienen `tv` en payload -> middleware responde 401 `token_revoked` en cada request.
+- Frontend debe manejar 401 -> redirect a /login (ya esta).
+- Usuarios deben re-loguearse despues del deploy.
+
+---
+
 ## [0.11.0] — 2026-05-24 — HIGH de auditoria de seguridad cerrados
 
 ### Seguridad — H2, H3, H4

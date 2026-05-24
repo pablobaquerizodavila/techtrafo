@@ -55,6 +55,14 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return;
   }
 
+  // Fix M7 auditoria: validar token_version. Si el usuario hizo logout o
+  // cambio password despues de firmar este JWT, token_version aumento y
+  // este token quedo revocado.
+  if (typeof payload.tv !== "number" || payload.tv !== usuario.token_version) {
+    res.status(401).json({ error: "token_revoked" });
+    return;
+  }
+
   if (usuario.estado_aprobacion !== "aprobado") {
     res.status(403).json({
       error: "user_no_aprobado",

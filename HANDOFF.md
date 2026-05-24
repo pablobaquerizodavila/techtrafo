@@ -1,14 +1,14 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-24 · v0.11.0 · 3 HIGH de auditoría cerrados (rate limit + CSRF + Grafana DB readonly)**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-24 · v0.12.0 · MEDIUM de auditoría cerrados (path traversal, morgan, /admin/roles, JWT revocation)**.
 
 ---
 
 ## 1. Estado del proyecto en 30 segundos
 
 - **Empresa**: TECHTRAFO — fabricación, reparación y mantenimiento de transformadores eléctricos (150 kVA → 10 MVA), Samborondón, Ecuador.
-- **Versión actual**: `v0.11.0`. Día de avance grande (2026-05-23 → 24). Cerradas: FASE 4 plus, FASE 5 (portal cliente), FASE 6 (4 dashboards), hardening nginx, FASE 7 (SCADA), FASE 8 (alerting), admin user management, self-service perfil, edición SLA, cronómetros, form visita técnica → informe → email, varias alert rules SCADA, fix roles aprobadores, fix dropdown clientes, **auditoría de seguridad + 4 CRITICAL fixeados** (IDOR, self-escalation, TLS SMTP, error leak) + **3 HIGH cerrados** (rate limit, CSRF double-submit, Grafana DB readonly user).
-- **Próximo trabajo**: MEDIUM/LOW de la auditoría (path/CRLF en evidencias, morgan loggea Authorization, GET /admin/roles expone permisos, JWT sin revocation list). Decisión sobre H5 (mosquitto auth) y H6 (grafana port mapping) — ambos mitigados por aislamiento. Iterar campos del form de visita técnica. Backlog en sección 8.
+- **Versión actual**: `v0.12.0`. Día de avance grande (2026-05-23 → 24). Cerradas: FASE 4 plus, FASE 5 (portal cliente), FASE 6 (4 dashboards), hardening nginx, FASE 7 (SCADA), FASE 8 (alerting), admin user management, self-service perfil, edición SLA, cronómetros, form visita técnica → informe → email, varias alert rules SCADA, fix roles aprobadores, fix dropdown clientes, **auditoría de seguridad COMPLETA**: 4 CRITICAL + 3 HIGH + 4 MEDIUM cerrados. H5/H6 mitigados por aislamiento.
+- **Próximo trabajo**: Iterar campos del form de visita técnica (Pablo dijo "luego lo iremos modificando"). Ya no quedan hallazgos críticos abiertos. Backlog en sección 8.
 - **Repo**: https://github.com/pablobaquerizodavila/techtrafo (branch `main`)
 
 ## 2. Topología real (no la del CLAUDE.md genérico)
@@ -259,13 +259,16 @@ HIGH con mitigación (decisión: no aplicar todavía):
 - **H5 Mosquitto sin auth** — sigue mitigado por aislamiento de red docker (sin port mapping al host). Aplicar cuando llegue hardware externo: agregar passwd file + allow_anonymous false + TLS.
 - **H6 Port mapping DBs** — Postgres/Redis/Influx ya bindeados a `127.0.0.1` desde antes. Grafana queda en `0.0.0.0:3001` por elección (acceso LAN al panel de dashboards). Si se quisiera restringir a SSH tunnel: cambiar a `127.0.0.1:3001:3000`.
 
-MEDIUM/LOW pendientes (no bloqueantes para uso interno actual sin datos reales):
-- M1 path/CRLF en evidencias download
-- M3 morgan combined loggea Authorization headers
-- M5 GET /api/admin/roles expone permisos completos
-- M7 JWT sin revocation list (8h tras robo de cookie)
+MEDIUM cerrados en v0.12.0:
+- **M1 path traversal + CRLF en evidencias** — `path.resolve` real (no `path.join`), strip de `\r\n` en filename, validar `otId` ANTES de que multer cree directorio.
+- **M3 sanitizacion de URLs en morgan** — formato custom + `morgan.token("sanitized-url")` que redacta `?token|password|csrf|authorization|secret|api_key|jwt=*`.
+- **M5 /admin/roles expone permisos** — campo `permisos` solo se devuelve a super_admin. Resto recibe metadata.
+- **M7 JWT revocation via token_version** — migration 018, columna `usuarios.token_version`. JWT incluye `tv`. `requireAuth` compara contra DB. `logout`, `change-password` y `admin reset password` incrementan token_version (invalida todas las sesiones del user).
 
-Decisión de Pablo: los CRITICAL+HIGH cerrados YA habilitan abrir `portal.techtrafo.com` a clientes externos cuando se quiera. Los MEDIUM se atacan en una pasada posterior antes de la GA real con varios clientes.
+LOW pendientes (no bloqueantes ni urgentes):
+- L1-L8 — varias mejoras menores (headers cache, validaciones extra, etc). Pendiente catalogar formalmente cuando llegue el momento.
+
+Estado actual de la auditoria: **0 CRITICAL, 0 HIGH abiertos**, todos los MEDIUM con riesgo real cerrados. H5 (mosquitto auth) y H6 (grafana port mapping) siguen mitigados por aislamiento de red docker. El sistema esta listo para abrir `portal.techtrafo.com` a clientes externos.
 
 ### Backlog pendiente
 - (sin hitos críticos abiertos)

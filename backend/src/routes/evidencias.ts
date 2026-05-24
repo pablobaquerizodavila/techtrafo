@@ -34,8 +34,16 @@ try { fs.mkdirSync(baseDir, { recursive: true }); } catch { /* ignore */ }
 
 const storage = multer.diskStorage({
   destination: (req, _file, cb) => {
-    const otId = req.params.id;
-    const dir = path.join(baseDir, otId);
+    // Fix M1 auditoria: validar otId ANTES de crear el directorio. Si vino
+    // "../malicioso" en :id, sin esto multer crearia el directorio afuera
+    // de baseDir aunque luego el handler rechazara el request.
+    const otIdRaw = req.params.id;
+    const otId = Number(otIdRaw);
+    if (!Number.isInteger(otId) || otId <= 0) {
+      cb(new Error("invalid_ot_id"), "");
+      return;
+    }
+    const dir = path.join(baseDir, String(otId));
     try { fs.mkdirSync(dir, { recursive: true }); } catch { /* ignore */ }
     cb(null, dir);
   },
@@ -190,9 +198,13 @@ router.get("/:id/evidencias/:evId/file", requirePermission("ot", "read"), async 
     res.status(404).json({ error: "not_found" });
     return;
   }
-  const fullPath = path.join(env.UPLOAD_DIR, ev.ruta_archivo);
-  // Sanity check para evitar path traversal
-  if (!fullPath.startsWith(path.resolve(env.UPLOAD_DIR))) {
+  // Fix M1 auditoria: path traversal real. path.join() NO resuelve ".." asi
+  // que el check anterior (startsWith con path.join) era inseguro:
+  // "/uploads/../etc/passwd".startsWith("/uploads") === true.
+  // path.resolve() colapsa ".." y devuelve el path canonico.
+  const uploadRoot = path.resolve(env.UPLOAD_DIR);
+  const fullPath = path.resolve(env.UPLOAD_DIR, ev.ruta_archivo);
+  if (fullPath !== uploadRoot && !fullPath.startsWith(uploadRoot + path.sep)) {
     res.status(403).json({ error: "forbidden" });
     return;
   }
@@ -201,7 +213,10 @@ router.get("/:id/evidencias/:evId/file", requirePermission("ot", "read"), async 
     return;
   }
   res.setHeader("Content-Type", ev.mime_type ?? "application/octet-stream");
-  res.setHeader("Content-Disposition", `inline; filename="${(ev.titulo ?? "archivo").replace(/"/g, "")}"`);
+  // Fix M1 auditoria: CRLF en filename podria inyectar nuevos headers
+  // (HTTP response splitting). Stripeamos \r y \n ademas de la comilla doble.
+  const safeFilename = (ev.titulo ?? "archivo").replace(/[\r\n"]/g, "").slice(0, 200);
+  res.setHeader("Content-Disposition", `inline; filename="${safeFilename}"`);
   fs.createReadStream(fullPath).pipe(res);
 });
 
@@ -221,10 +236,14 @@ router.delete("/:id/evidencias/:evId", requirePermission("ot", "write"), async (
     return;
   }
   await withAppUser(req.user!.id, (tx) => tx.ot_evidencias.delete({ where: { id: evId } }));
-  // Borrar archivo del disco (best-effort)
+  // Borrar archivo del disco (best-effort). Mismo check anti path-traversal
+  // que en GET file: si ruta_archivo escapa de UPLOAD_DIR, no borramos.
   if (ev.ruta_archivo) {
-    const fullPath = path.join(env.UPLOAD_DIR, ev.ruta_archivo);
-    try { fs.unlinkSync(fullPath); } catch { /* ignore */ }
+    const uploadRoot = path.resolve(env.UPLOAD_DIR);
+    const fullPath = path.resolve(env.UPLOAD_DIR, ev.ruta_archivo);
+    if (fullPath === uploadRoot || fullPath.startsWith(uploadRoot + path.sep)) {
+      try { fs.unlinkSync(fullPath); } catch { /* ignore */ }
+    }
   }
   res.status(204).end();
 });

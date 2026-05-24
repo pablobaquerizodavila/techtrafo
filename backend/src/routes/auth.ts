@@ -127,7 +127,9 @@ router.post("/login", loginLimiter, async (req, res) => {
     data: { ultimo_login: new Date() },
   });
 
-  const token = signToken({ sub: usuario.id });
+  // Fix M7 auditoria: firmar el JWT con el token_version actual del usuario.
+  // requireAuth lo compara contra DB en cada request; cambios invalidan el token.
+  const token = signToken({ sub: usuario.id, tv: usuario.token_version });
   res.cookie(AUTH_COOKIE_NAME, token, cookieOptions);
   // Fix H3 auditoria: setear cookie CSRF (no HttpOnly) en cada login. El
   // frontend la lee y la envia como header X-CSRF-Token en cada mutation.
@@ -148,7 +150,14 @@ router.post("/login", loginLimiter, async (req, res) => {
   });
 });
 
-router.post("/logout", (_req, res) => {
+router.post("/logout", requireAuth, async (req, res) => {
+  // Fix M7 auditoria: incrementar token_version para revocar GLOBALMENTE las
+  // sesiones de este usuario (defensa contra cookie robada). Costo aceptable:
+  // si el user tiene multiples dispositivos, todos quedan deslogueados.
+  await prisma.$executeRaw`
+    UPDATE core.usuarios SET token_version = token_version + 1
+     WHERE id = ${req.user!.id}::uuid
+  `;
   res.clearCookie(AUTH_COOKIE_NAME, cookieOptions);
   clearCsrfCookie(res);
   res.json({ ok: true });
@@ -227,9 +236,14 @@ router.post("/change-password", changePasswordLimiter, requireAuth, async (req, 
     return;
   }
   const password_hash = await hashPassword(parsed.data.new_password);
+  // Fix M7 auditoria: cambio de password incrementa token_version, invalidando
+  // todas las sesiones existentes (incluida la cookie actual). El user tiene
+  // que re-loguearse despues de cambiar password. Defensa contra cookie robada.
   await prisma.$executeRaw`
     UPDATE core.usuarios
-       SET password_hash = ${password_hash}, updated_at = NOW()
+       SET password_hash = ${password_hash},
+           token_version = token_version + 1,
+           updated_at = NOW()
      WHERE id = ${userId}::uuid
   `;
   res.json({ status: "password_actualizada" });

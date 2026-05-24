@@ -49,7 +49,18 @@ app.use(
 );
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
-app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
+
+// Fix M3 auditoria: morgan combined no loggea Cookie/Authorization headers
+// per se, pero la URL si puede llevar secrets si alguien los pasa en query
+// string (?token=..., ?password=...). Sanitizamos esos valores en el log.
+// Tambien usamos un formato explicito que NO loggea headers sensibles
+// para que cualquier cambio futuro al formato sea deliberado.
+morgan.token("sanitized-url", (req) => {
+  const url = (req as { originalUrl?: string; url?: string }).originalUrl ?? (req as { url?: string }).url ?? "";
+  return url.replace(/([?&])(token|password|csrf|authorization|secret|api[_-]?key|jwt)=[^&]*/gi, "$1$2=[REDACTED]");
+});
+const morganFormat = ':remote-addr - :remote-user [:date[clf]] ":method :sanitized-url HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent"';
+app.use(morgan(env.NODE_ENV === "production" ? morganFormat : "dev"));
 
 // Fix H3 auditoria: CSRF double-submit cookie. Debe ir DESPUES de cookieParser
 // (lee cookies) y ANTES de las rutas. Skipea GET/HEAD/OPTIONS, login/register/logout

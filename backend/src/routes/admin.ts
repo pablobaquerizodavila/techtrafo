@@ -357,9 +357,13 @@ router.post("/usuarios/:id/password", requirePermission("admin", "usuarios"), as
   }
 
   const password_hash = await hashPassword(parsed.data.new_password);
+  // Fix M7 auditoria: reset admin incrementa token_version del target,
+  // forzando logout en todos sus dispositivos.
   await prisma.$executeRaw`
     UPDATE core.usuarios
-       SET password_hash = ${password_hash}, updated_at = NOW()
+       SET password_hash = ${password_hash},
+           token_version = token_version + 1,
+           updated_at = NOW()
      WHERE id = ${id}::uuid
   `;
   res.json({ status: "password_reset" });
@@ -370,12 +374,20 @@ router.post("/usuarios/:id/password", requirePermission("admin", "usuarios"), as
 // ===================================================================
 // GET /api/admin/roles  -  cualquier user autenticado puede VER roles
 // (frontend lo usa para selectores al aprobar usuarios)
-router.get("/roles", async (_req, res) => {
+//
+// Fix M5 auditoria: el campo `permisos` se omite por defecto. Antes,
+// cualquier usuario autenticado (incluido un cliente del portal) podia
+// listar los permisos completos de todos los roles, lo cual ayuda a
+// planear escalation. Solo super_admin (que de hecho ya tiene acceso a
+// crear/editar roles) lo recibe.
+router.get("/roles", async (req, res) => {
+  const incluirPermisos = req.user?.es_super_admin === true;
   const data = await prisma.roles.findMany({
     orderBy: { id: "asc" },
     select: {
       id: true, nombre: true, descripcion: true,
-      permisos: true, es_super_admin: true, activo: true,
+      es_super_admin: true, activo: true,
+      ...(incluirPermisos ? { permisos: true } : {}),
     },
   });
   res.json({ data });
