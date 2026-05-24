@@ -239,7 +239,7 @@ export default function ExpedientesPage() {
                   expediente_estado: string;
                 };
                 return (
-                  <TableRow key={r.expediente_id} className="bg-destructive/5">
+                  <TableRow key={`${r.expediente_id}-${r.hito_codigo}`} className="bg-destructive/5">
                     <TableCell className="font-mono text-sm">{r.expediente_codigo}</TableCell>
                     <TableCell className="font-medium">{r.cliente_nombre}</TableCell>
                     <TableCell colSpan={3} className="text-sm">
