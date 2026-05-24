@@ -12,6 +12,7 @@ export interface AuthUser {
   rol_nombre: string | null;
   es_super_admin: boolean;
   permisos: Record<string, boolean>;
+  cliente_id: number | null; // si es usuario cliente vinculado a una empresa
 }
 
 declare global {
@@ -71,6 +72,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     rol_nombre: usuario.roles?.nombre ?? null,
     es_super_admin: usuario.roles?.es_super_admin ?? false,
     permisos: (usuario.roles?.permisos as Record<string, boolean>) ?? {},
+    cliente_id: usuario.cliente_id ? Number(usuario.cliente_id) : null,
   };
 
   next();

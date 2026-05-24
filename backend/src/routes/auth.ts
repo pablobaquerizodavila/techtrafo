@@ -138,6 +138,7 @@ router.post("/login", async (req, res) => {
       rol_nombre: usuario.roles?.nombre ?? null,
       es_super_admin: usuario.roles?.es_super_admin ?? false,
       permisos: (usuario.roles?.permisos as Record<string, boolean>) ?? {},
+      cliente_id: usuario.cliente_id ? Number(usuario.cliente_id) : null,
     },
   });
 });

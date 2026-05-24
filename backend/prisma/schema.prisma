@@ -70,6 +70,7 @@ model clientes {
   contratos                                   contratos[]
   cotizaciones                                cotizaciones[]
   expedientes                                 expedientes[]
+  usuarios_usuarios_cliente_idToclientes      usuarios[]          @relation("usuarios_cliente_idToclientes")
   garantias                                   garantias[]
   transformadores                             transformadores[]
 
@@ -306,6 +307,7 @@ model usuarios {
   fecha_aprobacion                                              DateTime?               @db.Timestamptz(6)
   motivo_rechazo                                                String?
   telefono_solicitud                                            String?                 @db.VarChar(20)
+  cliente_id                                                    BigInt?
   cliente_contactos_cliente_contactos_actualizado_porTousuarios cliente_contactos[]     @relation("cliente_contactos_actualizado_porTousuarios")
   cliente_contactos_cliente_contactos_creado_porTousuarios      cliente_contactos[]     @relation("cliente_contactos_creado_porTousuarios")
   clientes_clientes_actualizado_porTousuarios                   clientes[]              @relation("clientes_actualizado_porTousuarios")
@@ -340,6 +342,7 @@ model usuarios {
   notificaciones                                                notificaciones[]
   usuarios                                                      usuarios?               @relation("usuariosTousuarios", fields: [aprobado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
   other_usuarios                                                usuarios[]              @relation("usuariosTousuarios")
+  clientes_usuarios_cliente_idToclientes                        clientes?               @relation("usuarios_cliente_idToclientes", fields: [cliente_id], references: [id], onUpdate: NoAction)
   roles                                                         roles?                  @relation(fields: [rol_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   categorias_item_categorias_item_actualizado_porTousuarios     categorias_item[]       @relation("categorias_item_actualizado_porTousuarios")
   categorias_item_categorias_item_creado_porTousuarios          categorias_item[]       @relation("categorias_item_creado_porTousuarios")
@@ -1096,4 +1099,14 @@ model tiempos_trabajo {
   @@index([ot_id], map: "idx_tiempos_ot")
   @@index([usuario_id, fecha], map: "idx_tiempos_usuario")
   @@schema("produccion")
+}
+
+model hito_estados_cliente {
+  hito_codigo         String  @id @db.VarChar(40)
+  label_cliente       String  @db.VarChar(120)
+  descripcion_cliente String?
+  orden               Int     @default(0)
+  emoji               String? @db.VarChar(8)
+
+  @@schema("comercial")
 }

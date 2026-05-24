@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   LayoutDashboard, Users, FileText, FileSignature, Factory, FolderOpen,
   Boxes, Bell, Shield, ArrowRight, AlertTriangle,
@@ -17,6 +18,7 @@ interface AuthMeResponse {
     rol_nombre: string | null;
     es_super_admin: boolean;
     permisos: Record<string, boolean>;
+    cliente_id: number | null;
   };
 }
 
@@ -56,6 +58,11 @@ interface ModuloAcceso {
 
 export default async function DashboardPage() {
   const user = await fetchCurrentUser();
+
+  // Si es un usuario cliente vinculado a empresa, lo mandamos al portal
+  if (user?.rol_nombre === "cliente" && user.cliente_id !== null) {
+    redirect("/portal");
+  }
 
   // -------- Sesión inválida o expirada --------
   if (!user) {

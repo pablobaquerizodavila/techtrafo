@@ -13,6 +13,7 @@ interface MeResponse {
     rol_nombre: string | null;
     es_super_admin: boolean;
     permisos: Record<string, boolean>;
+    cliente_id: number | null;
   };
 }
 
@@ -47,62 +48,78 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const puedeAdminRoles = user?.es_super_admin ?? false;
   const puedeVerExpedientes = hasPerm(user, "expedientes", "read");
   const puedeVerOT = hasPerm(user, "ot", "read");
+  // Cliente externo: vista simplificada (rol cliente con cliente_id asociado)
+  const esCliente = user?.rol_nombre === "cliente" && user.cliente_id !== null;
 
   return (
     <div className="flex min-h-screen">
       <aside className="w-64 border-r bg-muted/20 p-4">
         <div className="mb-6">
           <h1 className="text-xl font-bold">TECHTRAFO</h1>
-          <p className="text-xs text-muted-foreground">Panel de gestion</p>
+          <p className="text-xs text-muted-foreground">
+            {esCliente ? "Portal de seguimiento" : "Panel de gestion"}
+          </p>
         </div>
         <nav className="space-y-1 text-sm">
-          <Link href="/dashboard" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-            Dashboard
-          </Link>
-          <Link href="/clientes" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-            Clientes
-          </Link>
-          {puedeVerExpedientes && (
-            <Link href="/expedientes" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-              Expedientes
-            </Link>
-          )}
-          {user && <NotifLink />}
-          <Link href="/cotizaciones" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-            Cotizaciones
-          </Link>
-          <Link href="/contratos" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-            Contratos
-          </Link>
-          {puedeVerOT && (
+          {esCliente ? (
             <>
-              <Link href="/ot" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-                Órdenes de trabajo
+              {/* Vista simplificada para cliente externo */}
+              <Link href="/portal" className="block rounded px-3 py-2 font-medium hover:bg-accent hover:text-accent-foreground">
+                🏠 Mi cuenta
               </Link>
-              <Link href="/transformadores" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-                ⚡ Transformadores
-              </Link>
-              <Link href="/produccion" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground font-medium">
-                📊 Dashboard producción
-              </Link>
+              {user && <NotifLink />}
             </>
-          )}
-          <Link href="/inventario" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-            Bodega
-          </Link>
-
-          {(puedeAdminUsuarios || puedeAdminRoles) && (
+          ) : (
             <>
-              <div className="mt-4 px-3 text-xs font-semibold uppercase text-muted-foreground">Administracion</div>
-              {puedeAdminUsuarios && (
-                <Link href="/admin/usuarios" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-                  Usuarios
+              <Link href="/dashboard" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
+                Dashboard
+              </Link>
+              <Link href="/clientes" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
+                Clientes
+              </Link>
+              {puedeVerExpedientes && (
+                <Link href="/expedientes" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
+                  Expedientes
                 </Link>
               )}
-              {puedeAdminRoles && (
-                <Link href="/admin/roles" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-                  Roles y permisos
-                </Link>
+              {user && <NotifLink />}
+              <Link href="/cotizaciones" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
+                Cotizaciones
+              </Link>
+              <Link href="/contratos" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
+                Contratos
+              </Link>
+              {puedeVerOT && (
+                <>
+                  <Link href="/ot" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
+                    Órdenes de trabajo
+                  </Link>
+                  <Link href="/transformadores" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
+                    ⚡ Transformadores
+                  </Link>
+                  <Link href="/produccion" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground font-medium">
+                    📊 Dashboard producción
+                  </Link>
+                </>
+              )}
+              <Link href="/inventario" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
+                Bodega
+              </Link>
+
+              {(puedeAdminUsuarios || puedeAdminRoles) && (
+                <>
+                  <div className="mt-4 px-3 text-xs font-semibold uppercase text-muted-foreground">Administracion</div>
+                  {puedeAdminUsuarios && (
+                    <Link href="/admin/usuarios" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
+                      Usuarios
+                    </Link>
+                  )}
+                  {puedeAdminRoles && (
+                    <Link href="/admin/roles" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
+                      Roles y permisos
+                    </Link>
+                  )}
+                </>
               )}
             </>
           )}

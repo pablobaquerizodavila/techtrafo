@@ -35,6 +35,7 @@ const updateUsuarioSchema = z.object({
   apellidos: z.string().min(1).max(100).optional(),
   telefono: z.string().max(20).optional().nullable(),
   rol_id: z.number().int().positive().optional().nullable(),
+  cliente_id: z.number().int().positive().optional().nullable(),
   activo: z.boolean().optional(),
 });
 
@@ -245,6 +246,9 @@ router.patch("/usuarios/:id", requirePermission("admin", "usuarios"), async (req
   }
   if (d.rol_id !== undefined) {
     await prisma.$executeRaw`UPDATE core.usuarios SET rol_id = ${d.rol_id} WHERE id = ${id}::uuid`;
+  }
+  if (d.cliente_id !== undefined) {
+    await prisma.$executeRaw`UPDATE core.usuarios SET cliente_id = ${d.cliente_id} WHERE id = ${id}::uuid`;
   }
   if (d.activo !== undefined) {
     await prisma.$executeRaw`UPDATE core.usuarios SET activo = ${d.activo} WHERE id = ${id}::uuid`;
