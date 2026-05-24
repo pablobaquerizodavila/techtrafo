@@ -1,0 +1,269 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "id": 1,
+      "options": {
+        "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table", "rawQuery": true,
+        "rawSql": "SELECT COUNT(*)::int FROM posventa.garantias WHERE estado = 'vigente'",
+        "refId": "A"
+      }],
+      "title": "Garantías vigentes",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 5}]},
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "id": 2,
+      "options": {
+        "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table", "rawQuery": true,
+        "rawSql": "SELECT COUNT(*)::int FROM posventa.v_garantias_por_vencer",
+        "refId": "A"
+      }],
+      "title": "Por vencer (≤30 días)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]},
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "id": 3,
+      "options": {
+        "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table", "rawQuery": true,
+        "rawSql": "SELECT COUNT(*)::int FROM posventa.reclamos WHERE estado <> 'cerrado'",
+        "refId": "A"
+      }],
+      "title": "Reclamos abiertos",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]},
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "id": 4,
+      "options": {
+        "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table", "rawQuery": true,
+        "rawSql": "SELECT COUNT(*)::int FROM posventa.intervenciones WHERE fecha_real >= date_trunc('month', CURRENT_DATE)",
+        "refId": "A"
+      }],
+      "title": "Intervenciones (mes actual)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"align": "auto", "cellOptions": {"type": "auto"}, "inspect": false},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "dias_restantes"},
+            "properties": [
+              {"id": "custom.cellOptions", "value": {"mode": "gradient", "type": "color-background"}},
+              {"id": "color", "value": {"mode": "continuous-RdYlGr"}},
+              {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 7}, {"color": "green", "value": 15}]}}
+            ]
+          }
+        ]
+      },
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 4},
+      "id": 5,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {"countRows": false, "fields": "", "reducer": ["sum"], "show": false},
+        "showHeader": true
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table", "rawQuery": true,
+        "rawSql": "SELECT codigo AS garantia, cliente_nombre AS cliente, transformador_codigo AS equipo, fecha_fin AS vence, dias_restantes::int FROM posventa.v_garantias_por_vencer ORDER BY dias_restantes ASC LIMIT 30",
+        "refId": "A"
+      }],
+      "title": "Garantías próximas a vencer (≤30 días)",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto",
+            "fillOpacity": 80, "gradientMode": "none",
+            "hideFrom": {"legend": false, "tooltip": false, "viz": false},
+            "lineWidth": 1, "scaleDistribution": {"type": "linear"}, "thresholdsStyle": {"mode": "off"}
+          },
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
+      "id": 6,
+      "options": {
+        "barRadius": 0, "barWidth": 0.97, "fullHighlight": false, "groupWidth": 0.7,
+        "legend": {"calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true},
+        "orientation": "horizontal", "showValue": "auto", "stacking": "none",
+        "tooltip": {"mode": "single", "sort": "none"}, "xTickLabelRotation": 0, "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table", "rawQuery": true,
+        "rawSql": "SELECT estado, COUNT(*)::int AS garantias FROM posventa.garantias GROUP BY estado ORDER BY garantias DESC",
+        "refId": "A"
+      }],
+      "title": "Garantías por estado",
+      "type": "barchart"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto",
+            "fillOpacity": 80, "gradientMode": "none",
+            "hideFrom": {"legend": false, "tooltip": false, "viz": false},
+            "lineWidth": 1, "scaleDistribution": {"type": "linear"}, "thresholdsStyle": {"mode": "off"}
+          },
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
+      "id": 7,
+      "options": {
+        "barRadius": 0, "barWidth": 0.97, "fullHighlight": false, "groupWidth": 0.7,
+        "legend": {"calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true},
+        "orientation": "horizontal", "showValue": "auto", "stacking": "none",
+        "tooltip": {"mode": "single", "sort": "none"}, "xTickLabelRotation": 0, "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table", "rawQuery": true,
+        "rawSql": "SELECT COALESCE(severidad, 'sin-severidad') AS severidad, COUNT(*)::int AS reclamos FROM posventa.reclamos GROUP BY severidad ORDER BY reclamos DESC",
+        "refId": "A"
+      }],
+      "title": "Reclamos por severidad (todo el histórico)",
+      "type": "barchart"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"align": "auto", "cellOptions": {"type": "auto"}, "inspect": false},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "dias_abierto"},
+            "properties": [
+              {"id": "custom.cellOptions", "value": {"mode": "gradient", "type": "color-background"}},
+              {"id": "color", "value": {"mode": "continuous-YlRd"}}
+            ]
+          }
+        ]
+      },
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 21},
+      "id": 8,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {"countRows": false, "fields": "", "reducer": ["sum"], "show": false},
+        "showHeader": true
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table", "rawQuery": true,
+        "rawSql": "SELECT r.codigo AS reclamo, cl.razon_social AS cliente, g.codigo AS garantia, r.severidad, r.estado, r.fecha_reclamo::date AS fecha, EXTRACT(DAY FROM (now() - r.fecha_reclamo))::int AS dias_abierto, LEFT(COALESCE(r.descripcion,''), 80) AS descripcion FROM posventa.reclamos r JOIN posventa.garantias g ON g.id = r.garantia_id JOIN comercial.clientes cl ON cl.id = g.cliente_id WHERE r.estado <> 'cerrado' ORDER BY r.fecha_reclamo ASC LIMIT 20",
+        "refId": "A"
+      }],
+      "title": "Reclamos abiertos (detalle)",
+      "type": "table"
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "tags": ["techtrafo", "garantias", "posventa"],
+  "templating": {"list": []},
+  "time": {"from": "now-90d", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Garantías / Posventa",
+  "uid": "garantias-posventa",
+  "version": 1,
+  "weekStart": ""
+}
