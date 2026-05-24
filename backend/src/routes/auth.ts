@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db/client";
 import { hashPassword, verifyPassword } from "../auth/password";
-import { signToken, AUTH_COOKIE_NAME } from "../auth/jwt";
+import { signToken, verifyToken, AUTH_COOKIE_NAME } from "../auth/jwt";
 import { requireAuth } from "../auth/middleware";
 import { loginLimiter, registerLimiter, changePasswordLimiter } from "../auth/rate-limit";
 import { setCsrfCookie, clearCsrfCookie } from "../auth/csrf";
@@ -150,14 +150,33 @@ router.post("/login", loginLimiter, async (req, res) => {
   });
 });
 
-router.post("/logout", requireAuth, async (req, res) => {
-  // Fix M7 auditoria: incrementar token_version para revocar GLOBALMENTE las
-  // sesiones de este usuario (defensa contra cookie robada). Costo aceptable:
-  // si el user tiene multiples dispositivos, todos quedan deslogueados.
-  await prisma.$executeRaw`
-    UPDATE core.usuarios SET token_version = token_version + 1
-     WHERE id = ${req.user!.id}::uuid
-  `;
+router.post("/logout", async (req, res) => {
+  // Logout idempotente: NUNCA requiere auth. Si requireAuth bloqueara con
+  // cookie revocada, el backend no llegaria a clearCookie y el browser
+  // quedaria con cookies "fantasma" (Domain=.techtrafo.com no se borran
+  // facilmente desde JS). Resultado seria un loop /login -> /dashboard.
+  //
+  // Si el JWT es valido, incrementamos token_version para revocar la sesion
+  // globalmente (defensa contra cookie robada, fix M7). Si no, simplemente
+  // limpiamos cookies.
+  const token = req.cookies?.[AUTH_COOKIE_NAME];
+  if (token) {
+    const payload = verifyToken(token);
+    if (payload?.sub && typeof payload.tv === "number") {
+      try {
+        // Solo incrementa si tv aun coincide (cookie no revocada). Sino,
+        // logout repetido de cookie ya revocada agregaria ruido innecesario.
+        await prisma.$executeRaw`
+          UPDATE core.usuarios
+             SET token_version = token_version + 1
+           WHERE id = ${payload.sub}::uuid
+             AND token_version = ${payload.tv}
+        `;
+      } catch {
+        // ignore: usuario borrado, DB caida, etc. Igual limpiamos cookies.
+      }
+    }
+  }
   res.clearCookie(AUTH_COOKIE_NAME, cookieOptions);
   clearCsrfCookie(res);
   res.json({ ok: true });

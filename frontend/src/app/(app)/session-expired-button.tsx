@@ -26,14 +26,22 @@ export function SessionExpiredButton({
     setBusy(true);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
-      // Intenta logout en el backend (limpia la cookie con domain correcto)
+      // Intenta logout en el backend (idempotente: no requiere auth, siempre
+      // limpia cookies con el Domain correcto y vacia token_version si el JWT
+      // sigue siendo valido).
       await fetch(`${apiUrl}/api/auth/logout`, {
         method: "POST",
         credentials: "include",
       }).catch(() => null);
     } finally {
-      // Tambien borrar localmente cualquier cookie residual del dominio actual
-      document.cookie = "techtrafo_session=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+      // Fallback: si el backend no respondio (red caida, etc), borrar cookies
+      // localmente. Probamos con y sin domain porque dev usa localhost (sin
+      // domain) y prod usa .techtrafo.com. Tambien limpiamos techtrafo_csrf.
+      const expired = "expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+      document.cookie = `techtrafo_session=; ${expired}`;
+      document.cookie = `techtrafo_session=; ${expired}; domain=.techtrafo.com`;
+      document.cookie = `techtrafo_csrf=; ${expired}`;
+      document.cookie = `techtrafo_csrf=; ${expired}; domain=.techtrafo.com`;
       // Hard navigation para que el middleware vea cookies limpias
       window.location.href = "/login";
     }
