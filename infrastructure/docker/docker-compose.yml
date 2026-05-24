@@ -76,8 +76,12 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_INSTALL_PLUGINS: "grafana-clock-panel,grafana-piechart-panel"
       GF_SERVER_ROOT_URL: "http://192.168.0.23:3001"
+      # Pass-through para resolver ${POSTGRES_PASSWORD} en provisioning/datasources/postgres.yaml
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - /opt/techtrafo/grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards-techtrafo:ro
     networks:
       - techtrafo_net
     ports:
@@ -114,19 +118,8 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3002,http://192.168.0.23:3002}
-      # --- SMTP / Notificaciones (4.D) ---
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_SECURE: ${SMTP_SECURE:-false}
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS}
-      SMTP_FROM: ${SMTP_FROM}
-      PANEL_URL: ${PANEL_URL:-https://panel.techtrafo.com}
-      NOTIF_WORKER_INTERVAL_SECONDS: ${NOTIF_WORKER_INTERVAL_SECONDS:-300}
-      UPLOAD_DIR: ${UPLOAD_DIR:-/uploads}
     volumes:
       - ../../backend:/app
-      - ../../uploads:/uploads
       - /app/node_modules
     networks:
       - techtrafo_net

@@ -1,14 +1,14 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-23 · v0.6.0 · FASE 5 cerrada**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-23 · v0.7.0 · FASE 6 cerrada**.
 
 ---
 
 ## 1. Estado del proyecto en 30 segundos
 
 - **Empresa**: TECHTRAFO — fabricación, reparación y mantenimiento de transformadores eléctricos (150 kVA → 10 MVA), Samborondón, Ecuador.
-- **Versión actual**: `v0.6.0` (FASE 5 completa). FASE 4 plus (botón PDF informe técnico + worker garantías 30d/7d) y FASE 5 (portal cliente en subdomain propio con SSL) cerradas.
-- **Próximo trabajo**: FASE 6 (Grafana). Backlog en sección 8.
+- **Versión actual**: `v0.7.0` (FASE 6 completa). FASE 4 plus, FASE 5 (portal cliente) y FASE 6 (Grafana provisioned con 3 dashboards) cerradas.
+- **Próximo trabajo**: backlog en sección 8 (SCADA InfluxDB, hardening nginx, garantía 4to dashboard).
 - **Repo**: https://github.com/pablobaquerizodavila/techtrafo (branch `main`)
 
 ## 2. Topología real (no la del CLAUDE.md genérico)
@@ -171,10 +171,20 @@ techtrafo/
 - Cert SAN expandido para cubrir panel + api + portal (un solo cert, una sola renovación).
 - DNS A record creado en GoDaddy: `portal` → `186.101.238.135`.
 
-### FASE 6 — Dashboards Grafana
-- Grafana ya está corriendo en `:3001` conectado a Postgres.
-- Faltan: provisioning de dashboards (financieros, planta, garantías, productividad).
+### FASE 6 — Dashboards Grafana — CERRADA (2026-05-23)
+- Datasource Postgres provisioned (uid `postgres-techtrafo`) via `infrastructure/docker/grafana/provisioning/datasources/postgres.yaml`. ReadOnly desde UI (la fuente de verdad es el yaml).
+- 3 dashboards en folder TECHTRAFO:
+  - `comercial-pipeline` — expedientes/cotizaciones/contratos + hitos estancados
+  - `planta-produccion` — OTs, carga por área, causas de demora, productividad
+  - `financiero-facturacion` — pipeline USD, contratado/mes, cobranza pendiente
+- Acceso: http://192.168.0.23:3001 (LAN only — no se expuso públicamente por seguridad).
+- Para editar un dashboard: la UI permite editar y "guardar como JSON". Bajar el JSON actualizado a `infrastructure/docker/grafana/dashboards/` y subir via pscp.
+- `updateIntervalSeconds: 30` en providers.yaml → cambios al JSON se reflejan automático sin restart.
+
+### Backlog pendiente
+- 4to dashboard Garantías / Posventa (la vista `posventa.v_garantias_por_vencer` ya existe; el worker la procesa).
 - Series temporales SCADA en InfluxDB (provisionado, sin uso aún).
+- Hardening nginx en VM .7 contra scans de credenciales (chip lateral).
 
 ## 9. Gotchas / errores recurrentes
 

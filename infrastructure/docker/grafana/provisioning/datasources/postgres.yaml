@@ -1,0 +1,26 @@
+apiVersion: 1
+
+# Limpia el datasource manual previo (uid distinto) antes de provisionar.
+# Idempotente: si no existe, no hace nada.
+deleteDatasources:
+  - name: PostgreSQL TECHTRAFO
+    orgId: 1
+
+datasources:
+  - name: PostgreSQL TECHTRAFO
+    uid: postgres-techtrafo
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    user: techtrafo_admin
+    secureJsonData:
+      password: ${POSTGRES_PASSWORD}
+    jsonData:
+      database: techtrafo
+      sslmode: disable
+      maxOpenConns: 100
+      maxIdleConns: 100
+      connMaxLifetime: 14400
+      postgresVersion: 1600
+    isDefault: true
+    editable: false

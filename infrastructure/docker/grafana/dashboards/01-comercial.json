@@ -1,0 +1,282 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]},
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "auto"
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table",
+        "rawQuery": true,
+        "rawSql": "SELECT COUNT(*)::int AS valor FROM comercial.expedientes WHERE estado <> 'cerrado'",
+        "refId": "A"
+      }],
+      "title": "Expedientes abiertos",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]},
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "auto"
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table",
+        "rawQuery": true,
+        "rawSql": "SELECT COUNT(*)::int AS valor FROM comercial.v_expediente_pipeline WHERE estancado = true",
+        "refId": "A"
+      }],
+      "title": "Hitos estancados",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]},
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "auto"
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table",
+        "rawQuery": true,
+        "rawSql": "SELECT COUNT(*)::int AS valor FROM comercial.cotizaciones WHERE estado IN ('borrador','enviada','en_negociacion')",
+        "refId": "A"
+      }],
+      "title": "Cotizaciones abiertas",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "auto"
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table",
+        "rawQuery": true,
+        "rawSql": "SELECT COUNT(*)::int AS valor FROM comercial.contratos WHERE fecha_firma >= date_trunc('month', CURRENT_DATE)",
+        "refId": "A"
+      }],
+      "title": "Contratos firmados (mes actual)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"align": "auto", "cellOptions": {"type": "auto"}, "inspect": false},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "horas"},
+            "properties": [
+              {"id": "custom.cellOptions", "value": {"mode": "gradient", "type": "color-background"}},
+              {"id": "color", "value": {"mode": "continuous-YlRd"}}
+            ]
+          }
+        ]
+      },
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 4},
+      "id": 5,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {"countRows": false, "fields": "", "reducer": ["sum"], "show": false},
+        "showHeader": true
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table",
+        "rawQuery": true,
+        "rawSql": "SELECT expediente_codigo AS expediente, cliente_nombre AS cliente, hito_nombre AS hito, horas_transcurridas::float AS horas, sla_horas AS sla FROM comercial.v_expediente_pipeline WHERE estancado = true ORDER BY horas_transcurridas DESC NULLS LAST LIMIT 50",
+        "refId": "A"
+      }],
+      "title": "Hitos estancados (detalle)",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {"legend": false, "tooltip": false, "viz": false},
+            "lineWidth": 1,
+            "scaleDistribution": {"type": "linear"},
+            "thresholdsStyle": {"mode": "off"}
+          },
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
+      "id": 6,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {"calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true},
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {"mode": "single", "sort": "none"},
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table",
+        "rawQuery": true,
+        "rawSql": "SELECT estado, COUNT(*)::int AS expedientes FROM comercial.expedientes GROUP BY estado ORDER BY expedientes DESC",
+        "refId": "A"
+      }],
+      "title": "Expedientes por estado",
+      "type": "barchart"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {"legend": false, "tooltip": false, "viz": false},
+            "lineWidth": 1,
+            "scaleDistribution": {"type": "linear"},
+            "thresholdsStyle": {"mode": "off"}
+          },
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
+      "id": 7,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {"calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true},
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {"mode": "single", "sort": "none"},
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table",
+        "rawQuery": true,
+        "rawSql": "SELECT estado, COUNT(*)::int AS cotizaciones FROM comercial.cotizaciones GROUP BY estado ORDER BY cotizaciones DESC",
+        "refId": "A"
+      }],
+      "title": "Cotizaciones por estado",
+      "type": "barchart"
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "tags": ["techtrafo", "comercial"],
+  "templating": {"list": []},
+  "time": {"from": "now-30d", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Comercial / Pipeline",
+  "uid": "comercial-pipeline",
+  "version": 1,
+  "weekStart": ""
+}

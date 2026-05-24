@@ -1,0 +1,234 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]},
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "id": 1,
+      "options": {
+        "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table", "rawQuery": true,
+        "rawSql": "SELECT COUNT(*)::int FROM produccion.ot WHERE estado = 'en_curso'",
+        "refId": "A"
+      }],
+      "title": "OTs en curso",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "yellow", "value": null}]},
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "id": 2,
+      "options": {
+        "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table", "rawQuery": true,
+        "rawSql": "SELECT COUNT(*)::int FROM produccion.ot WHERE estado = 'planificada'",
+        "refId": "A"
+      }],
+      "title": "OTs planificadas",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "id": 3,
+      "options": {
+        "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table", "rawQuery": true,
+        "rawSql": "SELECT COUNT(*)::int FROM produccion.ot WHERE estado = 'completada' AND updated_at >= date_trunc('month', CURRENT_DATE)",
+        "refId": "A"
+      }],
+      "title": "OTs completadas (mes)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}]},
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "id": 4,
+      "options": {
+        "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table", "rawQuery": true,
+        "rawSql": "SELECT COALESCE(SUM(incidencias_abiertas),0)::int FROM produccion.v_causas_demora_agregado",
+        "refId": "A"
+      }],
+      "title": "Reprocesos abiertos",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto",
+            "fillOpacity": 80, "gradientMode": "none",
+            "hideFrom": {"legend": false, "tooltip": false, "viz": false},
+            "lineWidth": 1, "scaleDistribution": {"type": "linear"}, "thresholdsStyle": {"mode": "off"}
+          },
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 4},
+      "id": 5,
+      "options": {
+        "barRadius": 0, "barWidth": 0.97, "fullHighlight": false, "groupWidth": 0.7,
+        "legend": {"calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true},
+        "orientation": "horizontal", "showValue": "auto", "stacking": "normal",
+        "tooltip": {"mode": "single", "sort": "none"}, "xTickLabelRotation": 0, "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table", "rawQuery": true,
+        "rawSql": "SELECT area_nombre AS area, pasos_en_curso::int AS en_curso, pasos_pendientes::int AS pendientes FROM produccion.v_carga_por_area ORDER BY (pasos_en_curso + pasos_pendientes) DESC",
+        "refId": "A"
+      }],
+      "title": "Carga por área (pasos)",
+      "type": "barchart"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"align": "auto", "cellOptions": {"type": "auto"}, "inspect": false},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "abiertas"},
+            "properties": [
+              {"id": "custom.cellOptions", "value": {"mode": "gradient", "type": "color-background"}},
+              {"id": "color", "value": {"mode": "continuous-YlRd"}}
+            ]
+          }
+        ]
+      },
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 4},
+      "id": 6,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {"countRows": false, "fields": "", "reducer": ["sum"], "show": false},
+        "showHeader": true
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table", "rawQuery": true,
+        "rawSql": "SELECT nombre AS causa, categoria, incidencias_total::int AS total, incidencias_abiertas::int AS abiertas, dias_perdidos_total::float AS dias_perd FROM produccion.v_causas_demora_agregado WHERE incidencias_total > 0 ORDER BY incidencias_abiertas DESC, dias_perdidos_total DESC LIMIT 15",
+        "refId": "A"
+      }],
+      "title": "Causas de demora (top 15)",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"align": "auto", "cellOptions": {"type": "auto"}, "inspect": false},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "horas_mes"},
+            "properties": [
+              {"id": "custom.cellOptions", "value": {"mode": "gradient", "type": "color-background"}},
+              {"id": "color", "value": {"mode": "continuous-BlPu"}}
+            ]
+          }
+        ]
+      },
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 13},
+      "id": 7,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {"countRows": false, "fields": "", "reducer": ["sum"], "show": false},
+        "showHeader": true
+      },
+      "pluginVersion": "13.0.1",
+      "targets": [{
+        "datasource": {"type": "postgres", "uid": "postgres-techtrafo"},
+        "format": "table", "rawQuery": true,
+        "rawSql": "SELECT nombre AS responsable, ot_intervenidas_mes::int AS ot_mes, horas_mes::float AS horas_mes, pasos_completados_mes::int AS pasos_mes FROM produccion.v_productividad_responsable ORDER BY horas_mes DESC, pasos_completados_mes DESC LIMIT 20",
+        "refId": "A"
+      }],
+      "title": "Productividad por responsable (últimos 30 días)",
+      "type": "table"
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "tags": ["techtrafo", "planta"],
+  "templating": {"list": []},
+  "time": {"from": "now-30d", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Planta / Producción",
+  "uid": "planta-produccion",
+  "version": 1,
+  "weekStart": ""
+}
