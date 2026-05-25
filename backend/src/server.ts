@@ -26,6 +26,11 @@ import evidenciasRouter from "./routes/evidencias";
 import auditoriaRouter from "./routes/auditoria";
 import pdfRouter from "./routes/pdf";
 import garantiasRouter from "./routes/garantias";
+import proveedoresRouter from "./routes/proveedores";
+import solicitudesCompraRouter from "./routes/solicitudes-compra";
+import ordenesCompraRouter from "./routes/ordenes-compra";
+import recepcionesRouter from "./routes/recepciones";
+import comprasDashboardRouter from "./routes/compras-dashboard";
 import { prisma } from "./db/client";
 import { csrfProtection } from "./auth/csrf";
 import { startNotificacionesWorker, stopNotificacionesWorker } from "./workers/notificaciones-worker";
@@ -90,6 +95,11 @@ app.use("/api/ot", evidenciasRouter);     // /:id/evidencias[...]
 app.use("/api/auditoria", auditoriaRouter); // /ot/:id, /expediente/:id
 app.use("/api/pdf", pdfRouter); // /cotizacion/:id, /contrato/:id, /ot/:id, /informe-tecnico/:id
 app.use("/api/garantias", garantiasRouter); // + /:id/reclamos[...]
+app.use("/api/proveedores", proveedoresRouter);
+app.use("/api/solicitudes-compra", solicitudesCompraRouter);
+app.use("/api/ordenes-compra", ordenesCompraRouter);
+app.use("/api/recepciones", recepcionesRouter);
+app.use("/api/compras-dashboard", comprasDashboardRouter);
 
 // 404 fallback
 app.use((_req, res) => {

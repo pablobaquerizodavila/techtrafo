@@ -48,6 +48,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const puedeAdminRoles = user?.es_super_admin ?? false;
   const puedeVerExpedientes = hasPerm(user, "expedientes", "read");
   const puedeVerOT = hasPerm(user, "ot", "read");
+  const puedeVerCompras = hasPerm(user, "compras", "read");
+  const puedeVerProveedores = hasPerm(user, "proveedores", "read") || puedeVerCompras;
   // Cliente externo: vista simplificada (rol cliente con cliente_id asociado)
   const esCliente = user?.rol_nombre === "cliente" && user.cliente_id !== null;
 
@@ -108,6 +110,25 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <Link href="/inventario" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
                 Bodega
               </Link>
+              {puedeVerCompras && (
+                <>
+                  <Link href="/compras" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground font-medium">
+                    🛒 Compras
+                  </Link>
+                  <Link href="/compras/solicitudes" className="block rounded px-3 py-1.5 pl-7 text-xs hover:bg-accent hover:text-accent-foreground">
+                    Solicitudes
+                  </Link>
+                  <Link href="/compras/ordenes-compra" className="block rounded px-3 py-1.5 pl-7 text-xs hover:bg-accent hover:text-accent-foreground">
+                    Órdenes de compra
+                  </Link>
+                  <Link href="/compras/recepciones" className="block rounded px-3 py-1.5 pl-7 text-xs hover:bg-accent hover:text-accent-foreground">
+                    Recepciones
+                  </Link>
+                  <Link href="/admin/proveedores" className="block rounded px-3 py-1.5 pl-7 text-xs hover:bg-accent hover:text-accent-foreground">
+                    Proveedores
+                  </Link>
+                </>
+              )}
 
               {(puedeAdminUsuarios || puedeAdminRoles) && (
                 <>
@@ -129,6 +150,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                         Plantillas de cotizacion
                       </Link>
                     </>
+                  )}
+                  {puedeVerProveedores && !puedeVerCompras && (
+                    <Link href="/admin/proveedores" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
+                      Proveedores
+                    </Link>
                   )}
                 </>
               )}

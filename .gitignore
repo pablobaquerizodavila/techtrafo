@@ -74,3 +74,4 @@ venv/
 # Compilados
 dist/
 *.tgz
+frontend/tsconfig.tsbuildinfo

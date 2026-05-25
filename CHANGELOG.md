@@ -6,6 +6,57 @@ El formato sigue Keep a Changelog y este proyecto adhiere a Semantic Versioning.
 
 ---
 
+## [0.14.0] — 2026-05-24 — Modulo de Compras (Fase 1 + 2)
+
+Cubre el documento de especificacion de Pablo: proveedores, solicitudes internas, ordenes de compra con aprobacion escalonada, recepciones que afectan bodega y costo de items.
+
+### Nuevo schema `compras` (migrations 019 + 020)
+
+- `compras.proveedores` — catalogo con codigo PRV-YYYY-NNNN auto, contacto, condiciones default, calificacion calculada desde recepciones (% entregas a tiempo).
+- `compras.item_proveedores` — relacion N:N items↔proveedores con precio vigente, tiempo entrega, moneda, condiciones, `es_principal` (trigger garantiza unicidad por item). Reemplaza al texto `items.proveedor_preferido`. Nueva FK `items.proveedor_principal_id`.
+- `compras.solicitudes` + `solicitud_lineas` — SC con codigo SC-YYYY-NNNN. Estados: borrador → enviada → aprobada → convertida_en_oc. Origen: manual / cotizacion / stock_minimo / expediente.
+- `compras.ordenes_compra` + `orden_compra_lineas` — OC con codigo OC-YYYY-NNNN. 10 estados (borrador → en_revision → aprobada → enviada → confirmada → recibida_parcial → recibida_total → cerrada). Aprobacion escalonada por monto.
+- `compras.recepciones` + `recepcion_lineas` — codigo REC-YYYY-NNNN. Borrador hasta que se confirma. Al confirmar, dispara movimientos_stock + actualizacion de costo.
+- `compras.item_proveedor_precios_historial` — trazabilidad de cada cambio de costo_referencia desde recepcion.
+- `compras.config_aprobacion` — umbrales monetarios por rol. Seeds iniciales: `≤$500 comprador`, `$500–$5K jefe_compras`, `$5K–$30K gerencia_general`, `>$30K presidencia`.
+- `compras.v_stock_consolidado` y `compras.v_items_bajo_reorden` — vistas para alertas de stock.
+- Roles nuevos en `core.roles`: `jefe_compras` (aprueba dentro de umbral, recibe), `comprador` (emite SC/OC).
+
+### Backend (5 routers nuevos)
+
+- `routes/proveedores.ts` — CRUD + relacion item↔proveedor + endpoint `GET /buscar-por-item/:itemId` para comparativo.
+- `routes/solicitudes-compra.ts` — CRUD borrador + flujo de aprobacion + endpoint `POST /:id/convertir-en-oc` (genera OC borrador con precios resueltos desde `item_proveedores` y aprobador por monto).
+- `routes/ordenes-compra.ts` — CRUD + flujo completo (`solicitar-aprobacion / aprobar / rechazar / enviar / confirmar / cancelar`). Aprobacion verifica jerarquia: `presidencia > gerencia_general > gerencia_comercial > jefe_compras > comprador`. Endpoint `GET /config/umbrales` para mostrar la tabla.
+- `routes/recepciones.ts` — `POST /` crea recepcion borrador validando saldos. `POST /:id/confirmar` es la operacion clave: por cada linea aprobada con cantidad > 0 inserta `inventario.movimientos_stock` (trigger actualiza stock), acumula `cantidad_recibida` en OC lineas, recalcula `estado_linea` y `estado` de la OC, si `precio_real` difiere actualiza `items.costo_referencia` + escribe `item_proveedor_precios_historial`, y suma contadores del proveedor (entregas a tiempo, no conformidades, calificacion).
+- `routes/compras-dashboard.ts` — KPIs, lista de items bajo punto_reorden, generacion masiva de SC desde alertas, historial de precios por item.
+
+### Frontend (10 paginas + 1 helper)
+
+- `lib/compras.ts` — tipos + clientes API de todo el modulo.
+- `/admin/proveedores` (listado, `/nuevo`, `/[id]` con tab items que suministra).
+- `/compras` — dashboard con 8 KPIs + tabla de alertas de stock con seleccion para generar SC.
+- `/compras/solicitudes` (listado + detalle con boton convertir-en-oc).
+- `/compras/ordenes-compra` (listado + detalle con todos los botones de transicion + ver recepciones).
+- `/compras/recepciones` (listado + detalle con confirmar/anular).
+- `/compras/recepciones/nueva?oc=X` — form contra OC con saldos, precio real opcional, resultado de inspeccion por linea y ubicacion bodega destino.
+- Sidebar: nuevo bloque "🛒 Compras" + sublinks para los roles con permiso `compras`.
+
+### Integraciones
+
+- `inventario.movimientos_stock.referencia_tipo='compra'` con `referencia_id=OC.id` cierra el ciclo de bodega.
+- Cuando se actualiza `items.costo_referencia` desde recepcion, el endpoint `POST /api/cotizaciones/desde-plantilla` (ya existente) usa el costo nuevo automaticamente al re-leer el item — la plantilla queda sincronizada con el costo real de bodega sin intervencion adicional.
+- Alertas de stock por `punto_reorden` se exponen via endpoint; el equipo de compras dispara la generacion de SC manualmente desde la UI (no worker autonomo para no spamear SCs).
+
+### Pendiente (futuras iteraciones)
+
+- Form de creacion manual de SC y de OC desde cero (hoy la OC se crea desde SC aprobada; la SC desde cotizacion o alerta de stock).
+- Validacion de margen minimo por gerencia general en cotizaciones.
+- Portal de proveedor con auth limitada (confirmacion de OC, carga de proforma/factura).
+- Calidad / no conformidades con workflow contra proveedor (devolucion, nota de credito).
+- PDF de OC para envio formal al proveedor.
+
+---
+
 ## [0.12.0] — 2026-05-24 — MEDIUM de auditoria cerrados
 
 ### Seguridad — M1, M3, M5, M7

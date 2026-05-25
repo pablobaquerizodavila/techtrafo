@@ -1,13 +1,25 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-24 · v0.13.0 · plantillas de cotización con check de stock + revisión interna escalonada + gating de roles en expedientes**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-24 · v0.14.0 · módulo de compras (proveedores + SCs + OCs + recepciones con efecto a bodega + actualización automática de costos)**.
 
 ---
 
 ## 1. Estado del proyecto en 30 segundos
 
 - **Empresa**: TECHTRAFO — fabricación, reparación y mantenimiento de transformadores eléctricos (150 kVA → 10 MVA), Samborondón, Ecuador.
-- **Versión actual**: `v0.13.0`. La sesión `0.12.0 → 0.13.0` cerró:
+- **Versión actual**: `v0.14.0`. La sesión `0.13.0 → 0.14.0` cerró el **módulo de Compras (Fase 1 + Fase 2)**:
+  - Schema nuevo `compras` con 10 tablas: `proveedores`, `item_proveedores`, `solicitudes`, `solicitud_lineas`, `ordenes_compra`, `orden_compra_lineas`, `recepciones`, `recepcion_lineas`, `item_proveedor_precios_historial`, `config_aprobacion`. Migrations 019 + 020.
+  - Roles nuevos: `jefe_compras` y `comprador`.
+  - Aprobación escalonada por monto (config_aprobacion seed con 4 niveles: comprador / jefe_compras / gerencia_general / presidencia).
+  - 5 routers backend: `/api/proveedores`, `/api/solicitudes-compra`, `/api/ordenes-compra`, `/api/recepciones`, `/api/compras-dashboard`.
+  - Flujo SC: borrador → enviada → aprobada → convertida_en_oc. La conversión a OC resuelve precios desde `item_proveedores` y asigna aprobador requerido por monto.
+  - Flujo OC: borrador → en_revision → aprobada → enviada → confirmada → recibida_parcial → recibida_total. Aprobación verifica jerarquía del rol del usuario.
+  - **Recepción es la pieza clave**: al confirmar, dispara `inventario.movimientos_stock` (trigger ya existente actualiza stock real), acumula cantidades en OC, ajusta estado de OC, y si `precio_real` ≠ `items.costo_referencia` actualiza el item **y** escribe historial (`compras.item_proveedor_precios_historial`).
+  - Integración con cotizaciones: `POST /api/cotizaciones/desde-plantilla` ya re-leía `costo_referencia` al emitir → ahora ese costo refleja la última recepción automáticamente.
+  - Vistas: `compras.v_stock_consolidado` y `compras.v_items_bajo_reorden`. Endpoint `GET /compras-dashboard/alertas-stock` + acción "generar SC con seleccionados".
+  - Frontend: `/compras` dashboard, listados/detalle de SC/OC/recepciones, form `/compras/recepciones/nueva?oc=X` (saldos pre-cargados, precio real opcional, ubicación bodega por línea), `/admin/proveedores` CRUD completo. Sidebar nuevo bloque "🛒 Compras".
+  - Decisión: **NO** hay worker autónomo que cree SCs por stock — el equipo dispara desde UI (evita spam).
+- **Versión `v0.13.0`** (sesión anterior, cerrada):
   - **Form editable del informe técnico** con secciones de diagnóstico / pronóstico / trabajos / estimaciones (sobre `datos_inspeccion JSONB`)
   - **Fix crítico del PDF**: `pintarPie` causaba "Maximum call stack" cuando el documento pasaba a 2+ páginas (margen inferior se restaura ahora durante el render del footer)
   - **Gating de acciones en expedientes por rol designado**: solo el responsable o aprobador del hito (o un override `presidencia/gerencia_general/gerencia_comercial`) puede iniciar/aprobar/rechazar/reintentar/reabrir/escalar
@@ -18,10 +30,13 @@
   - Fix Prisma: el FK escalar `actualizado_por` dejó de ser aceptado en UpdateInput tras agregar nuevos FKs a `core.usuarios` — ahora se usa la relación nombrada
   - Notificaciones email para revisión interna (solicitar/escalar → rol destino; aprobar/rechazar → vendedor original)
 - **Próximo trabajo natural** (no bloquea ni urge):
-  - Módulo de compras / asignación a bodega para resolver el aprovisionamiento de líneas pendientes (hoy el tiempo es manual por componente)
-  - Validación opcional de margen mínimo por gerencia general (rechazo automático si margen < X%)
+  - **Validación de margen mínimo** por gerencia general en cotizaciones (rechazo automático si margen < X% configurable)
+  - **Form de creación manual de SC y OC desde cero** — hoy SC nace de cotización/alerta y OC nace de SC. A veces puede ser útil crear directo.
+  - **PDF de OC** para envío formal al proveedor (mismo motor que cotizaciones/contratos).
+  - **Portal de proveedor** con auth limitada (confirmación de OC, carga de proforma/factura, actualización de estado de despacho).
+  - **Calidad / no conformidades** con workflow contra proveedor (devolución, nota de crédito, reposición).
+  - Definir umbrales de aprobación reales con Pablo (los seeds son tentativos: $500/$5K/$30K).
   - Iterar campos del form de visita técnica e informe técnico con data real
-  - Definir si bodega compra o existe departamento de compras (Pablo lo confirma con su equipo)
 - **Repo**: https://github.com/pablobaquerizodavila/techtrafo (branch `main`)
 
 ## 2. Topología real (no la del CLAUDE.md genérico)

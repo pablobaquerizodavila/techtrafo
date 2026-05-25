@@ -6,7 +6,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["comercial", "core", "inventario", "posventa", "produccion"]
+  schemas  = ["comercial", "compras", "core", "inventario", "posventa", "produccion"]
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -244,6 +244,7 @@ model cotizaciones {
   usuarios_cotizaciones_revision_interna_solicitada_porTousuarios usuarios?                               @relation("cotizaciones_revision_interna_solicitada_porTousuarios", fields: [revision_interna_solicitada_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
   usuarios_cotizaciones_vendedor_idTousuarios                     usuarios?                               @relation("cotizaciones_vendedor_idTousuarios", fields: [vendedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   expedientes                                                     expedientes[]
+  solicitudes                                                     solicitudes[]
 
   @@index([cliente_id], map: "idx_cotizaciones_cliente")
   @@index([codigo], map: "idx_cotizaciones_codigo")
@@ -291,17 +292,19 @@ model configuracion {
 }
 
 model roles {
-  id               Int                @id @default(autoincrement())
-  nombre           String             @unique @db.VarChar(50)
-  descripcion      String?
-  permisos         Json?              @default("{}")
-  activo           Boolean?           @default(true)
-  created_at       DateTime?          @default(now()) @db.Timestamptz(6)
-  updated_at       DateTime?          @default(now()) @db.Timestamptz(6)
-  es_super_admin   Boolean            @default(false)
-  expediente_hitos expediente_hitos[]
-  hito_plantillas  hito_plantillas[]
-  usuarios         usuarios[]
+  id                Int                 @id @default(autoincrement())
+  nombre            String              @unique @db.VarChar(50)
+  descripcion       String?
+  permisos          Json?               @default("{}")
+  activo            Boolean?            @default(true)
+  created_at        DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime?           @default(now()) @db.Timestamptz(6)
+  es_super_admin    Boolean             @default(false)
+  expediente_hitos  expediente_hitos[]
+  hito_plantillas   hito_plantillas[]
+  config_aprobacion config_aprobacion[]
+  ordenes_compra    ordenes_compra[]
+  usuarios          usuarios[]
 
   @@schema("core")
 }
@@ -359,6 +362,22 @@ model usuarios {
   visitas_tecnicas_visitas_tecnicas_actualizado_porTousuarios           visitas_tecnicas[]                      @relation("visitas_tecnicas_actualizado_porTousuarios")
   visitas_tecnicas_visitas_tecnicas_creado_porTousuarios                visitas_tecnicas[]                      @relation("visitas_tecnicas_creado_porTousuarios")
   visitas_tecnicas_visitas_tecnicas_ingeniero_idTousuarios              visitas_tecnicas[]                      @relation("visitas_tecnicas_ingeniero_idTousuarios")
+  item_proveedor_precios_historial                                      item_proveedor_precios_historial[]
+  item_proveedores_item_proveedores_actualizado_porTousuarios           item_proveedores[]                      @relation("item_proveedores_actualizado_porTousuarios")
+  item_proveedores_item_proveedores_creado_porTousuarios                item_proveedores[]                      @relation("item_proveedores_creado_porTousuarios")
+  ordenes_compra_ordenes_compra_actualizado_porTousuarios               ordenes_compra[]                        @relation("ordenes_compra_actualizado_porTousuarios")
+  ordenes_compra_ordenes_compra_aprobador_idTousuarios                  ordenes_compra[]                        @relation("ordenes_compra_aprobador_idTousuarios")
+  ordenes_compra_ordenes_compra_creado_porTousuarios                    ordenes_compra[]                        @relation("ordenes_compra_creado_porTousuarios")
+  proveedores_proveedores_actualizado_porTousuarios                     proveedores[]                           @relation("proveedores_actualizado_porTousuarios")
+  proveedores_proveedores_creado_porTousuarios                          proveedores[]                           @relation("proveedores_creado_porTousuarios")
+  recepciones_recepciones_actualizado_porTousuarios                     recepciones[]                           @relation("recepciones_actualizado_porTousuarios")
+  recepciones_recepciones_creado_porTousuarios                          recepciones[]                           @relation("recepciones_creado_porTousuarios")
+  recepciones_recepciones_responsable_calidad_idTousuarios              recepciones[]                           @relation("recepciones_responsable_calidad_idTousuarios")
+  recepciones_recepciones_responsable_recepcion_idTousuarios            recepciones[]                           @relation("recepciones_responsable_recepcion_idTousuarios")
+  solicitudes_solicitudes_actualizado_porTousuarios                     solicitudes[]                           @relation("solicitudes_actualizado_porTousuarios")
+  solicitudes_solicitudes_aprobador_idTousuarios                        solicitudes[]                           @relation("solicitudes_aprobador_idTousuarios")
+  solicitudes_solicitudes_creado_porTousuarios                          solicitudes[]                           @relation("solicitudes_creado_porTousuarios")
+  solicitudes_solicitudes_solicitante_idTousuarios                      solicitudes[]                           @relation("solicitudes_solicitante_idTousuarios")
   auditoria                                                             auditoria[]
   configuracion                                                         configuracion[]
   notificaciones                                                        notificaciones[]
@@ -422,34 +441,40 @@ model categorias_item {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model items {
-  id                                       BigInt                  @id @default(autoincrement())
-  codigo_interno                           String                  @unique @db.VarChar(50)
+  id                                       BigInt                             @id @default(autoincrement())
+  codigo_interno                           String                             @unique @db.VarChar(50)
   categoria_id                             BigInt
-  nombre                                   String                  @db.VarChar(200)
+  nombre                                   String                             @db.VarChar(200)
   descripcion                              String?
-  tipo_item                                String                  @db.VarChar(30)
-  unidad_medida                            String                  @default("unid") @db.VarChar(20)
-  controla_stock                           Boolean?                @default(true)
-  controla_lote                            Boolean?                @default(false)
-  controla_serie                           Boolean?                @default(false)
-  costo_referencia                         Decimal?                @default(0) @db.Decimal(14, 2)
-  precio_referencia                        Decimal?                @default(0) @db.Decimal(14, 2)
-  stock_minimo                             Decimal?                @default(0) @db.Decimal(14, 3)
-  stock_maximo                             Decimal?                @default(0) @db.Decimal(14, 3)
-  punto_reorden                            Decimal?                @default(0) @db.Decimal(14, 3)
-  proveedor_preferido                      String?                 @db.VarChar(200)
-  peso_kg                                  Decimal?                @db.Decimal(10, 3)
+  tipo_item                                String                             @db.VarChar(30)
+  unidad_medida                            String                             @default("unid") @db.VarChar(20)
+  controla_stock                           Boolean?                           @default(true)
+  controla_lote                            Boolean?                           @default(false)
+  controla_serie                           Boolean?                           @default(false)
+  costo_referencia                         Decimal?                           @default(0) @db.Decimal(14, 2)
+  precio_referencia                        Decimal?                           @default(0) @db.Decimal(14, 2)
+  stock_minimo                             Decimal?                           @default(0) @db.Decimal(14, 3)
+  stock_maximo                             Decimal?                           @default(0) @db.Decimal(14, 3)
+  punto_reorden                            Decimal?                           @default(0) @db.Decimal(14, 3)
+  proveedor_preferido                      String?                            @db.VarChar(200)
+  peso_kg                                  Decimal?                           @db.Decimal(10, 3)
   notas                                    String?
-  estado                                   String?                 @default("activo") @db.VarChar(20)
-  creado_por                               String?                 @db.Uuid
-  actualizado_por                          String?                 @db.Uuid
-  created_at                               DateTime?               @default(now()) @db.Timestamptz(6)
-  updated_at                               DateTime?               @default(now()) @db.Timestamptz(6)
+  estado                                   String?                            @default("activo") @db.VarChar(20)
+  creado_por                               String?                            @db.Uuid
+  actualizado_por                          String?                            @db.Uuid
+  created_at                               DateTime?                          @default(now()) @db.Timestamptz(6)
+  updated_at                               DateTime?                          @default(now()) @db.Timestamptz(6)
+  proveedor_principal_id                   BigInt?
   cotizacion_lineas                        cotizacion_lineas[]
   plantilla_componentes                    plantilla_componentes[]
-  usuarios_items_actualizado_porTousuarios usuarios?               @relation("items_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  categorias_item                          categorias_item         @relation(fields: [categoria_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  usuarios_items_creado_porTousuarios      usuarios?               @relation("items_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  item_proveedor_precios_historial         item_proveedor_precios_historial[]
+  item_proveedores                         item_proveedores[]
+  orden_compra_lineas                      orden_compra_lineas[]
+  solicitud_lineas                         solicitud_lineas[]
+  usuarios_items_actualizado_porTousuarios usuarios?                          @relation("items_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  categorias_item                          categorias_item                    @relation(fields: [categoria_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_items_creado_porTousuarios      usuarios?                          @relation("items_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  proveedores                              proveedores?                       @relation(fields: [proveedor_principal_id], references: [id], onUpdate: NoAction)
   lotes                                    lotes[]
   movimientos_stock                        movimientos_stock[]
   series                                   series[]
@@ -476,6 +501,7 @@ model lotes {
   actualizado_por                          String?             @db.Uuid
   created_at                               DateTime?           @default(now()) @db.Timestamptz(6)
   updated_at                               DateTime?           @default(now()) @db.Timestamptz(6)
+  recepcion_lineas                         recepcion_lineas[]
   usuarios_lotes_actualizado_porTousuarios usuarios?           @relation("lotes_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
   usuarios_lotes_creado_porTousuarios      usuarios?           @relation("lotes_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
   items                                    items               @relation(fields: [item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -564,21 +590,23 @@ model stock {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model ubicaciones {
-  id                                                                    BigInt              @id @default(autoincrement())
-  codigo                                                                String              @unique @db.VarChar(20)
-  nombre                                                                String              @db.VarChar(100)
+  id                                                                    BigInt                @id @default(autoincrement())
+  codigo                                                                String                @unique @db.VarChar(20)
+  nombre                                                                String                @db.VarChar(100)
   descripcion                                                           String?
-  tipo                                                                  String?             @default("bodega") @db.VarChar(20)
-  estado                                                                String?             @default("activo") @db.VarChar(20)
-  creado_por                                                            String?             @db.Uuid
-  actualizado_por                                                       String?             @db.Uuid
-  created_at                                                            DateTime?           @default(now()) @db.Timestamptz(6)
-  updated_at                                                            DateTime?           @default(now()) @db.Timestamptz(6)
-  movimientos_stock_movimientos_stock_ubicacion_destino_idToubicaciones movimientos_stock[] @relation("movimientos_stock_ubicacion_destino_idToubicaciones")
-  movimientos_stock_movimientos_stock_ubicacion_origen_idToubicaciones  movimientos_stock[] @relation("movimientos_stock_ubicacion_origen_idToubicaciones")
+  tipo                                                                  String?               @default("bodega") @db.VarChar(20)
+  estado                                                                String?               @default("activo") @db.VarChar(20)
+  creado_por                                                            String?               @db.Uuid
+  actualizado_por                                                       String?               @db.Uuid
+  created_at                                                            DateTime?             @default(now()) @db.Timestamptz(6)
+  updated_at                                                            DateTime?             @default(now()) @db.Timestamptz(6)
+  orden_compra_lineas                                                   orden_compra_lineas[]
+  recepcion_lineas                                                      recepcion_lineas[]
+  movimientos_stock_movimientos_stock_ubicacion_destino_idToubicaciones movimientos_stock[]   @relation("movimientos_stock_ubicacion_destino_idToubicaciones")
+  movimientos_stock_movimientos_stock_ubicacion_origen_idToubicaciones  movimientos_stock[]   @relation("movimientos_stock_ubicacion_origen_idToubicaciones")
   stock                                                                 stock[]
-  usuarios_ubicaciones_actualizado_porTousuarios                        usuarios?           @relation("ubicaciones_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  usuarios_ubicaciones_creado_porTousuarios                             usuarios?           @relation("ubicaciones_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_ubicaciones_actualizado_porTousuarios                        usuarios?             @relation("ubicaciones_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_ubicaciones_creado_porTousuarios                             usuarios?             @relation("ubicaciones_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@schema("inventario")
 }
@@ -871,6 +899,8 @@ model expedientes {
   transformadores                                transformadores?    @relation(fields: [transformador_id], references: [id], onUpdate: NoAction)
   informes_tecnicos                              informes_tecnicos[]
   visitas_tecnicas                               visitas_tecnicas[]
+  ordenes_compra                                 ordenes_compra[]
+  solicitudes                                    solicitudes[]
 
   @@index([cliente_id], map: "idx_expedientes_cliente")
   @@index([ejecutivo_id], map: "idx_expedientes_ejecutivo")
@@ -1212,4 +1242,335 @@ model plantilla_componentes {
 
   @@index([plantilla_id, orden], map: "idx_plant_comp_plantilla")
   @@schema("comercial")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model config_aprobacion {
+  id               BigInt   @id @default(autoincrement())
+  monto_minimo     Decimal  @db.Decimal(14, 2)
+  monto_maximo     Decimal? @db.Decimal(14, 2)
+  rol_aprobador_id Int
+  moneda           String   @default("USD") @db.VarChar(3)
+  activo           Boolean  @default(true)
+  notas            String?
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime @default(now()) @db.Timestamptz(6)
+  roles            roles    @relation(fields: [rol_aprobador_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([activo, monto_minimo], map: "idx_compras_config_activo")
+  @@schema("compras")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model item_proveedor_precios_historial {
+  id                   BigInt          @id @default(autoincrement())
+  item_id              BigInt
+  proveedor_id         BigInt
+  orden_compra_id      BigInt?
+  recepcion_id         BigInt?
+  precio_anterior      Decimal?        @db.Decimal(14, 4)
+  precio_nuevo         Decimal         @db.Decimal(14, 4)
+  variacion_porcentaje Decimal?        @db.Decimal(7, 2)
+  moneda               String          @default("USD") @db.VarChar(3)
+  origen               String          @default("recepcion") @db.VarChar(20)
+  registrado_por       String?         @db.Uuid
+  fecha                DateTime        @default(now()) @db.Timestamptz(6)
+  notas                String?
+  items                items           @relation(fields: [item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ordenes_compra       ordenes_compra? @relation(fields: [orden_compra_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  proveedores          proveedores     @relation(fields: [proveedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  recepciones          recepciones?    @relation(fields: [recepcion_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios             usuarios?       @relation(fields: [registrado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([item_id, fecha(sort: Desc)], map: "idx_precios_hist_item")
+  @@index([proveedor_id, fecha(sort: Desc)], map: "idx_precios_hist_prov")
+  @@schema("compras")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model item_proveedores {
+  id                                                  BigInt      @id @default(autoincrement())
+  item_id                                             BigInt
+  proveedor_id                                        BigInt
+  precio_unitario                                     Decimal     @default(0) @db.Decimal(14, 4)
+  moneda                                              String      @default("USD") @db.VarChar(3)
+  unidad_medida                                       String      @default("unid") @db.VarChar(20)
+  cantidad_minima_orden                               Decimal     @default(1) @db.Decimal(14, 3)
+  tiempo_entrega_dias                                 Int?
+  condiciones_pago                                    String?     @db.VarChar(120)
+  incoterm                                            String?     @db.VarChar(10)
+  codigo_proveedor_item                               String?     @db.VarChar(100)
+  es_principal                                        Boolean     @default(false)
+  vigencia_desde                                      DateTime    @default(dbgenerated("CURRENT_DATE")) @db.Date
+  vigencia_hasta                                      DateTime?   @db.Date
+  notas                                               String?
+  creado_por                                          String?     @db.Uuid
+  actualizado_por                                     String?     @db.Uuid
+  created_at                                          DateTime    @default(now()) @db.Timestamptz(6)
+  updated_at                                          DateTime    @default(now()) @db.Timestamptz(6)
+  usuarios_item_proveedores_actualizado_porTousuarios usuarios?   @relation("item_proveedores_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_item_proveedores_creado_porTousuarios      usuarios?   @relation("item_proveedores_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  items                                               items       @relation(fields: [item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  proveedores                                         proveedores @relation(fields: [proveedor_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([item_id, proveedor_id])
+  @@index([item_id], map: "idx_item_prov_item")
+  @@index([proveedor_id], map: "idx_item_prov_proveedor")
+  @@schema("compras")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model orden_compra_lineas {
+  id                    BigInt             @id @default(autoincrement())
+  orden_compra_id       BigInt
+  orden                 Int                @default(1)
+  item_id               BigInt?
+  descripcion           String             @db.VarChar(500)
+  codigo_proveedor_item String?            @db.VarChar(100)
+  unidad_medida         String             @default("unid") @db.VarChar(20)
+  cantidad_solicitada   Decimal            @db.Decimal(14, 3)
+  precio_unitario       Decimal            @db.Decimal(14, 4)
+  descuento_porcentaje  Decimal            @default(0) @db.Decimal(5, 2)
+  subtotal              Decimal            @default(0) @db.Decimal(14, 2)
+  cantidad_recibida     Decimal            @default(0) @db.Decimal(14, 3)
+  cantidad_rechazada    Decimal            @default(0) @db.Decimal(14, 3)
+  estado_linea          String             @default("pendiente") @db.VarChar(20)
+  ubicacion_destino_id  BigInt?
+  proyecto_referencia   String?            @db.VarChar(100)
+  notas                 String?
+  created_at            DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime           @default(now()) @db.Timestamptz(6)
+  items                 items?             @relation(fields: [item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ordenes_compra        ordenes_compra     @relation(fields: [orden_compra_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  ubicaciones           ubicaciones?       @relation(fields: [ubicacion_destino_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  recepcion_lineas      recepcion_lineas[]
+
+  @@index([estado_linea], map: "idx_oc_lineas_estado")
+  @@index([orden_compra_id, orden], map: "idx_oc_lineas_oc")
+  @@schema("compras")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model ordenes_compra {
+  id                                                      BigInt                             @id @default(autoincrement())
+  codigo                                                  String                             @unique @db.VarChar(30)
+  proveedor_id                                            BigInt
+  solicitud_id                                            BigInt?
+  expediente_id                                           BigInt?
+  fecha_emision                                           DateTime                           @default(dbgenerated("CURRENT_DATE")) @db.Date
+  fecha_entrega_acordada                                  DateTime?                          @db.Date
+  fecha_confirmacion_proveedor                            DateTime?                          @db.Date
+  fecha_entrega_real                                      DateTime?                          @db.Date
+  condiciones_pago                                        String?                            @db.VarChar(120)
+  moneda                                                  String                             @default("USD") @db.VarChar(3)
+  tipo_cambio                                             Decimal?                           @db.Decimal(10, 4)
+  incoterm                                                String?                            @db.VarChar(10)
+  lugar_entrega                                           String?
+  subtotal                                                Decimal                            @default(0) @db.Decimal(14, 2)
+  descuento_porcentaje                                    Decimal                            @default(0) @db.Decimal(5, 2)
+  descuento_valor                                         Decimal                            @default(0) @db.Decimal(14, 2)
+  iva_porcentaje                                          Decimal                            @default(15.00) @db.Decimal(5, 2)
+  iva_valor                                               Decimal                            @default(0) @db.Decimal(14, 2)
+  retencion_valor                                         Decimal                            @default(0) @db.Decimal(14, 2)
+  total                                                   Decimal                            @default(0) @db.Decimal(14, 2)
+  estado                                                  String                             @default("borrador") @db.VarChar(30)
+  rol_aprobador_requerido_id                              Int?
+  aprobador_id                                            String?                            @db.Uuid
+  fecha_aprobacion                                        DateTime?                          @db.Timestamptz(6)
+  motivo_rechazo                                          String?
+  observaciones_internas                                  String?
+  observaciones_proveedor                                 String?
+  archivo_proveedor_url                                   String?
+  archivo_oc_url                                          String?
+  creado_por                                              String?                            @db.Uuid
+  actualizado_por                                         String?                            @db.Uuid
+  created_at                                              DateTime                           @default(now()) @db.Timestamptz(6)
+  updated_at                                              DateTime                           @default(now()) @db.Timestamptz(6)
+  item_proveedor_precios_historial                        item_proveedor_precios_historial[]
+  orden_compra_lineas                                     orden_compra_lineas[]
+  usuarios_ordenes_compra_actualizado_porTousuarios       usuarios?                          @relation("ordenes_compra_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_ordenes_compra_aprobador_idTousuarios          usuarios?                          @relation("ordenes_compra_aprobador_idTousuarios", fields: [aprobador_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_ordenes_compra_creado_porTousuarios            usuarios?                          @relation("ordenes_compra_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  expedientes                                             expedientes?                       @relation(fields: [expediente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  proveedores                                             proveedores                        @relation(fields: [proveedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  roles                                                   roles?                             @relation(fields: [rol_aprobador_requerido_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  solicitudes_ordenes_compra_solicitud_idTosolicitudes    solicitudes?                       @relation("ordenes_compra_solicitud_idTosolicitudes", fields: [solicitud_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  recepciones                                             recepciones[]
+  solicitudes_solicitudes_orden_compra_idToordenes_compra solicitudes[]                      @relation("solicitudes_orden_compra_idToordenes_compra")
+
+  @@index([estado], map: "idx_oc_estado")
+  @@index([fecha_emision(sort: Desc)], map: "idx_oc_fecha")
+  @@index([proveedor_id], map: "idx_oc_proveedor")
+  @@schema("compras")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model proveedores {
+  id                                             BigInt                             @id @default(autoincrement())
+  codigo                                         String                             @unique @db.VarChar(30)
+  razon_social                                   String                             @db.VarChar(200)
+  nombre_comercial                               String?                            @db.VarChar(200)
+  ruc                                            String?                            @db.VarChar(20)
+  pais                                           String                             @default("Ecuador") @db.VarChar(80)
+  ciudad                                         String?                            @db.VarChar(120)
+  direccion                                      String?
+  contacto_nombre                                String?                            @db.VarChar(150)
+  contacto_cargo                                 String?                            @db.VarChar(120)
+  contacto_email                                 String?                            @db.VarChar(255)
+  contacto_telefono                              String?                            @db.VarChar(40)
+  sitio_web                                      String?                            @db.VarChar(255)
+  condiciones_pago_default                       String?                            @db.VarChar(120)
+  moneda_default                                 String                             @default("USD") @db.VarChar(3)
+  tiempo_entrega_default_dias                    Int?
+  incoterm_default                               String?                            @db.VarChar(10)
+  certificaciones                                String?
+  productos_que_suministra                       String?
+  calificacion                                   Decimal?                           @db.Decimal(5, 2)
+  total_ordenes                                  Int                                @default(0)
+  total_entregas_atiempo                         Int                                @default(0)
+  total_no_conformidades                         Int                                @default(0)
+  observaciones                                  String?
+  estado                                         String                             @default("activo") @db.VarChar(20)
+  creado_por                                     String?                            @db.Uuid
+  actualizado_por                                String?                            @db.Uuid
+  created_at                                     DateTime                           @default(now()) @db.Timestamptz(6)
+  updated_at                                     DateTime                           @default(now()) @db.Timestamptz(6)
+  item_proveedor_precios_historial               item_proveedor_precios_historial[]
+  item_proveedores                               item_proveedores[]
+  ordenes_compra                                 ordenes_compra[]
+  usuarios_proveedores_actualizado_porTousuarios usuarios?                          @relation("proveedores_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_proveedores_creado_porTousuarios      usuarios?                          @relation("proveedores_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  solicitud_lineas                               solicitud_lineas[]
+  items                                          items[]
+
+  @@index([estado], map: "idx_proveedores_estado")
+  @@schema("compras")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model recepcion_lineas {
+  id                    BigInt              @id @default(autoincrement())
+  recepcion_id          BigInt
+  orden_compra_linea_id BigInt
+  cantidad_recibida     Decimal             @db.Decimal(14, 3)
+  cantidad_rechazada    Decimal             @default(0) @db.Decimal(14, 3)
+  precio_real           Decimal?            @db.Decimal(14, 4)
+  resultado_inspeccion  String              @default("aprobado") @db.VarChar(20)
+  motivo_rechazo        String?
+  ubicacion_id          BigInt?
+  lote_id               BigInt?
+  movimiento_stock_id   BigInt?
+  observaciones         String?
+  created_at            DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime            @default(now()) @db.Timestamptz(6)
+  lotes                 lotes?              @relation(fields: [lote_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  orden_compra_lineas   orden_compra_lineas @relation(fields: [orden_compra_linea_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  recepciones           recepciones         @relation(fields: [recepcion_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  ubicaciones           ubicaciones?        @relation(fields: [ubicacion_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([orden_compra_linea_id], map: "idx_rec_lineas_oc_linea")
+  @@index([recepcion_id], map: "idx_rec_lineas_recepcion")
+  @@schema("compras")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model recepciones {
+  id                                                      BigInt                             @id @default(autoincrement())
+  codigo                                                  String                             @unique @db.VarChar(30)
+  orden_compra_id                                         BigInt
+  fecha_recepcion                                         DateTime                           @default(now()) @db.Timestamptz(6)
+  guia_remision_numero                                    String?                            @db.VarChar(100)
+  factura_numero                                          String?                            @db.VarChar(100)
+  factura_fecha                                           DateTime?                          @db.Date
+  factura_url                                             String?
+  estado                                                  String                             @default("borrador") @db.VarChar(30)
+  estado_general                                          String                             @default("bueno") @db.VarChar(30)
+  responsable_recepcion_id                                String?                            @db.Uuid
+  responsable_calidad_id                                  String?                            @db.Uuid
+  observaciones                                           String?
+  evidencia_url                                           String?
+  creado_por                                              String?                            @db.Uuid
+  actualizado_por                                         String?                            @db.Uuid
+  created_at                                              DateTime                           @default(now()) @db.Timestamptz(6)
+  updated_at                                              DateTime                           @default(now()) @db.Timestamptz(6)
+  item_proveedor_precios_historial                        item_proveedor_precios_historial[]
+  recepcion_lineas                                        recepcion_lineas[]
+  usuarios_recepciones_actualizado_porTousuarios          usuarios?                          @relation("recepciones_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_recepciones_creado_porTousuarios               usuarios?                          @relation("recepciones_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ordenes_compra                                          ordenes_compra                     @relation(fields: [orden_compra_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_recepciones_responsable_calidad_idTousuarios   usuarios?                          @relation("recepciones_responsable_calidad_idTousuarios", fields: [responsable_calidad_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_recepciones_responsable_recepcion_idTousuarios usuarios?                          @relation("recepciones_responsable_recepcion_idTousuarios", fields: [responsable_recepcion_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([estado], map: "idx_recepciones_estado")
+  @@index([fecha_recepcion(sort: Desc)], map: "idx_recepciones_fecha")
+  @@index([orden_compra_id], map: "idx_recepciones_oc")
+  @@schema("compras")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model solicitud_lineas {
+  id                    BigInt       @id @default(autoincrement())
+  solicitud_id          BigInt
+  orden                 Int          @default(1)
+  item_id               BigInt?
+  descripcion           String       @db.VarChar(500)
+  unidad_medida         String       @default("unid") @db.VarChar(20)
+  cantidad_solicitada   Decimal      @db.Decimal(14, 3)
+  precio_referencial    Decimal      @default(0) @db.Decimal(14, 4)
+  moneda                String       @default("USD") @db.VarChar(3)
+  cotizacion_linea_id   BigInt?
+  proveedor_sugerido_id BigInt?
+  notas                 String?
+  created_at            DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime     @default(now()) @db.Timestamptz(6)
+  items                 items?       @relation(fields: [item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  proveedores           proveedores? @relation(fields: [proveedor_sugerido_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  solicitudes           solicitudes  @relation(fields: [solicitud_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([solicitud_id, orden], map: "idx_sc_lineas_sc")
+  @@schema("compras")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model solicitudes {
+  id                                                         BigInt             @id @default(autoincrement())
+  codigo                                                     String             @unique @db.VarChar(30)
+  departamento_solicitante                                   String             @db.VarChar(50)
+  solicitante_id                                             String?            @db.Uuid
+  cotizacion_id                                              BigInt?
+  expediente_id                                              BigInt?
+  fecha_solicitud                                            DateTime           @default(dbgenerated("CURRENT_DATE")) @db.Date
+  fecha_requerida                                            DateTime?          @db.Date
+  prioridad                                                  String             @default("media") @db.VarChar(20)
+  justificacion                                              String?
+  observaciones                                              String?
+  estado                                                     String             @default("borrador") @db.VarChar(30)
+  origen                                                     String             @default("manual") @db.VarChar(20)
+  aprobador_id                                               String?            @db.Uuid
+  fecha_aprobacion                                           DateTime?          @db.Timestamptz(6)
+  motivo_rechazo                                             String?
+  orden_compra_id                                            BigInt?
+  total_estimado                                             Decimal            @default(0) @db.Decimal(14, 2)
+  moneda                                                     String             @default("USD") @db.VarChar(3)
+  creado_por                                                 String?            @db.Uuid
+  actualizado_por                                            String?            @db.Uuid
+  created_at                                                 DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at                                                 DateTime           @default(now()) @db.Timestamptz(6)
+  ordenes_compra_ordenes_compra_solicitud_idTosolicitudes    ordenes_compra[]   @relation("ordenes_compra_solicitud_idTosolicitudes")
+  solicitud_lineas                                           solicitud_lineas[]
+  usuarios_solicitudes_actualizado_porTousuarios             usuarios?          @relation("solicitudes_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_solicitudes_aprobador_idTousuarios                usuarios?          @relation("solicitudes_aprobador_idTousuarios", fields: [aprobador_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  cotizaciones                                               cotizaciones?      @relation(fields: [cotizacion_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_solicitudes_creado_porTousuarios                  usuarios?          @relation("solicitudes_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  expedientes                                                expedientes?       @relation(fields: [expediente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ordenes_compra_solicitudes_orden_compra_idToordenes_compra ordenes_compra?    @relation("solicitudes_orden_compra_idToordenes_compra", fields: [orden_compra_id], references: [id], onUpdate: NoAction, map: "solicitudes_orden_compra_fkey")
+  usuarios_solicitudes_solicitante_idTousuarios              usuarios?          @relation("solicitudes_solicitante_idTousuarios", fields: [solicitante_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([estado], map: "idx_sc_estado")
+  @@index([fecha_solicitud(sort: Desc)], map: "idx_sc_fecha")
+  @@index([solicitante_id], map: "idx_sc_solicitante")
+  @@schema("compras")
 }
