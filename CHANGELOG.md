@@ -6,6 +6,39 @@ El formato sigue Keep a Changelog y este proyecto adhiere a Semantic Versioning.
 
 ---
 
+## [0.15.2] — 2026-05-25 — Voltage OS Ola 3A: admin + auth
+
+Migra al lenguaje Voltage OS las paginas de administracion y autenticacion:
+
+- `/login`: hero con brand mark copper + glow, gradient title
+  (Tech + trafo italico), ambient glow corners (copper sup-izq +
+  teal inf-der), form glass con backdrop-blur, callout rose para
+  errores. Cambio de fondo `bg-muted/30` claro a la base dark Voltage.
+- `/register`: misma estetica que /login, shell reutilizable interno
+  con titulo/subtitulo/contenido. Pantalla de confirmacion con
+  CheckCircle2 green pulsante.
+- `/perfil`: PageHeader, 3 Panels (cuenta con avatar teal grande,
+  informacion personal, cambiar contrasena). Boton save copper con
+  glow, layout coherente con el resto del panel.
+- `/admin/usuarios`: filtros compactos h-8, tabla con avatar gradient
+  por usuario, badges de rol (`super` en copper, `inactivo` en muted),
+  acciones inline copper/rose para aprobar/rechazar pendientes y
+  iconos para editar/reset-password/toggle-activo en aprobados.
+- `/admin/roles`: cada rol como Panel glass con icon copper, badges
+  (super=copper, all-access=teal), matriz de permisos en grids con
+  checkbox accent-copper, dialog nuevo rol mantiene logica.
+- `/admin/hito-plantillas`: agrupado por tipo de servicio en Panels
+  separados, badges (visible-cliente=teal, requiere-aprobacion=warning).
+- `/admin/cotizacion-plantillas`: codigo en copper, contadores de
+  componentes en badge teal.
+- `/admin/proveedores`: Select (no `<select>` nativo) con border-glass,
+  calificacion con estrella amber, codigo de proveedor en copper.
+
+Pendiente para proxima sub-ola: /admin/proveedores/nuevo y /[id]
+(no eran lo mas visible — pasarlas con el batch de /compras).
+
+---
+
 ## [0.15.1] — 2026-05-25 — Voltage OS Ola 2B: formularios `nueva/o`
 
 Migra al lenguaje Voltage OS los 5 formularios de creacion:

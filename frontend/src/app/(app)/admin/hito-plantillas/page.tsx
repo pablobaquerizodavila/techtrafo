@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Pencil } from "lucide-react";
+import { Pencil, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/page-header";
+import { Panel } from "@/components/panel";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -107,68 +109,78 @@ export default function HitoPlantillasPage() {
   }, {});
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h2 className="text-3xl font-bold">Hitos del catalogo</h2>
-        <p className="text-muted-foreground">
-          SLA, aprobaciones y visibilidad por hito. Estos valores se aplican a expedientes <strong>nuevos</strong>;
-          los existentes mantienen sus SLA actuales (editable por hito en el detalle del expediente).
-        </p>
-      </header>
+    <div>
+      <PageHeader
+        breadcrumb={[{ href: "/dashboard", label: "Panel" }, { label: "Admin" }, { label: "Hitos" }]}
+        title="Hitos"
+        titleAccent="del catálogo"
+        meta={<span>SLA, aprobaciones y visibilidad por hito · solo aplica a expedientes nuevos</span>}
+      />
 
-      {loading ? (
-        <p className="text-muted-foreground">Cargando...</p>
-      ) : (
-        Object.entries(grouped).map(([tipo, plantillas]) => (
-          <section key={tipo}>
-            <h3 className="mb-2 text-xl font-bold capitalize">{tipo}</h3>
-            <div className="rounded-md border">
+      <div className="space-y-6 pt-6">
+        {loading ? (
+          <div className="flex h-[40vh] items-center justify-center text-muted-foreground">
+            <div className="flex flex-col items-center gap-3">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-copper border-t-transparent" />
+              <span className="text-sm">Cargando…</span>
+            </div>
+          </div>
+        ) : (
+          Object.entries(grouped).map(([tipo, plantillas]) => (
+            <Panel
+              key={tipo}
+              title={tipo.charAt(0).toUpperCase() + tipo.slice(1)}
+              subtitle={`${plantillas.length} hito${plantillas.length === 1 ? "" : "s"} en este tipo de servicio`}
+              icon={<FolderOpen className="h-3.5 w-3.5" />}
+              padded={false}
+            >
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">#</TableHead>
-                    <TableHead>Codigo</TableHead>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead className="text-right">SLA (h)</TableHead>
-                    <TableHead>Aprobacion</TableHead>
-                    <TableHead>Visible cliente</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                  <TableRow className="border-glass bg-glass hover:bg-glass">
+                    <TableHead className="w-12 font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">#</TableHead>
+                    <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Código</TableHead>
+                    <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Nombre</TableHead>
+                    <TableHead className="text-right font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">SLA (h)</TableHead>
+                    <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Aprobación</TableHead>
+                    <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Visible cliente</TableHead>
+                    <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Estado</TableHead>
+                    <TableHead className="text-right"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {plantillas.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell className="text-muted-foreground">{p.orden}</TableCell>
-                      <TableCell className="font-mono text-xs">{p.codigo}</TableCell>
-                      <TableCell>{p.nombre}</TableCell>
-                      <TableCell className="text-right font-mono">
-                        {p.sla_horas ?? <span className="text-muted-foreground">—</span>}
+                    <TableRow key={p.id} className="border-glass hover:bg-glass">
+                      <TableCell className="font-mono text-muted-foreground">{p.orden}</TableCell>
+                      <TableCell className="font-mono text-xs text-copper">{p.codigo}</TableCell>
+                      <TableCell className="text-sm">{p.nombre}</TableCell>
+                      <TableCell className="text-right font-mono text-sm tabular-nums">
+                        {p.sla_horas ?? <span className="text-muted-foreground/50">—</span>}
                       </TableCell>
                       <TableCell className="text-sm">
                         {p.requiere_aprobacion
                           ? <Badge variant="warning">{p.roles?.nombre ?? "?"}</Badge>
-                          : <span className="text-muted-foreground">no</span>}
+                          : <span className="text-muted-foreground/60">—</span>}
                       </TableCell>
                       <TableCell className="text-sm">
-                        {p.visible_cliente ? "si" : <span className="text-muted-foreground">no</span>}
+                        {p.visible_cliente ? <Badge variant="teal">sí</Badge> : <span className="text-muted-foreground/60">—</span>}
                       </TableCell>
                       <TableCell>
                         <Badge variant={p.activo ? "success" : "muted"}>{p.activo ? "activo" : "inactivo"}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="outline" size="sm" onClick={() => openEdit(p)} title="Editar">
-                          <Pencil className="h-3 w-3" />
-                        </Button>
+                        <button type="button" onClick={() => openEdit(p)} title="Editar"
+                          className="rounded-md p-1.5 text-muted-foreground hover:bg-glass-elev hover:text-copper">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            </div>
-          </section>
-        ))
-      )}
+            </Panel>
+          ))
+        )}
+      </div>
 
       {/* Dialog editar */}
       <Dialog open={!!editing} onOpenChange={(open) => { if (!open) { setEditing(null); setForm(null); } }}>
@@ -246,7 +258,7 @@ export default function HitoPlantillasPage() {
         </DialogContent>
       </Dialog>
 
-      <Toaster richColors position="top-right" />
+      <Toaster richColors position="top-right" theme="dark" />
     </div>
   );
 }

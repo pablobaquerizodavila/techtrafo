@@ -2,20 +2,18 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Plus, Search, Truck, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Toaster, toast } from "sonner";
+import { PageHeader, HeaderActionPrimary } from "@/components/page-header";
+import { Panel } from "@/components/panel";
 import { listProveedores, Proveedor } from "@/lib/compras";
 import { ApiError } from "@/lib/api";
-
-const ESTADO_COLOR: Record<string, string> = {
-  activo: "bg-green-100 text-green-800",
-  inactivo: "bg-gray-200 text-gray-700",
-  bloqueado: "bg-red-100 text-red-800",
-};
 
 export default function ProveedoresListPage() {
   const [items, setItems] = useState<Proveedor[]>([]);
@@ -41,93 +39,107 @@ export default function ProveedoresListPage() {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <div className="space-y-6">
-      <Toaster richColors />
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Proveedores</h1>
-          <p className="text-sm text-muted-foreground">
-            Catálogo maestro de proveedores. Cada uno puede tener N items con precio y tiempo de entrega vigentes.
-          </p>
-        </div>
-        <Link href="/admin/proveedores/nuevo">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
+    <div>
+      <PageHeader
+        breadcrumb={[{ href: "/dashboard", label: "Panel" }, { label: "Admin" }, { label: "Proveedores" }]}
+        title="Proveedores"
+        titleAccent="catálogo"
+        meta={<span>Cada proveedor puede tener N items con precio y tiempo de entrega vigentes</span>}
+        actions={
+          <HeaderActionPrimary href="/admin/proveedores/nuevo" icon={<Plus className="h-3.5 w-3.5" />}>
             Nuevo proveedor
-          </Button>
-        </Link>
+          </HeaderActionPrimary>
+        }
+      />
+
+      <div className="space-y-6 pt-6">
+        <Panel padded={false}>
+          {/* Filtros */}
+          <div className="flex flex-wrap items-center gap-2 border-b border-glass px-5 py-3">
+            <div className="relative flex-1 min-w-[18rem] max-w-sm">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por razón social, código, RUC…"
+                className="h-8 border-glass bg-glass pl-8 text-sm"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+            </div>
+            <Select value={estado} onValueChange={(v) => setEstado(v as "activo" | "inactivo" | "bloqueado" | "todos")}>
+              <SelectTrigger className="h-8 w-36 border-glass bg-glass text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="activo">Activos</SelectItem>
+                <SelectItem value="inactivo">Inactivos</SelectItem>
+                <SelectItem value="bloqueado">Bloqueados</SelectItem>
+                <SelectItem value="todos">Todos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Tabla */}
+          <Table>
+            <TableHeader>
+              <TableRow className="border-glass bg-glass hover:bg-glass">
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Código</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Razón social</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">RUC</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Contacto</TableHead>
+                <TableHead className="text-right font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Calificación</TableHead>
+                <TableHead className="text-right font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Órdenes</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Estado</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow><TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">Cargando…</TableCell></TableRow>
+              ) : items.length === 0 ? (
+                <TableRow><TableCell colSpan={7} className="py-10 text-center">
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <Truck className="h-5 w-5" />
+                    <span className="text-sm">Sin proveedores con esos filtros</span>
+                  </div>
+                </TableCell></TableRow>
+              ) : (
+                items.map((p) => (
+                  <TableRow key={p.id} className="border-glass hover:bg-glass">
+                    <TableCell className="font-mono text-xs">
+                      <Link className="text-copper hover:underline" href={`/admin/proveedores/${p.id}`}>
+                        {p.codigo}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <p className="font-medium">{p.razon_social}</p>
+                      {p.nombre_comercial && <p className="text-xs text-muted-foreground">{p.nombre_comercial}</p>}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-foreground/80">{p.ruc ?? "—"}</TableCell>
+                    <TableCell className="text-xs">
+                      <span className="text-foreground/85">{p.contacto_nombre ?? "—"}</span>
+                      {p.contacto_email && <p className="font-mono text-[10.5px] text-muted-foreground">{p.contacto_email}</p>}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {p.calificacion ? (
+                        <span className="inline-flex items-center gap-1 font-mono text-xs">
+                          <Star className="h-3 w-3 text-amber-400" />
+                          <span className="text-foreground/90">{Number(p.calificacion).toFixed(1)}</span>
+                          <span className="text-muted-foreground/60">/100</span>
+                        </span>
+                      ) : <span className="text-muted-foreground/50">—</span>}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs tabular-nums text-foreground/85">{p.total_ordenes}</TableCell>
+                    <TableCell>
+                      <Badge variant={p.estado === "activo" ? "success" : p.estado === "bloqueado" ? "destructive" : "muted"}>
+                        {p.estado}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </Panel>
       </div>
 
-      <div className="flex gap-2">
-        <div className="relative max-w-md flex-1">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por razón social, código, RUC…"
-            className="pl-10"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </div>
-        <select
-          className="rounded-md border bg-background px-3 text-sm"
-          value={estado}
-          onChange={(e) => setEstado(e.target.value as "activo" | "inactivo" | "bloqueado" | "todos")}
-        >
-          <option value="activo">Activos</option>
-          <option value="inactivo">Inactivos</option>
-          <option value="bloqueado">Bloqueados</option>
-          <option value="todos">Todos</option>
-        </select>
-      </div>
-
-      <div className="rounded-md border bg-white">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Código</TableHead>
-              <TableHead>Razón social</TableHead>
-              <TableHead>RUC</TableHead>
-              <TableHead>Contacto</TableHead>
-              <TableHead className="text-right">Calificación</TableHead>
-              <TableHead className="text-right">Órdenes</TableHead>
-              <TableHead>Estado</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Cargando…</TableCell></TableRow>
-            ) : items.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Sin proveedores con esos filtros.</TableCell></TableRow>
-            ) : (
-              items.map((p) => (
-                <TableRow key={p.id} className="hover:bg-muted/40">
-                  <TableCell className="font-mono text-xs">
-                    <Link className="text-blue-700 underline-offset-2 hover:underline" href={`/admin/proveedores/${p.id}`}>
-                      {p.codigo}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium">{p.razon_social}</div>
-                    {p.nombre_comercial && <div className="text-xs text-muted-foreground">{p.nombre_comercial}</div>}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{p.ruc ?? "—"}</TableCell>
-                  <TableCell className="text-xs">
-                    {p.contacto_nombre ?? "—"}
-                    {p.contacto_email && <div className="text-muted-foreground">{p.contacto_email}</div>}
-                  </TableCell>
-                  <TableCell className="text-right text-sm">
-                    {p.calificacion ? `${Number(p.calificacion).toFixed(1)} / 100` : "—"}
-                  </TableCell>
-                  <TableCell className="text-right text-sm">{p.total_ordenes}</TableCell>
-                  <TableCell>
-                    <Badge className={ESTADO_COLOR[p.estado] ?? ""}>{p.estado}</Badge>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <Toaster richColors theme="dark" />
     </div>
   );
 }

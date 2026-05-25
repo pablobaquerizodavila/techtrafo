@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, Plus, Trash2 } from "lucide-react";
+import { Save, Plus, Trash2, KeySquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader, HeaderActionPrimary } from "@/components/page-header";
 import {
   Dialog,
   DialogContent,
@@ -151,96 +151,108 @@ export default function RolesAdminPage() {
     }
   }
 
-  if (loading) return <p className="text-muted-foreground">Cargando roles...</p>;
+  if (loading) {
+    return (
+      <div className="flex h-[40vh] items-center justify-center text-muted-foreground">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-copper border-t-transparent" />
+          <span className="text-sm">Cargando roles…</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold">Roles y permisos</h2>
-          <p className="text-muted-foreground">
-            Define que puede hacer cada rol. Solo el super admin puede editar estos permisos.
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Roles marcados como <Badge variant="warning">super admin</Badge> tienen todos los permisos automaticamente.
-          </p>
-        </div>
-        <Button onClick={() => setNewDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" /> Nuevo rol
-        </Button>
-      </header>
+    <div>
+      <PageHeader
+        breadcrumb={[{ href: "/dashboard", label: "Panel" }, { label: "Admin" }, { label: "Roles" }]}
+        title="Roles"
+        titleAccent="y permisos"
+        meta={<span>Definí qué puede hacer cada rol · solo super admin edita</span>}
+        actions={
+          <HeaderActionPrimary onClick={() => setNewDialogOpen(true)} icon={<Plus className="h-3.5 w-3.5" />}>
+            Nuevo rol
+          </HeaderActionPrimary>
+        }
+      />
 
-      {roles.map((rol) => {
-        const dirty = isDirty(rol.id);
-        const hasAll = rol.permisos?.all === true;
-        return (
-          <Card key={rol.id}>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    {rol.nombre}
-                    {rol.es_super_admin && <Badge variant="warning">super admin</Badge>}
-                    {hasAll && !rol.es_super_admin && <Badge variant="default">all-access</Badge>}
-                  </CardTitle>
-                  <CardDescription>{rol.descripcion ?? "Sin descripcion"}</CardDescription>
+      <div className="space-y-4 pt-6">
+        {roles.map((rol) => {
+          const dirty = isDirty(rol.id);
+          const hasAll = rol.permisos?.all === true;
+          return (
+            <section key={rol.id} className="overflow-hidden rounded-xl border border-glass bg-glass inset-highlight">
+              <div className="flex items-start justify-between gap-3 border-b border-glass px-5 py-3.5">
+                <div className="flex items-start gap-3">
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-glass-mid bg-glass-elev text-copper">
+                    <KeySquare className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="flex items-center gap-2 font-display text-sm font-semibold tracking-tight capitalize">
+                      {rol.nombre}
+                      {rol.es_super_admin && <Badge variant="copper">super admin</Badge>}
+                      {hasAll && !rol.es_super_admin && <Badge variant="teal">all-access</Badge>}
+                    </h3>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{rol.descripcion ?? "Sin descripción"}</p>
+                  </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex shrink-0 items-center gap-2">
                   {dirty && (
-                    <Button onClick={() => guardar(rol.id)} disabled={saving === rol.id}>
-                      <Save className="mr-2 h-4 w-4" />
-                      {saving === rol.id ? "Guardando..." : "Guardar"}
-                    </Button>
+                    <button type="button" onClick={() => guardar(rol.id)} disabled={saving === rol.id}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-b from-copper to-copper-deep px-3 py-1.5 text-xs font-medium text-white shadow-sm glow-copper-sm inset-highlight-md transition hover:glow-copper disabled:opacity-60">
+                      <Save className="h-3.5 w-3.5" />
+                      {saving === rol.id ? "Guardando…" : "Guardar"}
+                    </button>
                   )}
                   {!rol.es_super_admin && (
-                    <Button variant="ghost" size="icon" onClick={() => handleEliminar(rol)} aria-label="Eliminar rol">
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    <button type="button" onClick={() => handleEliminar(rol)} aria-label="Eliminar rol"
+                      className="rounded-md p-1.5 text-rose-400 hover:bg-rose-500/10">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   )}
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              {rol.es_super_admin ? (
-                <p className="text-sm text-muted-foreground italic">
-                  Super admin tiene todos los permisos por diseno; no requiere configuracion manual.
-                </p>
-              ) : hasAll ? (
-                <p className="text-sm text-muted-foreground italic">
-                  Este rol tiene el permiso comodin {`{ "all": true }`}. Para usar permisos granulares,
-                  destildalo y configura los modulos individualmente.
-                </p>
-              ) : null}
+              <div className="p-5">
+                {rol.es_super_admin ? (
+                  <p className="rounded-lg border border-copper/20 bg-copper/[0.05] px-3 py-2 text-xs italic text-copper-soft">
+                    Super admin tiene todos los permisos por diseño · no requiere configuración manual.
+                  </p>
+                ) : hasAll ? (
+                  <p className="rounded-lg border border-ttteal/20 bg-ttteal/[0.05] px-3 py-2 text-xs italic text-ttteal-soft">
+                    Permiso comodín <span className="font-mono">{`{ "all": true }`}</span>. Para usar permisos granulares, destildalo y configurá los módulos.
+                  </p>
+                ) : null}
 
-              <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {catalogo.map(({ modulo, acciones }) => (
-                  <div key={modulo} className="rounded-md border p-3">
-                    <h4 className="mb-2 text-sm font-semibold capitalize">{modulo}</h4>
-                    <div className="space-y-1">
-                      {acciones.map((accion) => {
-                        const clave = `${modulo}.${accion}`;
-                        const checked = getEffective(rol.id, clave);
-                        return (
-                          <label key={accion} className="flex cursor-pointer items-center gap-2 text-sm">
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              disabled={rol.es_super_admin}
-                              onChange={() => togglePermiso(rol.id, clave)}
-                              className="h-4 w-4"
-                            />
-                            <span className="capitalize">{accion}</span>
-                          </label>
-                        );
-                      })}
+                <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  {catalogo.map(({ modulo, acciones }) => (
+                    <div key={modulo} className="rounded-lg border border-glass bg-glass-elev p-3">
+                      <h4 className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-copper">{modulo}</h4>
+                      <div className="space-y-1.5">
+                        {acciones.map((accion) => {
+                          const clave = `${modulo}.${accion}`;
+                          const checked = getEffective(rol.id, clave);
+                          return (
+                            <label key={accion} className="flex cursor-pointer items-center gap-2 text-xs">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                disabled={rol.es_super_admin}
+                                onChange={() => togglePermiso(rol.id, clave)}
+                                className="h-3.5 w-3.5 accent-copper"
+                              />
+                              <span className="capitalize text-foreground/85">{accion}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+            </section>
+          );
+        })}
+      </div>
 
       {/* Dialog crear rol */}
       <Dialog open={newDialogOpen} onOpenChange={setNewDialogOpen}>
@@ -284,7 +296,7 @@ export default function RolesAdminPage() {
         </DialogContent>
       </Dialog>
 
-      <Toaster richColors position="top-right" />
+      <Toaster richColors position="top-right" theme="dark" />
     </div>
   );
 }

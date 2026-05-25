@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Search, CheckCircle2, XCircle, UserX, UserCheck, Pencil, KeyRound } from "lucide-react";
+import { Search, CheckCircle2, XCircle, UserX, UserCheck, Pencil, KeyRound, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/page-header";
+import { Panel } from "@/components/panel";
 import {
   Table,
   TableBody,
@@ -218,105 +220,144 @@ export default function UsuariosAdminPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT));
 
+  const pendientes = data.filter((u) => u.estado_aprobacion === "pendiente").length;
+
   return (
-    <div className="space-y-6">
-      <header>
-        <h2 className="text-3xl font-bold">Usuarios</h2>
-        <p className="text-muted-foreground">Administracion de usuarios, aprobacion de solicitudes y asignacion de roles</p>
-      </header>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative w-72">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input value={qInput} onChange={(e) => setQInput(e.target.value)} placeholder="Buscar por nombre o email" className="pl-9" />
-        </div>
-        <Select value={estado || "_"} onValueChange={(v) => { setPage(1); setEstado(v === "_" ? "" : v as EstadoAprobacion); }}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Estado" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_">Todos los estados</SelectItem>
-            <SelectItem value="pendiente">Pendientes</SelectItem>
-            <SelectItem value="aprobado">Aprobados</SelectItem>
-            <SelectItem value="rechazado">Rechazados</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Usuario</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Telefono</TableHead>
-              <TableHead>Rol</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Solicitud</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Cargando...</TableCell></TableRow>
-            ) : data.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Sin usuarios con esos filtros</TableCell></TableRow>
-            ) : (
-              data.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell>
-                    <div className="font-medium">{u.nombres} {u.apellidos}</div>
-                  </TableCell>
-                  <TableCell className="text-sm">{u.email}</TableCell>
-                  <TableCell className="text-sm font-mono">{u.telefono ?? u.telefono_solicitud ?? "—"}</TableCell>
-                  <TableCell className="text-sm">
-                    {u.roles?.nombre ?? <span className="text-muted-foreground italic">sin rol</span>}
-                    {u.roles?.es_super_admin && <Badge variant="warning" className="ml-2">super</Badge>}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={estadoAprobVariant(u.estado_aprobacion)}>{u.estado_aprobacion}</Badge>
-                    {!u.activo && <Badge variant="muted" className="ml-1">inactivo</Badge>}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {u.created_at.split("T")[0]}
-                    {u.motivo_rechazo && <div className="text-destructive">Motivo: {u.motivo_rechazo}</div>}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {u.estado_aprobacion === "pendiente" && (
-                      <>
-                        <Button variant="default" size="sm" onClick={() => setDialog({ kind: "aprobar", user: u })}>
-                          <CheckCircle2 className="mr-1 h-3 w-3" /> Aprobar
-                        </Button>
-                        <Button variant="destructive" size="sm" className="ml-2" onClick={() => setDialog({ kind: "rechazar", user: u })}>
-                          <XCircle className="mr-1 h-3 w-3" /> Rechazar
-                        </Button>
-                      </>
-                    )}
-                    {u.estado_aprobacion === "aprobado" && (
-                      <div className="flex justify-end gap-1">
-                        <Button variant="outline" size="sm" onClick={() => openEditar(u)} title="Editar info">
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => setDialog({ kind: "reset-password", user: u })} title="Resetear password">
-                          <KeyRound className="h-3 w-3" />
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => toggleActivo(u)} title={u.activo ? "Desactivar" : "Activar"}>
-                          {u.activo ? <UserX className="h-3 w-3" /> : <UserCheck className="h-3 w-3" />}
-                        </Button>
-                      </div>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))
+    <div>
+      <PageHeader
+        breadcrumb={[{ href: "/dashboard", label: "Panel" }, { label: "Admin" }, { label: "Usuarios" }]}
+        title="Usuarios"
+        titleAccent="del sistema"
+        meta={
+          <>
+            <span>{total} usuario{total === 1 ? "" : "s"}</span>
+            {pendientes > 0 && (
+              <>
+                <span className="text-muted-foreground/40">·</span>
+                <Badge variant="warning">{pendientes} pendiente{pendientes === 1 ? "" : "s"} de aprobación</Badge>
+              </>
             )}
-          </TableBody>
-        </Table>
-      </div>
+          </>
+        }
+      />
 
-      <div className="flex items-center justify-between text-sm">
-        <p className="text-muted-foreground">{total === 0 ? "Sin resultados" : `${total} - pagina ${page}/${totalPages}`}</p>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>Anterior</Button>
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>Siguiente</Button>
-        </div>
+      <div className="space-y-6 pt-6">
+        <Panel padded={false}>
+          {/* Filtros */}
+          <div className="flex flex-wrap items-center gap-2 border-b border-glass px-5 py-3">
+            <div className="relative flex-1 min-w-[18rem] max-w-sm">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input value={qInput} onChange={(e) => setQInput(e.target.value)} placeholder="Buscar por nombre o email…" className="h-8 border-glass bg-glass pl-8 text-sm" />
+            </div>
+            <Select value={estado || "_"} onValueChange={(v) => { setPage(1); setEstado(v === "_" ? "" : v as EstadoAprobacion); }}>
+              <SelectTrigger className="h-8 w-44 border-glass bg-glass text-xs"><SelectValue placeholder="Estado" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_">Todos los estados</SelectItem>
+                <SelectItem value="pendiente">Pendientes</SelectItem>
+                <SelectItem value="aprobado">Aprobados</SelectItem>
+                <SelectItem value="rechazado">Rechazados</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Tabla */}
+          <Table>
+            <TableHeader>
+              <TableRow className="border-glass bg-glass hover:bg-glass">
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Usuario</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Email</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Teléfono</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Rol</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Estado</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Solicitud</TableHead>
+                <TableHead className="text-right font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow><TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">Cargando…</TableCell></TableRow>
+              ) : data.length === 0 ? (
+                <TableRow><TableCell colSpan={7} className="py-10 text-center">
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <Users className="h-5 w-5" />
+                    <span className="text-sm">Sin usuarios con esos filtros</span>
+                  </div>
+                </TableCell></TableRow>
+              ) : (
+                data.map((u) => {
+                  const iniciales = ((u.nombres?.[0] ?? "") + (u.apellidos?.[0] ?? "")).toUpperCase();
+                  return (
+                    <TableRow key={u.id} className="border-glass group hover:bg-glass">
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-glass-mid bg-gradient-to-br from-copper/15 to-ttteal/15 font-display text-[10px] font-bold inset-highlight">
+                            {iniciales}
+                          </div>
+                          <div className="font-medium">{u.nombres} {u.apellidos}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-foreground/85">{u.email}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{u.telefono ?? u.telefono_solicitud ?? "—"}</TableCell>
+                      <TableCell className="text-sm text-foreground/85">
+                        {u.roles?.nombre ?? <span className="italic text-muted-foreground">sin rol</span>}
+                        {u.roles?.es_super_admin && <Badge variant="copper" className="ml-2">super</Badge>}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant={estadoAprobVariant(u.estado_aprobacion)}>{u.estado_aprobacion}</Badge>
+                          {!u.activo && <Badge variant="muted">inactivo</Badge>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-[10.5px] text-muted-foreground">
+                        {u.created_at.split("T")[0]}
+                        {u.motivo_rechazo && <div className="mt-0.5 text-rose-300">Motivo: {u.motivo_rechazo}</div>}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {u.estado_aprobacion === "pendiente" && (
+                          <div className="flex justify-end gap-1.5">
+                            <button type="button" onClick={() => setDialog({ kind: "aprobar", user: u })}
+                              className="inline-flex items-center gap-1 rounded-md bg-gradient-to-b from-copper to-copper-deep px-2.5 py-1 text-[11px] font-medium text-white glow-copper-sm">
+                              <CheckCircle2 className="h-3 w-3" /> Aprobar
+                            </button>
+                            <button type="button" onClick={() => setDialog({ kind: "rechazar", user: u })}
+                              className="inline-flex items-center gap-1 rounded-md border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-[11px] font-medium text-rose-300 hover:bg-rose-500/15">
+                              <XCircle className="h-3 w-3" /> Rechazar
+                            </button>
+                          </div>
+                        )}
+                        {u.estado_aprobacion === "aprobado" && (
+                          <div className="flex justify-end gap-1">
+                            <button type="button" onClick={() => openEditar(u)} title="Editar info"
+                              className="rounded-md p-1.5 text-muted-foreground hover:bg-glass-elev hover:text-copper">
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button type="button" onClick={() => setDialog({ kind: "reset-password", user: u })} title="Resetear password"
+                              className="rounded-md p-1.5 text-muted-foreground hover:bg-glass-elev hover:text-copper">
+                              <KeyRound className="h-3.5 w-3.5" />
+                            </button>
+                            <button type="button" onClick={() => toggleActivo(u)} title={u.activo ? "Desactivar" : "Activar"}
+                              className="rounded-md p-1.5 text-muted-foreground hover:bg-glass-elev hover:text-copper">
+                              {u.activo ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
+                            </button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+
+          {/* Paginación */}
+          <div className="flex items-center justify-between border-t border-glass px-5 py-3 text-sm">
+            <p className="font-mono text-[11px] text-muted-foreground">{total === 0 ? "Sin resultados" : `${total} usuario${total === 1 ? "" : "s"} · página ${page}/${totalPages}`}</p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="border-glass-mid bg-glass">Anterior</Button>
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="border-glass-mid bg-glass">Siguiente</Button>
+            </div>
+          </div>
+        </Panel>
       </div>
 
       {/* Dialog aprobar */}
@@ -458,7 +499,7 @@ export default function UsuariosAdminPage() {
         </DialogContent>
       </Dialog>
 
-      <Toaster richColors position="top-right" />
+      <Toaster richColors position="top-right" theme="dark" />
     </div>
   );
 }
