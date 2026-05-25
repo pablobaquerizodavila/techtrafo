@@ -79,11 +79,31 @@ function isInternalRoot(pathname: string): boolean {
 }
 
 export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+  const { pathname, searchParams } = req.nextUrl;
   const cookieValue = req.cookies.get(AUTH_COOKIE)?.value;
   const sessionPlausible = isSessionPlausible(cookieValue);
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
   const onPortal = isPortalHost(req);
+
+  // Escape hatch: /login?logout=1 LIMPIA cookies autoritativamente y deja
+  // pasar a la pagina de login. Esto rompe el loop "cookie con tv -> middleware
+  // me redirige a /dashboard -> dashboard ve 401 token_revoked -> me redirige
+  // a /login con cookie todavia ahi -> loop". El SessionExpiredButton apunta
+  // aca y no depende del backend ni del JS cliente para limpiar las cookies.
+  if (pathname === "/login" && searchParams.get("logout") === "1") {
+    const res = NextResponse.next();
+    // Set-Cookie expired en TODAS las variantes (con y sin domain) para
+    // cubrir prod (Domain=.techtrafo.com) y dev (sin domain).
+    res.cookies.set(AUTH_COOKIE, "", { expires: new Date(0), path: "/" });
+    res.cookies.set("techtrafo_csrf", "", { expires: new Date(0), path: "/" });
+    res.cookies.set(AUTH_COOKIE, "", {
+      expires: new Date(0), path: "/", domain: ".techtrafo.com",
+    });
+    res.cookies.set("techtrafo_csrf", "", {
+      expires: new Date(0), path: "/", domain: ".techtrafo.com",
+    });
+    return res;
+  }
 
   // No autenticado intentando entrar a ruta privada -> /login
   if (!sessionPlausible && !isPublic) {
