@@ -54,6 +54,11 @@ const cabeceraCreateSchema = z.object({
 
 const createSchema = cabeceraCreateSchema.extend({
   lineas: z.array(lineaSchema).min(1, "Al menos una linea es requerida"),
+  // Opcional: si se pasa, despues de crear la cotizacion se vincula al
+  // expediente (expedientes.cotizacion_id = nueva.id). Esto permite emitir
+  // la cotizacion desde el flujo del expediente y que el hito "Cotizacion
+  // emitida" auto-avance via el trigger de sincronizacion.
+  expediente_id: z.number().int().positive().optional().nullable(),
 });
 
 const updateSchema = cabeceraCreateSchema.partial().extend({
@@ -263,7 +268,17 @@ router.post("/", requirePermission("cotizaciones", "write"), async (req, res) =>
       const codigo = await generarCodigoCotizacion(tx, year);
 
       // Crear cabecera + lineas
-      return tx.cotizaciones.create({
+      // Si se vincula a un expediente, validar que existe y este activo, y que
+      // su cliente coincide con el de la cotizacion (evita vincular cotizaciones
+      // de un cliente a expedientes de otro).
+      if (data.expediente_id) {
+        const exp = await tx.expedientes.findUnique({ where: { id: data.expediente_id } });
+        if (!exp) throw new Error("expediente_no_encontrado");
+        if (exp.estado !== "activo") throw new Error("expediente_no_activo");
+        if (Number(exp.cliente_id) !== data.cliente_id) throw new Error("cliente_no_coincide");
+      }
+
+      const cot = await tx.cotizaciones.create({
         data: {
           codigo,
           cliente_id: data.cliente_id,
@@ -305,13 +320,32 @@ router.post("/", requirePermission("cotizaciones", "write"), async (req, res) =>
           clientes: { select: { id: true, razon_social: true, ruc_cedula: true } },
         },
       });
+
+      // Vincular al expediente (raw porque cotizacion_id es BigInt y prisma no
+      // siempre infiere bien el tipo en update).
+      if (data.expediente_id) {
+        await tx.$executeRaw`
+          UPDATE comercial.expedientes
+             SET cotizacion_id = ${cot.id},
+                 actualizado_por = ${userId}::uuid,
+                 updated_at = NOW()
+           WHERE id = ${data.expediente_id}
+        `;
+      }
+      return cot;
     });
 
     res.status(201).json({ data: cotizacion });
   } catch (err) {
-    if (err instanceof Error && err.message === "cliente_no_disponible") {
-      res.status(400).json({ error: "cliente_no_disponible" });
-      return;
+    if (err instanceof Error) {
+      const map: Record<string, number> = {
+        cliente_no_disponible: 400,
+        expediente_no_encontrado: 404,
+        expediente_no_activo: 409,
+        cliente_no_coincide: 409,
+      };
+      const code = map[err.message];
+      if (code) { res.status(code).json({ error: err.message }); return; }
     }
     throw err;
   }

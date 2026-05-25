@@ -32,7 +32,9 @@ import {
 } from "@/lib/cotizaciones";
 
 interface Props {
-  initial?: Cotizacion | null;
+  // Aceptamos Partial para poder precargar solo cliente_id desde el flujo
+  // del expediente (no requerimos pasar el objeto Cotizacion completo).
+  initial?: Partial<Cotizacion> | null;
   readOnly?: boolean;
   onSubmit: (payload: CotizacionCreateInput) => Promise<void>;
   onCancel: () => void;

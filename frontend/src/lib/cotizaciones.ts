@@ -91,6 +91,9 @@ export interface CotizacionCreateInput {
   observaciones?: string | null;
   notas_internas?: string | null;
   lineas: Array<Omit<CotizacionLinea, "id" | "subtotal_linea">>;
+  // Si se pasa, al crear la cotizacion se la vincula a este expediente
+  // (expedientes.cotizacion_id = nueva.id).
+  expediente_id?: number | null;
 }
 
 export type CotizacionUpdateInput = Partial<CotizacionCreateInput>;
