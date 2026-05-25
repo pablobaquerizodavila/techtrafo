@@ -482,6 +482,37 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
             const canEscalar     = puedeActuarEnHito(currentUser, h, "escalar");
             const canCancelarExp = esOverrideExpediente(currentUser);
             const canEditarSla   = esOverrideExpediente(currentUser);
+            // Atajo al documento relacionado del hito (para que el aprobador pueda
+            // revisarlo antes de aprobar/rechazar). Si el hito menciona cotizacion/
+            // contrato/OT/informe y el expediente tiene el doc emitido, render boton.
+            const codigoHito = h.codigo.toLowerCase();
+            let docRelacionado: { label: string; href?: string; onClick?: () => void; estado?: string } | null = null;
+            if (codigoHito.includes("cotizacion") && expediente.cotizaciones) {
+              docRelacionado = {
+                label: `Ver cotización ${expediente.cotizaciones.codigo}`,
+                href: `/cotizaciones/${expediente.cotizaciones.id}`,
+                estado: expediente.cotizaciones.estado,
+              };
+            } else if (codigoHito.includes("contrato") && expediente.contratos) {
+              docRelacionado = {
+                label: `Ver contrato ${expediente.contratos.codigo}`,
+                href: `/contratos/${expediente.contratos.id}`,
+                estado: expediente.contratos.estado,
+              };
+            } else if ((codigoHito.includes("orden_trabajo") || codigoHito.startsWith("ot_")) && expediente.ot) {
+              docRelacionado = {
+                label: `Ver OT ${expediente.ot.codigo}`,
+                href: `/ot/${expediente.ot.id}`,
+                estado: expediente.ot.estado,
+              };
+            } else if (codigoHito.includes("informe_tecnico") && expediente.informes_tecnicos && expediente.informes_tecnicos.length > 0) {
+              const inf = expediente.informes_tecnicos[0];
+              docRelacionado = {
+                label: `Ver informe ${inf.numero}`,
+                onClick: () => setInformeDialogId(inf.id),
+                estado: inf.estado,
+              };
+            }
             return (
               <div
                 key={h.id}
@@ -575,6 +606,31 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
 
                     {/* Acciones */}
                     <div className="mt-3 flex flex-wrap gap-2">
+                      {docRelacionado && (
+                        docRelacionado.href ? (
+                          <Button asChild size="sm" variant="outline">
+                            <Link href={docRelacionado.href}>
+                              <ExternalLink className="mr-1 h-3.5 w-3.5" />
+                              {docRelacionado.label}
+                              {docRelacionado.estado && (
+                                <Badge variant="muted" className="ml-2 text-[10px]">
+                                  {docRelacionado.estado}
+                                </Badge>
+                              )}
+                            </Link>
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="outline" onClick={docRelacionado.onClick}>
+                            <ExternalLink className="mr-1 h-3.5 w-3.5" />
+                            {docRelacionado.label}
+                            {docRelacionado.estado && (
+                              <Badge variant="muted" className="ml-2 text-[10px]">
+                                {docRelacionado.estado}
+                              </Badge>
+                            )}
+                          </Button>
+                        )
+                      )}
                       {canIniciar && (
                         <Button size="sm" variant="outline" onClick={() => handleIniciar(h)} disabled={isWorking}>
                           <Play className="mr-1 h-3.5 w-3.5" /> Iniciar
