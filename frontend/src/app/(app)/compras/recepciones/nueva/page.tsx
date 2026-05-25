@@ -3,8 +3,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, Save } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ChevronLeft, Save, PackageCheck } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { PageHeader, HeaderActionGhost } from "@/components/page-header";
+import { Panel } from "@/components/panel";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -126,149 +130,182 @@ export default function NuevaRecepcionPage() {
 
   if (!ocId) {
     return (
-      <div className="p-8 space-y-4">
-        <p>Necesitás especificar una OC en el query string (<code>?oc=ID</code>).</p>
-        <Link href="/compras/ordenes-compra"><Button variant="outline">Ver OCs</Button></Link>
+      <div>
+        <PageHeader breadcrumb={[{ href: "/dashboard", label: "Panel" }, { href: "/compras", label: "Compras" }, { label: "Nueva recepción" }]} title="Nueva" titleAccent="recepción" />
+        <div className="pt-6">
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.06] p-6 inset-highlight">
+            <p className="mb-3 text-sm text-amber-200">Necesitás especificar una OC en el query string (<code className="font-mono text-amber-100">?oc=ID</code>).</p>
+            <Link href="/compras/ordenes-compra"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-glass-mid bg-glass px-4 py-2 text-sm font-medium text-foreground/90 transition hover:border-glass-strong hover:bg-glass-elev">
+              Ver OCs →
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
-  if (!oc) return <div className="p-8 text-muted-foreground">Cargando OC…</div>;
+  if (!oc) {
+    return (
+      <div className="flex h-[40vh] items-center justify-center text-muted-foreground">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-copper border-t-transparent" />
+          <span className="text-sm">Cargando OC…</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-5xl space-y-6">
-      <Toaster richColors />
-      <Link href={`/compras/ordenes-compra/${oc.id}`} className="inline-flex items-center text-sm text-muted-foreground hover:underline">
-        <ChevronLeft className="mr-1 h-4 w-4" /> Volver a la OC
-      </Link>
+    <div>
+      <PageHeader
+        breadcrumb={[
+          { href: "/dashboard", label: "Panel" },
+          { href: "/compras", label: "Compras" },
+          { href: `/compras/ordenes-compra/${oc.id}`, label: oc.codigo },
+          { label: "Nueva recepción" },
+        ]}
+        title="Registrar"
+        titleAccent="recepción"
+        meta={
+          <>
+            <span>Contra OC <Link href={`/compras/ordenes-compra/${oc.id}`} className="font-mono text-copper hover:underline">{oc.codigo}</Link></span>
+            <span className="text-muted-foreground/40">·</span>
+            <span>{oc.proveedores?.razon_social}</span>
+            <span className="text-muted-foreground/40">·</span>
+            <span>Si el precio real difiere, se actualiza el costo del item</span>
+          </>
+        }
+        actions={<HeaderActionGhost href={`/compras/ordenes-compra/${oc.id}`} icon={<ChevronLeft className="h-3.5 w-3.5" />}>Volver a la OC</HeaderActionGhost>}
+      />
 
-      <div>
-        <h1 className="text-2xl font-bold">Registrar recepción contra OC {oc.codigo}</h1>
-        <p className="text-sm text-muted-foreground">
-          Proveedor: {oc.proveedores?.razon_social}. Las cantidades se descuentan del saldo pendiente.
-          Si el precio real difiere del precio de la OC, se actualiza el costo del item en bodega y se guarda en historial.
-        </p>
-      </div>
+      <form onSubmit={onSubmit} className="space-y-6 pt-6">
+        <Panel title="Documentos" subtitle="Guía de remisión, factura y estado físico" icon={<PackageCheck className="h-3.5 w-3.5" />}>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+            <FormField label="Guía de remisión" htmlFor="guia"><Input id="guia" value={guia} onChange={(e) => setGuia(e.target.value)} className="h-10 border-glass bg-glass" /></FormField>
+            <FormField label="Factura" htmlFor="fact"><Input id="fact" value={factNum} onChange={(e) => setFactNum(e.target.value)} className="h-10 border-glass bg-glass" /></FormField>
+            <FormField label="Fecha factura" htmlFor="factf"><Input id="factf" type="date" value={factFecha} onChange={(e) => setFactFecha(e.target.value)} className="h-10 border-glass bg-glass" /></FormField>
+          </div>
+          <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
+            <FormField label="Estado físico general" htmlFor="estado">
+              <Select value={estadoGeneral} onValueChange={(v) => setEstadoGeneral(v as "bueno" | "observado" | "danado" | "incompleto")}>
+                <SelectTrigger id="estado" className="h-10 border-glass bg-glass"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bueno">Bueno</SelectItem>
+                  <SelectItem value="observado">Observado</SelectItem>
+                  <SelectItem value="danado">Dañado</SelectItem>
+                  <SelectItem value="incompleto">Incompleto</SelectItem>
+                </SelectContent>
+              </Select>
+            </FormField>
+          </div>
+          <div className="mt-5">
+            <FormField label="Observaciones" htmlFor="obs">
+              <Textarea id="obs" rows={2} value={obs} onChange={(e) => setObs(e.target.value)} className="border-glass bg-glass" />
+            </FormField>
+          </div>
+        </Panel>
 
-      <form onSubmit={onSubmit} className="space-y-6">
-        <section className="rounded-md border bg-white p-6 space-y-4">
-          <h2 className="text-sm font-semibold uppercase text-muted-foreground">Documentos</h2>
-          <div className="grid grid-cols-3 gap-4">
-            <div><Label>Guía de remisión</Label><Input value={guia} onChange={(e) => setGuia(e.target.value)} /></div>
-            <div><Label>Factura</Label><Input value={factNum} onChange={(e) => setFactNum(e.target.value)} /></div>
-            <div><Label>Fecha factura</Label><Input type="date" value={factFecha} onChange={(e) => setFactFecha(e.target.value)} /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Estado físico general</Label>
-              <select
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                value={estadoGeneral}
-                onChange={(e) => setEstadoGeneral(e.target.value as "bueno" | "observado" | "danado" | "incompleto")}
-              >
-                <option value="bueno">Bueno</option>
-                <option value="observado">Observado</option>
-                <option value="danado">Dañado</option>
-                <option value="incompleto">Incompleto</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <Label>Observaciones</Label>
-            <Textarea rows={2} value={obs} onChange={(e) => setObs(e.target.value)} />
-          </div>
-        </section>
-
-        <section className="rounded-md border bg-white p-6 space-y-4">
-          <h2 className="text-sm font-semibold uppercase text-muted-foreground">Líneas</h2>
+        <Panel
+          title="Líneas a recibir"
+          subtitle="Cantidades se descuentan del saldo pendiente"
+          padded={false}
+        >
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Item</TableHead>
-                <TableHead className="text-right">Saldo</TableHead>
-                <TableHead className="text-right">Recibida</TableHead>
-                <TableHead className="text-right">Rechazada</TableHead>
-                <TableHead className="text-right">Precio real</TableHead>
-                <TableHead>Inspección</TableHead>
-                <TableHead>Ubicación bodega</TableHead>
+              <TableRow className="border-glass bg-glass hover:bg-glass">
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Item</TableHead>
+                <TableHead className="text-right font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Saldo</TableHead>
+                <TableHead className="text-right font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Recibida</TableHead>
+                <TableHead className="text-right font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Rechazada</TableHead>
+                <TableHead className="text-right font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Precio real</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Inspección</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Ubicación</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {lineas.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">La OC no tiene líneas pendientes.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">La OC no tiene líneas pendientes</TableCell></TableRow>
               ) : (
                 lineas.map((l, i) => (
-                  <TableRow key={l.orden_compra_linea_id}>
+                  <TableRow key={l.orden_compra_linea_id} className="border-glass hover:bg-glass">
                     <TableCell className="max-w-xs">
-                      <div className="font-mono text-xs text-muted-foreground">{l.item_codigo}</div>
-                      <div className="text-sm">{l.descripcion}</div>
+                      <p className="font-mono text-[10.5px] text-copper">{l.item_codigo}</p>
+                      <p className="text-sm">{l.descripcion}</p>
                     </TableCell>
-                    <TableCell className="text-right text-xs text-muted-foreground">{l.saldo} {l.unidad_medida}</TableCell>
+                    <TableCell className="text-right font-mono text-xs text-muted-foreground">{l.saldo} {l.unidad_medida}</TableCell>
                     <TableCell className="text-right">
-                      <Input
-                        type="number" step="any" min="0" max={l.saldo}
-                        className="h-8 w-24 text-right"
+                      <Input type="number" step="any" min="0" max={l.saldo}
+                        className="h-8 w-24 border-glass bg-glass text-right font-mono text-xs"
                         value={l.cantidad_recibida}
-                        onChange={(e) => updateLinea(i, { cantidad_recibida: Number(e.target.value) })}
-                      />
+                        onChange={(e) => updateLinea(i, { cantidad_recibida: Number(e.target.value) })} />
                     </TableCell>
                     <TableCell className="text-right">
-                      <Input
-                        type="number" step="any" min="0"
-                        className="h-8 w-20 text-right"
+                      <Input type="number" step="any" min="0"
+                        className="h-8 w-20 border-glass bg-glass text-right font-mono text-xs"
                         value={l.cantidad_rechazada}
-                        onChange={(e) => updateLinea(i, { cantidad_rechazada: Number(e.target.value) })}
-                      />
+                        onChange={(e) => updateLinea(i, { cantidad_rechazada: Number(e.target.value) })} />
                     </TableCell>
                     <TableCell className="text-right">
-                      <Input
-                        type="number" step="any" min="0"
+                      <Input type="number" step="any" min="0"
                         placeholder={l.precio_oc.toFixed(2)}
-                        className="h-8 w-28 text-right"
+                        className="h-8 w-28 border-glass bg-glass text-right font-mono text-xs"
                         value={l.precio_real ?? ""}
-                        onChange={(e) => updateLinea(i, { precio_real: e.target.value ? Number(e.target.value) : null })}
-                      />
+                        onChange={(e) => updateLinea(i, { precio_real: e.target.value ? Number(e.target.value) : null })} />
                     </TableCell>
                     <TableCell>
-                      <select
-                        className="h-8 rounded-md border bg-background px-2 text-xs"
-                        value={l.resultado_inspeccion}
-                        onChange={(e) => updateLinea(i, { resultado_inspeccion: e.target.value as LineaForm["resultado_inspeccion"] })}
-                      >
-                        <option value="aprobado">Aprobado</option>
-                        <option value="observado">Observado</option>
-                        <option value="rechazado">Rechazado</option>
-                        <option value="pendiente_inspeccion">Pendiente</option>
-                      </select>
+                      <Select value={l.resultado_inspeccion} onValueChange={(v) => updateLinea(i, { resultado_inspeccion: v as LineaForm["resultado_inspeccion"] })}>
+                        <SelectTrigger className="h-8 w-36 border-glass bg-glass text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="aprobado">Aprobado</SelectItem>
+                          <SelectItem value="observado">Observado</SelectItem>
+                          <SelectItem value="rechazado">Rechazado</SelectItem>
+                          <SelectItem value="pendiente_inspeccion">Pendiente</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell>
-                      <select
-                        className="h-8 rounded-md border bg-background px-2 text-xs"
-                        value={l.ubicacion_id ?? ""}
-                        onChange={(e) => updateLinea(i, { ubicacion_id: e.target.value ? Number(e.target.value) : null })}
-                      >
-                        <option value="">—</option>
-                        {ubicaciones.map((u) => (
-                          <option key={u.id} value={u.id}>{u.codigo}</option>
-                        ))}
-                      </select>
+                      <Select value={l.ubicacion_id?.toString() ?? "_"} onValueChange={(v) => updateLinea(i, { ubicacion_id: v === "_" ? null : Number(v) })}>
+                        <SelectTrigger className="h-8 w-28 border-glass bg-glass text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="_">—</SelectItem>
+                          {ubicaciones.map((u) => (
+                            <SelectItem key={u.id} value={u.id.toString()}>{u.codigo}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                   </TableRow>
                 ))
               )}
             </TableBody>
           </Table>
-          <p className="text-xs text-muted-foreground">
-            Tip: dejá la columna "precio real" vacía si el precio de la OC se mantiene. Llenala solo cuando el proveedor facturó distinto.
+          <p className="border-t border-glass px-5 py-3 text-xs text-muted-foreground">
+            <span className="font-mono text-copper">Tip:</span> dejá el precio real vacío si se mantiene el de la OC. Llenalo solo cuando el proveedor facturó distinto.
           </p>
-        </section>
+        </Panel>
 
-        <div className="flex justify-end gap-2">
-          <Link href={`/compras/ordenes-compra/${oc.id}`}><Button type="button" variant="outline">Cancelar</Button></Link>
-          <Button type="submit" disabled={saving}>
-            <Save className="mr-2 h-4 w-4" /> {saving ? "Guardando…" : "Crear recepción (borrador)"}
-          </Button>
+        <div className="flex justify-end gap-2 border-t border-glass pt-5">
+          <Link href={`/compras/ordenes-compra/${oc.id}`}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-glass-mid bg-glass px-4 py-2 text-sm font-medium text-foreground/90 transition hover:border-glass-strong hover:bg-glass-elev">
+            Cancelar
+          </Link>
+          <button type="submit" disabled={saving}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-b from-copper to-copper-deep px-4 py-2 text-sm font-medium text-white shadow-sm glow-copper-sm inset-highlight-md transition hover:glow-copper disabled:opacity-60">
+            <Save className="h-3.5 w-3.5" /> {saving ? "Guardando…" : "Crear recepción (borrador)"}
+          </button>
         </div>
       </form>
+
+      <Toaster richColors theme="dark" />
+    </div>
+  );
+}
+
+function FormField({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={htmlFor} className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground">{label}</Label>
+      {children}
     </div>
   );
 }

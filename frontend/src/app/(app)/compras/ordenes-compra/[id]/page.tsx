@@ -2,18 +2,33 @@
 
 import { useEffect, useState, useCallback, use as usePromise } from "react";
 import Link from "next/link";
-import { ChevronLeft, Send, Check, X, Truck, PackageCheck } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ChevronLeft, Send, Check, X, Truck, PackageCheck, ShoppingCart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Toaster, toast } from "sonner";
+import { PageHeader, HeaderActionGhost } from "@/components/page-header";
+import { Panel } from "@/components/panel";
 import {
-  aprobarOC, cancelarOC, confirmarOC, enviarOC, ESTADO_OC_COLOR, ESTADO_OC_LABEL,
+  aprobarOC, cancelarOC, confirmarOC, enviarOC, ESTADO_OC_LABEL,
   fmtMoneda, getOrdenCompra, OrdenCompra, rechazarOC, solicitarAprobacionOC,
 } from "@/lib/compras";
 import { ApiError } from "@/lib/api";
+
+const OC_BADGE: Record<string, "default" | "muted" | "success" | "warning" | "destructive" | "teal" | "copper"> = {
+  borrador: "muted", en_revision: "warning", aprobada: "copper", enviada: "teal",
+  confirmada: "teal", recibida_parcial: "warning", recibida_total: "success",
+  cerrada: "muted", cancelada: "destructive", rechazada: "destructive",
+};
+
+function actionClass(tone: "primary" | "ghost" | "destructive") {
+  return tone === "primary"
+    ? "inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-b from-copper to-copper-deep px-3.5 py-2 text-xs font-medium text-white glow-copper-sm inset-highlight-md transition hover:glow-copper disabled:opacity-60"
+    : tone === "destructive"
+    ? "inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3.5 py-2 text-xs font-medium text-rose-300 transition hover:bg-rose-500/15 disabled:opacity-60"
+    : "inline-flex items-center gap-1.5 rounded-lg border border-glass-mid bg-glass px-3.5 py-2 text-xs font-medium text-foreground/90 transition hover:border-glass-strong hover:bg-glass-elev disabled:opacity-60";
+}
 
 export default function OCDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = usePromise(params);
@@ -29,253 +44,248 @@ export default function OCDetallePage({ params }: { params: Promise<{ id: string
 
   const load = useCallback(async () => {
     setLoading(true);
-    try {
-      const res = await getOrdenCompra(ocId);
-      setOc(res.data);
-    } catch (err) {
-      toast.error(err instanceof ApiError ? `Error ${err.status}` : "Error cargando OC");
-    } finally {
-      setLoading(false);
-    }
+    try { const res = await getOrdenCompra(ocId); setOc(res.data); }
+    catch (err) { toast.error(err instanceof ApiError ? `Error ${err.status}` : "Error cargando OC"); }
+    finally { setLoading(false); }
   }, [ocId]);
 
   useEffect(() => { load(); }, [load]);
 
   async function action(fn: () => Promise<unknown>, ok: string) {
     setBusy(true);
-    try {
-      await fn();
-      toast.success(ok);
-      await load();
-    } catch (err) {
-      toast.error(err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error");
-    } finally {
-      setBusy(false);
-    }
+    try { await fn(); toast.success(ok); await load(); }
+    catch (err) { toast.error(err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error"); }
+    finally { setBusy(false); }
   }
 
-  if (loading || !oc) return <div className="p-8 text-muted-foreground">Cargando…</div>;
+  if (loading || !oc) {
+    return (
+      <div className="flex h-[40vh] items-center justify-center text-muted-foreground">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-copper border-t-transparent" />
+          <span className="text-sm">Cargando orden de compra…</span>
+        </div>
+      </div>
+    );
+  }
 
-  const cantidadRecibida = (oc.orden_compra_lineas ?? []).reduce(
-    (acc, l) => acc + Number(l.cantidad_recibida ?? 0), 0,
-  );
-  const cantidadTotal = (oc.orden_compra_lineas ?? []).reduce(
-    (acc, l) => acc + Number(l.cantidad_solicitada), 0,
-  );
+  const cantidadRecibida = (oc.orden_compra_lineas ?? []).reduce((acc, l) => acc + Number(l.cantidad_recibida ?? 0), 0);
+  const cantidadTotal = (oc.orden_compra_lineas ?? []).reduce((acc, l) => acc + Number(l.cantidad_solicitada), 0);
   const progresoRecepcion = cantidadTotal > 0 ? (cantidadRecibida / cantidadTotal) * 100 : 0;
 
   return (
-    <div className="max-w-5xl space-y-6">
-      <Toaster richColors />
-      <Link href="/compras/ordenes-compra" className="inline-flex items-center text-sm text-muted-foreground hover:underline">
-        <ChevronLeft className="mr-1 h-4 w-4" /> Volver
-      </Link>
-
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="font-mono text-xs text-muted-foreground">{oc.codigo}</div>
-          <h1 className="text-2xl font-bold">{oc.proveedores?.razon_social}</h1>
-          <div className="mt-1 flex items-center gap-2 text-sm">
-            <Badge className={ESTADO_OC_COLOR[oc.estado] ?? ""}>{ESTADO_OC_LABEL[oc.estado] ?? oc.estado}</Badge>
-            {oc.roles && <span className="text-muted-foreground">Aprobador requerido: {oc.roles.nombre}</span>}
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-xs text-muted-foreground">Total</div>
-          <div className="text-3xl font-bold">{fmtMoneda(oc.total, oc.moneda)}</div>
-          <div className="text-xs text-muted-foreground">
-            Subtotal {fmtMoneda(oc.subtotal, oc.moneda)} · IVA {Number(oc.iva_porcentaje)}%
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {(oc.estado === "borrador" || oc.estado === "rechazada") && (
-          <Button onClick={() => action(() => solicitarAprobacionOC(ocId), "OC en revisión")} disabled={busy}>
-            <Send className="mr-2 h-4 w-4" /> Solicitar aprobación
-          </Button>
-        )}
-        {(oc.estado === "en_revision" || oc.estado === "borrador") && (
+    <div>
+      <PageHeader
+        breadcrumb={[
+          { href: "/dashboard", label: "Panel" },
+          { href: "/compras", label: "Compras" },
+          { href: "/compras/ordenes-compra", label: "OCs" },
+          { label: oc.codigo },
+        ]}
+        title={oc.codigo}
+        titleAccent={oc.proveedores?.razon_social ?? ""}
+        meta={
           <>
-            <Button onClick={() => action(() => aprobarOC(ocId), "OC aprobada")} disabled={busy}>
-              <Check className="mr-2 h-4 w-4" /> Aprobar
-            </Button>
-            <Button variant="outline" onClick={() => setShowRechazo((s) => !s)} disabled={busy}>
-              <X className="mr-2 h-4 w-4" /> Rechazar
-            </Button>
+            <Badge variant={OC_BADGE[oc.estado] ?? "muted"}>{ESTADO_OC_LABEL[oc.estado] ?? oc.estado}</Badge>
+            {oc.roles && (<><span className="text-muted-foreground/40">·</span><span>Aprobador: {oc.roles.nombre}</span></>)}
           </>
-        )}
-        {oc.estado === "aprobada" && (
-          <Button onClick={() => action(() => enviarOC(ocId), "OC enviada al proveedor")} disabled={busy}>
-            <Truck className="mr-2 h-4 w-4" /> Marcar como enviada
-          </Button>
-        )}
-        {oc.estado === "enviada" && (
-          <Button onClick={() => setShowConfirmar((s) => !s)} disabled={busy}>
-            <Check className="mr-2 h-4 w-4" /> Confirmar disponibilidad proveedor
-          </Button>
-        )}
-        {["confirmada", "enviada", "recibida_parcial"].includes(oc.estado) && (
-          <Link href={`/compras/recepciones/nueva?oc=${oc.id}`}>
-            <Button variant="default" disabled={busy}>
-              <PackageCheck className="mr-2 h-4 w-4" /> Registrar recepción
-            </Button>
-          </Link>
-        )}
-        {!["recibida_total", "cerrada", "cancelada"].includes(oc.estado) && (
-          <Button variant="outline" onClick={() => action(() => cancelarOC(ocId), "OC cancelada")} disabled={busy}>
-            Cancelar OC
-          </Button>
-        )}
-      </div>
+        }
+        actions={<HeaderActionGhost href="/compras/ordenes-compra" icon={<ChevronLeft className="h-3.5 w-3.5" />}>Volver</HeaderActionGhost>}
+      />
 
-      {showRechazo && (
-        <div className="rounded-md border bg-amber-50/40 p-4">
-          <Label>Motivo del rechazo</Label>
-          <Input value={motivoRechazo} onChange={(e) => setMotivoRechazo(e.target.value)} className="mt-2" />
-          <div className="mt-3 flex gap-2">
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={motivoRechazo.length < 2 || busy}
-              onClick={() => action(() => rechazarOC(ocId, motivoRechazo), "OC rechazada")}
-            >Confirmar rechazo</Button>
-            <Button variant="outline" size="sm" onClick={() => setShowRechazo(false)}>Cancelar</Button>
+      <div className="space-y-6 pt-6">
+        {/* Total */}
+        <Panel title="Total de la orden" subtitle={`Subtotal ${fmtMoneda(oc.subtotal, oc.moneda)} · IVA ${Number(oc.iva_porcentaje)}%`} icon={<ShoppingCart className="h-3.5 w-3.5" />}>
+          <p className="font-display text-4xl font-semibold tabular-nums tracking-tight text-copper text-glow-copper">
+            {fmtMoneda(oc.total, oc.moneda)}
+          </p>
+        </Panel>
+
+        {/* Acciones */}
+        <Panel title="Acciones disponibles" subtitle="Transiciones de estado">
+          <div className="flex flex-wrap gap-2">
+            {(oc.estado === "borrador" || oc.estado === "rechazada") && (
+              <button type="button" onClick={() => action(() => solicitarAprobacionOC(ocId), "OC en revisión")} disabled={busy} className={actionClass("primary")}>
+                <Send className="h-3.5 w-3.5" /> Solicitar aprobación
+              </button>
+            )}
+            {(oc.estado === "en_revision" || oc.estado === "borrador") && (
+              <>
+                <button type="button" onClick={() => action(() => aprobarOC(ocId), "OC aprobada")} disabled={busy} className={actionClass("primary")}>
+                  <Check className="h-3.5 w-3.5" /> Aprobar
+                </button>
+                <button type="button" onClick={() => setShowRechazo((s) => !s)} disabled={busy} className={actionClass("destructive")}>
+                  <X className="h-3.5 w-3.5" /> Rechazar
+                </button>
+              </>
+            )}
+            {oc.estado === "aprobada" && (
+              <button type="button" onClick={() => action(() => enviarOC(ocId), "OC enviada al proveedor")} disabled={busy} className={actionClass("primary")}>
+                <Truck className="h-3.5 w-3.5" /> Marcar como enviada
+              </button>
+            )}
+            {oc.estado === "enviada" && (
+              <button type="button" onClick={() => setShowConfirmar((s) => !s)} disabled={busy} className={actionClass("primary")}>
+                <Check className="h-3.5 w-3.5" /> Confirmar disponibilidad
+              </button>
+            )}
+            {["confirmada", "enviada", "recibida_parcial"].includes(oc.estado) && (
+              <Link href={`/compras/recepciones/nueva?oc=${oc.id}`} className={actionClass("primary")}>
+                <PackageCheck className="h-3.5 w-3.5" /> Registrar recepción
+              </Link>
+            )}
+            {!["recibida_total", "cerrada", "cancelada"].includes(oc.estado) && (
+              <button type="button" onClick={() => action(() => cancelarOC(ocId), "OC cancelada")} disabled={busy} className={actionClass("ghost")}>
+                Cancelar OC
+              </button>
+            )}
           </div>
-        </div>
-      )}
+        </Panel>
 
-      {showConfirmar && (
-        <div className="rounded-md border bg-blue-50/40 p-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Fecha confirmación proveedor</Label>
-              <Input type="date" value={fechaConfirm} onChange={(e) => setFechaConfirm(e.target.value)} />
+        {showRechazo && (
+          <Panel title="Motivo del rechazo">
+            <Input value={motivoRechazo} onChange={(e) => setMotivoRechazo(e.target.value)} className="border-glass bg-glass" />
+            <div className="mt-3 flex gap-2">
+              <button type="button" disabled={motivoRechazo.length < 2 || busy} onClick={() => action(() => rechazarOC(ocId, motivoRechazo), "OC rechazada")} className={actionClass("destructive")}>
+                Confirmar rechazo
+              </button>
+              <button type="button" onClick={() => setShowRechazo(false)} className={actionClass("ghost")}>Cancelar</button>
             </div>
-            <div>
-              <Label>Fecha entrega acordada</Label>
-              <Input type="date" value={fechaEntrega} onChange={(e) => setFechaEntrega(e.target.value)} />
+          </Panel>
+        )}
+
+        {showConfirmar && (
+          <Panel title="Confirmación del proveedor" subtitle="Fechas acordadas">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground">Fecha confirmación</Label>
+                <Input type="date" value={fechaConfirm} onChange={(e) => setFechaConfirm(e.target.value)} className="h-10 border-glass bg-glass" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground">Fecha entrega acordada</Label>
+                <Input type="date" value={fechaEntrega} onChange={(e) => setFechaEntrega(e.target.value)} className="h-10 border-glass bg-glass" />
+              </div>
             </div>
-          </div>
-          <div className="mt-3 flex gap-2">
-            <Button
-              size="sm"
-              onClick={() => action(
-                () => confirmarOC(ocId, {
-                  fecha_confirmacion_proveedor: fechaConfirm || undefined,
-                  fecha_entrega_acordada: fechaEntrega || undefined,
-                }),
-                "Confirmación registrada",
-              )}
-              disabled={busy}
-            >Confirmar</Button>
-            <Button variant="outline" size="sm" onClick={() => setShowConfirmar(false)}>Cerrar</Button>
-          </div>
-        </div>
-      )}
+            <div className="mt-4 flex gap-2">
+              <button type="button" disabled={busy}
+                onClick={() => action(() => confirmarOC(ocId, { fecha_confirmacion_proveedor: fechaConfirm || undefined, fecha_entrega_acordada: fechaEntrega || undefined }), "Confirmación registrada")}
+                className={actionClass("primary")}>Confirmar</button>
+              <button type="button" onClick={() => setShowConfirmar(false)} className={actionClass("ghost")}>Cerrar</button>
+            </div>
+          </Panel>
+        )}
 
-      {oc.motivo_rechazo && (
-        <div className="rounded-md border border-red-200 bg-red-50/60 p-4 text-sm">
-          <strong>Rechazo:</strong> {oc.motivo_rechazo}
-        </div>
-      )}
+        {oc.motivo_rechazo && (
+          <div className="rounded-xl border border-rose-500/30 bg-rose-500/[0.06] px-4 py-3 text-sm inset-highlight">
+            <strong className="text-rose-300">Rechazo:</strong> <span className="text-foreground/85">{oc.motivo_rechazo}</span>
+          </div>
+        )}
 
-      <section className="rounded-md border bg-white p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase text-muted-foreground">Líneas de la orden</h2>
-          {cantidadTotal > 0 && (
-            <span className="text-xs text-muted-foreground">
-              Recepción: {progresoRecepcion.toFixed(0)}% ({cantidadRecibida} / {cantidadTotal})
-            </span>
+        {/* Líneas */}
+        <Panel
+          title="Líneas de la orden"
+          subtitle={cantidadTotal > 0 ? `Recepción ${progresoRecepcion.toFixed(0)}% · ${cantidadRecibida} de ${cantidadTotal}` : undefined}
+          padded={false}
+          action={cantidadTotal > 0 && (
+            <div className="w-32">
+              <div className="h-1.5 overflow-hidden rounded-full bg-glass-elev">
+                <div className={`h-full rounded-full ${progresoRecepcion >= 100 ? "bg-green-500" : progresoRecepcion > 0 ? "bg-copper" : "bg-muted-foreground/40"}`} style={{ width: `${progresoRecepcion}%` }} />
+              </div>
+            </div>
           )}
-        </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>#</TableHead>
-              <TableHead>Item</TableHead>
-              <TableHead>Descripción</TableHead>
-              <TableHead className="text-right">Cant.</TableHead>
-              <TableHead className="text-right">Precio</TableHead>
-              <TableHead className="text-right">Subtotal</TableHead>
-              <TableHead className="text-right">Recibido</TableHead>
-              <TableHead>Estado</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {(oc.orden_compra_lineas ?? []).map((l) => (
-              <TableRow key={l.id}>
-                <TableCell>{l.orden}</TableCell>
-                <TableCell className="font-mono text-xs">{l.items?.codigo_interno ?? "—"}</TableCell>
-                <TableCell>{l.descripcion}</TableCell>
-                <TableCell className="text-right">{Number(l.cantidad_solicitada)} {l.unidad_medida}</TableCell>
-                <TableCell className="text-right">{fmtMoneda(l.precio_unitario, oc.moneda)}</TableCell>
-                <TableCell className="text-right font-semibold">{fmtMoneda(l.subtotal, oc.moneda)}</TableCell>
-                <TableCell className="text-right">{Number(l.cantidad_recibida ?? 0)}</TableCell>
-                <TableCell><span className="text-xs">{l.estado_linea}</span></TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </section>
-
-      <div className="grid grid-cols-2 gap-4 text-sm">
-        <KVRow label="Solicitud origen" value={
-          oc.solicitudes_ordenes_compra_solicitud_idTosolicitudes
-            ? <Link href={`/compras/solicitudes/${oc.solicitudes_ordenes_compra_solicitud_idTosolicitudes.id}`} className="text-blue-700 hover:underline">{oc.solicitudes_ordenes_compra_solicitud_idTosolicitudes.codigo}</Link>
-            : "—"
-        } />
-        <KVRow label="Expediente" value={
-          oc.expedientes
-            ? <Link href={`/expedientes/${oc.expedientes.id}`} className="text-blue-700 hover:underline">{oc.expedientes.codigo}</Link>
-            : "—"
-        } />
-        <KVRow label="Condiciones de pago" value={oc.condiciones_pago} />
-        <KVRow label="Incoterm" value={oc.incoterm} />
-        <KVRow label="Lugar entrega" value={oc.lugar_entrega} />
-        <KVRow label="Fecha confirmación" value={oc.fecha_confirmacion_proveedor ? new Date(oc.fecha_confirmacion_proveedor).toLocaleDateString() : "—"} />
-        <KVRow label="Fecha entrega real" value={oc.fecha_entrega_real ? new Date(oc.fecha_entrega_real).toLocaleDateString() : "—"} />
-        <KVRow label="Aprobador" value={oc.usuarios_ordenes_compra_aprobador_idTousuarios?.nombre_completo} />
-        {oc.observaciones_internas && <KVRow span={2} label="Notas internas" value={oc.observaciones_internas} />}
-        {oc.observaciones_proveedor && <KVRow span={2} label="Notas al proveedor" value={oc.observaciones_proveedor} />}
-      </div>
-
-      {(oc.recepciones ?? []).length > 0 && (
-        <section className="rounded-md border bg-white p-6">
-          <h2 className="mb-4 text-sm font-semibold uppercase text-muted-foreground">Recepciones de esta OC</h2>
+        >
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Código</TableHead>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Estado general</TableHead>
+              <TableRow className="border-glass bg-glass hover:bg-glass">
+                <TableHead className="w-12 font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">#</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Item</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Descripción</TableHead>
+                <TableHead className="text-right font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Cant.</TableHead>
+                <TableHead className="text-right font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Precio</TableHead>
+                <TableHead className="text-right font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Subtotal</TableHead>
+                <TableHead className="text-right font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Recibido</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Estado</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(oc.recepciones ?? []).map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-mono text-xs">
-                    <Link href={`/compras/recepciones/${r.id}`} className="text-blue-700 hover:underline">{r.codigo}</Link>
-                  </TableCell>
-                  <TableCell className="text-xs">{new Date(r.fecha_recepcion).toLocaleString()}</TableCell>
-                  <TableCell><Badge>{r.estado}</Badge></TableCell>
-                  <TableCell className="text-xs">{r.estado_general}</TableCell>
+              {(oc.orden_compra_lineas ?? []).map((l) => (
+                <TableRow key={l.id} className="border-glass hover:bg-glass">
+                  <TableCell className="font-mono text-xs text-muted-foreground">{l.orden}</TableCell>
+                  <TableCell className="font-mono text-xs text-copper">{l.items?.codigo_interno ?? "—"}</TableCell>
+                  <TableCell className="text-sm">{l.descripcion}</TableCell>
+                  <TableCell className="text-right font-mono text-sm tabular-nums">{Number(l.cantidad_solicitada)} <span className="text-[10px] text-muted-foreground">{l.unidad_medida}</span></TableCell>
+                  <TableCell className="text-right font-mono text-sm tabular-nums">{fmtMoneda(l.precio_unitario, oc.moneda)}</TableCell>
+                  <TableCell className="text-right font-mono text-sm font-semibold tabular-nums text-copper">{fmtMoneda(l.subtotal, oc.moneda)}</TableCell>
+                  <TableCell className="text-right font-mono text-sm tabular-nums text-green-300">{Number(l.cantidad_recibida ?? 0)}</TableCell>
+                  <TableCell><span className="font-mono text-[10.5px] capitalize text-muted-foreground">{l.estado_linea}</span></TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </section>
-      )}
+        </Panel>
+
+        {/* Metadatos */}
+        <Panel title="Datos del proceso">
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm md:grid-cols-2 lg:grid-cols-3">
+            <KVPair label="Solicitud origen" value={
+              oc.solicitudes_ordenes_compra_solicitud_idTosolicitudes
+                ? <Link href={`/compras/solicitudes/${oc.solicitudes_ordenes_compra_solicitud_idTosolicitudes.id}`} className="font-mono text-copper hover:underline">{oc.solicitudes_ordenes_compra_solicitud_idTosolicitudes.codigo}</Link>
+                : "—"
+            } />
+            <KVPair label="Expediente" value={
+              oc.expedientes
+                ? <Link href={`/expedientes/${oc.expedientes.id}`} className="font-mono text-copper hover:underline">{oc.expedientes.codigo}</Link>
+                : "—"
+            } />
+            <KVPair label="Aprobador" value={oc.usuarios_ordenes_compra_aprobador_idTousuarios?.nombre_completo} />
+            <KVPair label="Condiciones de pago" value={oc.condiciones_pago} />
+            <KVPair label="Incoterm" value={oc.incoterm} />
+            <KVPair label="Lugar entrega" value={oc.lugar_entrega} />
+            <KVPair label="Fecha confirmación" value={oc.fecha_confirmacion_proveedor ? new Date(oc.fecha_confirmacion_proveedor).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil" }) : "—"} mono />
+            <KVPair label="Fecha entrega real" value={oc.fecha_entrega_real ? new Date(oc.fecha_entrega_real).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil" }) : "—"} mono />
+            {oc.observaciones_internas && <KVPair label="Notas internas" value={oc.observaciones_internas} full />}
+            {oc.observaciones_proveedor && <KVPair label="Notas al proveedor" value={oc.observaciones_proveedor} full />}
+          </dl>
+        </Panel>
+
+        {(oc.recepciones ?? []).length > 0 && (
+          <Panel title="Recepciones de esta OC" icon={<PackageCheck className="h-3.5 w-3.5" />} padded={false}>
+            <Table>
+              <TableHeader>
+                <TableRow className="border-glass bg-glass hover:bg-glass">
+                  <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Código</TableHead>
+                  <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Fecha</TableHead>
+                  <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Estado</TableHead>
+                  <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Estado general</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(oc.recepciones ?? []).map((r) => (
+                  <TableRow key={r.id} className="border-glass hover:bg-glass">
+                    <TableCell className="font-mono text-xs">
+                      <Link href={`/compras/recepciones/${r.id}`} className="text-copper hover:underline">{r.codigo}</Link>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-foreground/80">{new Date(r.fecha_recepcion).toLocaleString("es-EC", { timeZone: "America/Guayaquil" })}</TableCell>
+                    <TableCell><Badge variant={r.estado === "confirmada" ? "success" : "muted"}>{r.estado}</Badge></TableCell>
+                    <TableCell className="text-xs capitalize text-foreground/80">{r.estado_general}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Panel>
+        )}
+      </div>
+
+      <Toaster richColors theme="dark" />
     </div>
   );
 }
 
-function KVRow({ label, value, span = 1 }: { label: string; value: React.ReactNode; span?: 1 | 2 }) {
+function KVPair({ label, value, full, mono }: { label: string; value: React.ReactNode; full?: boolean; mono?: boolean }) {
   return (
-    <div className={span === 2 ? "col-span-2 rounded-md border bg-white p-3" : "rounded-md border bg-white p-3"}>
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="text-sm">{value ?? "—"}</div>
+    <div className={full ? "md:col-span-2 lg:col-span-3" : ""}>
+      <dt className="mb-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dd className={`text-sm text-foreground/90 ${mono ? "font-mono" : ""}`}>{value ?? "—"}</dd>
     </div>
   );
 }

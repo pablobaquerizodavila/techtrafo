@@ -3,17 +3,20 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { PackageCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Toaster, toast } from "sonner";
+import { PageHeader, HeaderActionGhost } from "@/components/page-header";
+import { Panel } from "@/components/panel";
 import { listRecepciones, Recepcion } from "@/lib/compras";
 import { ApiError } from "@/lib/api";
 
-const ESTADO_COLOR: Record<string, string> = {
-  borrador: "bg-gray-100 text-gray-700",
-  confirmada: "bg-green-100 text-green-800",
-  rechazada: "bg-red-100 text-red-800",
-  anulada: "bg-rose-100 text-rose-800",
+const REC_BADGE: Record<string, "muted" | "success" | "destructive" | "warning"> = {
+  borrador: "muted",
+  confirmada: "success",
+  rechazada: "destructive",
+  anulada: "warning",
 };
 
 export default function RecepcionesPage() {
@@ -37,74 +40,81 @@ export default function RecepcionesPage() {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <div className="space-y-6">
-      <Toaster richColors />
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Recepciones</h1>
-          <p className="text-sm text-muted-foreground">
-            Las recepciones se crean desde una OC. Al confirmarlas, el material entra a bodega y se actualiza el costo del item si difiere.
-          </p>
+    <div>
+      <PageHeader
+        breadcrumb={[{ href: "/dashboard", label: "Panel" }, { href: "/compras", label: "Compras" }, { label: "Recepciones" }]}
+        title="Recepciones"
+        titleAccent="de material"
+        meta={<span>Al confirmarlas el material entra a bodega y actualiza el costo del item si difiere</span>}
+        actions={<HeaderActionGhost href="/compras">← Dashboard</HeaderActionGhost>}
+      />
+
+      <div className="space-y-6 pt-6">
+        <div className="flex flex-wrap gap-1.5">
+          {["todas", "borrador", "confirmada", "anulada"].map((e) => (
+            <button
+              key={e}
+              type="button"
+              onClick={() => setEstado(e)}
+              className={estado === e
+                ? "inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-b from-copper to-copper-deep px-3 py-1.5 text-xs font-medium text-white glow-copper-sm inset-highlight-md"
+                : "inline-flex items-center gap-1.5 rounded-lg border border-glass-mid bg-glass px-3 py-1.5 text-xs font-medium capitalize text-foreground/80 transition hover:border-glass-strong hover:bg-glass-elev"}
+            >
+              {e === "todas" ? "Todas" : e}
+            </button>
+          ))}
         </div>
-        <Link href="/compras" className="text-sm text-muted-foreground hover:underline">← Volver al dashboard</Link>
+
+        <Panel padded={false}>
+          <Table>
+            <TableHeader>
+              <TableRow className="border-glass bg-glass hover:bg-glass">
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Código</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">OC</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Fecha</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Guía remisión</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Factura</TableHead>
+                <TableHead className="text-right font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Líneas</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Estado general</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Estado</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow><TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">Cargando…</TableCell></TableRow>
+              ) : items.length === 0 ? (
+                <TableRow><TableCell colSpan={8} className="py-10 text-center">
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <PackageCheck className="h-5 w-5" />
+                    <span className="text-sm">No hay recepciones con ese filtro</span>
+                  </div>
+                </TableCell></TableRow>
+              ) : (
+                items.map((r) => (
+                  <TableRow key={r.id} className="border-glass hover:bg-glass">
+                    <TableCell className="font-mono text-xs">
+                      <Link className="text-copper hover:underline" href={`/compras/recepciones/${r.id}`}>{r.codigo}</Link>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {r.ordenes_compra && (
+                        <Link className="text-ttteal hover:underline" href={`/compras/ordenes-compra/${r.ordenes_compra.id}`}>{r.ordenes_compra.codigo}</Link>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-foreground/80">{new Date(r.fecha_recepcion).toLocaleString("es-EC", { timeZone: "America/Guayaquil" })}</TableCell>
+                    <TableCell className="font-mono text-xs text-foreground/80">{r.guia_remision_numero ?? <span className="text-muted-foreground/50">—</span>}</TableCell>
+                    <TableCell className="font-mono text-xs text-foreground/80">{r.factura_numero ?? <span className="text-muted-foreground/50">—</span>}</TableCell>
+                    <TableCell className="text-right font-mono text-xs tabular-nums">{r._count?.recepcion_lineas ?? "—"}</TableCell>
+                    <TableCell className="text-xs capitalize text-foreground/80">{r.estado_general}</TableCell>
+                    <TableCell><Badge variant={REC_BADGE[r.estado] ?? "muted"}>{r.estado}</Badge></TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </Panel>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {["todas", "borrador", "confirmada", "anulada"].map((e) => (
-          <button
-            key={e}
-            onClick={() => setEstado(e)}
-            className={`rounded-md border px-3 py-1.5 text-sm transition ${
-              estado === e ? "border-blue-500 bg-blue-50 text-blue-700" : "bg-white hover:bg-muted/30"
-            }`}
-          >
-            {e === "todas" ? "Todas" : e}
-          </button>
-        ))}
-      </div>
-
-      <div className="rounded-md border bg-white">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Código</TableHead>
-              <TableHead>OC</TableHead>
-              <TableHead>Fecha</TableHead>
-              <TableHead>Guía remisión</TableHead>
-              <TableHead>Factura</TableHead>
-              <TableHead>Líneas</TableHead>
-              <TableHead>Estado general</TableHead>
-              <TableHead>Estado</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Cargando…</TableCell></TableRow>
-            ) : items.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No hay recepciones con ese filtro.</TableCell></TableRow>
-            ) : (
-              items.map((r) => (
-                <TableRow key={r.id} className="hover:bg-muted/40">
-                  <TableCell className="font-mono text-xs">
-                    <Link className="text-blue-700 hover:underline" href={`/compras/recepciones/${r.id}`}>{r.codigo}</Link>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {r.ordenes_compra && (
-                      <Link className="text-blue-700 hover:underline" href={`/compras/ordenes-compra/${r.ordenes_compra.id}`}>{r.ordenes_compra.codigo}</Link>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-xs">{new Date(r.fecha_recepcion).toLocaleString()}</TableCell>
-                  <TableCell className="text-xs">{r.guia_remision_numero ?? "—"}</TableCell>
-                  <TableCell className="text-xs">{r.factura_numero ?? "—"}</TableCell>
-                  <TableCell className="text-right text-xs">{r._count?.recepcion_lineas ?? "—"}</TableCell>
-                  <TableCell className="text-xs">{r.estado_general}</TableCell>
-                  <TableCell><Badge className={ESTADO_COLOR[r.estado] ?? ""}>{r.estado}</Badge></TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <Toaster richColors theme="dark" />
     </div>
   );
 }

@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useState, useCallback, use as usePromise } from "react";
-import Link from "next/link";
-import { ChevronLeft, Pencil, Save, X, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ChevronLeft, Pencil, Save, X, Trash2, Truck, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Toaster, toast } from "sonner";
+import { PageHeader, HeaderActionGhost } from "@/components/page-header";
+import { Panel } from "@/components/panel";
 import {
   archiveProveedor, getProveedor, ItemProveedor, Proveedor, ProveedorCreateInput,
   updateProveedor, fmtMoneda,
@@ -21,11 +24,13 @@ interface ProveedorFull extends Proveedor {
   _count: { ordenes_compra: number };
 }
 
-const ESTADO_COLOR: Record<string, string> = {
-  activo: "bg-green-100 text-green-800",
-  inactivo: "bg-gray-200 text-gray-700",
-  bloqueado: "bg-red-100 text-red-800",
-};
+function actionClass(tone: "primary" | "ghost" | "destructive") {
+  return tone === "primary"
+    ? "inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-b from-copper to-copper-deep px-3.5 py-2 text-xs font-medium text-white glow-copper-sm inset-highlight-md transition hover:glow-copper disabled:opacity-60"
+    : tone === "destructive"
+    ? "inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3.5 py-2 text-xs font-medium text-rose-300 transition hover:bg-rose-500/15 disabled:opacity-60"
+    : "inline-flex items-center gap-1.5 rounded-lg border border-glass-mid bg-glass px-3.5 py-2 text-xs font-medium text-foreground/90 transition hover:border-glass-strong hover:bg-glass-elev disabled:opacity-60";
+}
 
 export default function ProveedorDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = usePromise(params);
@@ -91,145 +96,176 @@ export default function ProveedorDetallePage({ params }: { params: Promise<{ id:
   }
 
   if (loading || !prov) {
-    return <div className="p-8 text-muted-foreground">Cargando…</div>;
+    return (
+      <div className="flex h-[40vh] items-center justify-center text-muted-foreground">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-copper border-t-transparent" />
+          <span className="text-sm">Cargando proveedor…</span>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="max-w-4xl space-y-6">
-      <Toaster richColors />
-      <Link href="/admin/proveedores" className="inline-flex items-center text-sm text-muted-foreground hover:underline">
-        <ChevronLeft className="mr-1 h-4 w-4" /> Volver
-      </Link>
+    <div>
+      <PageHeader
+        breadcrumb={[{ href: "/dashboard", label: "Panel" }, { href: "/admin/proveedores", label: "Proveedores" }, { label: prov.codigo }]}
+        title={prov.codigo}
+        titleAccent={prov.razon_social}
+        meta={
+          <>
+            <Badge variant={prov.estado === "activo" ? "success" : prov.estado === "bloqueado" ? "destructive" : "muted"}>{prov.estado}</Badge>
+            <span className="text-muted-foreground/40">·</span>
+            <span>{prov._count.ordenes_compra} órdenes históricas</span>
+            {prov.calificacion && (
+              <>
+                <span className="text-muted-foreground/40">·</span>
+                <span className="inline-flex items-center gap-1">
+                  <Star className="h-3 w-3 text-amber-400" />
+                  <span className="font-mono">{Number(prov.calificacion).toFixed(1)}/100</span>
+                </span>
+              </>
+            )}
+          </>
+        }
+        actions={
+          <>
+            <HeaderActionGhost href="/admin/proveedores" icon={<ChevronLeft className="h-3.5 w-3.5" />}>Volver</HeaderActionGhost>
+            {!editing ? (
+              <>
+                <button type="button" onClick={() => setEditing(true)} className={actionClass("ghost")}>
+                  <Pencil className="h-3.5 w-3.5" /> Editar
+                </button>
+                {prov.estado === "activo" && (
+                  <button type="button" onClick={handleArchivar} className={actionClass("destructive")}>
+                    <Trash2 className="h-3.5 w-3.5" /> Archivar
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                <button type="button" onClick={handleSave} className={actionClass("primary")}>
+                  <Save className="h-3.5 w-3.5" /> Guardar
+                </button>
+                <button type="button" onClick={() => { setEditing(false); load(); }} className={actionClass("ghost")}>
+                  <X className="h-3.5 w-3.5" /> Cancelar
+                </button>
+              </>
+            )}
+          </>
+        }
+      />
 
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="font-mono text-xs text-muted-foreground">{prov.codigo}</div>
-          <h1 className="text-2xl font-bold">{prov.razon_social}</h1>
-          <div className="mt-1 flex items-center gap-2">
-            <Badge className={ESTADO_COLOR[prov.estado] ?? ""}>{prov.estado}</Badge>
-            <span className="text-sm text-muted-foreground">
-              {prov._count.ordenes_compra} órdenes históricas
-              {prov.calificacion && ` · calificación ${Number(prov.calificacion).toFixed(1)}/100`}
-            </span>
+      <div className="space-y-6 pt-6">
+        <Panel title="Identificación y contacto" icon={<Truck className="h-3.5 w-3.5" />}>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            {editing ? (
+              <>
+                <FormField label="Razón social" full><Input value={form.razon_social ?? ""} onChange={(e) => setForm((f) => ({ ...f, razon_social: e.target.value }))} className="h-10 border-glass bg-glass" /></FormField>
+                <FormField label="Nombre comercial"><Input value={form.nombre_comercial ?? ""} onChange={(e) => setForm((f) => ({ ...f, nombre_comercial: e.target.value }))} className="h-10 border-glass bg-glass" /></FormField>
+                <FormField label="RUC"><Input value={form.ruc ?? ""} onChange={(e) => setForm((f) => ({ ...f, ruc: e.target.value }))} className="h-10 border-glass bg-glass font-mono" /></FormField>
+                <FormField label="País"><Input value={form.pais ?? ""} onChange={(e) => setForm((f) => ({ ...f, pais: e.target.value }))} className="h-10 border-glass bg-glass" /></FormField>
+                <FormField label="Ciudad"><Input value={form.ciudad ?? ""} onChange={(e) => setForm((f) => ({ ...f, ciudad: e.target.value }))} className="h-10 border-glass bg-glass" /></FormField>
+                <FormField label="Contacto"><Input value={form.contacto_nombre ?? ""} onChange={(e) => setForm((f) => ({ ...f, contacto_nombre: e.target.value }))} className="h-10 border-glass bg-glass" /></FormField>
+                <FormField label="Cargo"><Input value={form.contacto_cargo ?? ""} onChange={(e) => setForm((f) => ({ ...f, contacto_cargo: e.target.value }))} className="h-10 border-glass bg-glass" /></FormField>
+                <FormField label="Email"><Input type="email" value={form.contacto_email ?? ""} onChange={(e) => setForm((f) => ({ ...f, contacto_email: e.target.value }))} className="h-10 border-glass bg-glass" /></FormField>
+                <FormField label="Teléfono"><Input value={form.contacto_telefono ?? ""} onChange={(e) => setForm((f) => ({ ...f, contacto_telefono: e.target.value }))} className="h-10 border-glass bg-glass" /></FormField>
+                <FormField label="Condiciones de pago"><Input value={form.condiciones_pago_default ?? ""} onChange={(e) => setForm((f) => ({ ...f, condiciones_pago_default: e.target.value }))} className="h-10 border-glass bg-glass" /></FormField>
+                <FormField label="Moneda"><Input value={form.moneda_default ?? "USD"} maxLength={3} onChange={(e) => setForm((f) => ({ ...f, moneda_default: e.target.value }))} className="h-10 border-glass bg-glass font-mono" /></FormField>
+                <FormField label="Tiempo entrega (días)"><Input type="number" value={form.tiempo_entrega_default_dias ?? ""} onChange={(e) => setForm((f) => ({ ...f, tiempo_entrega_default_dias: e.target.value ? Number(e.target.value) : null }))} className="h-10 border-glass bg-glass font-mono" /></FormField>
+                <FormField label="Certificaciones" full><Textarea rows={2} value={form.certificaciones ?? ""} onChange={(e) => setForm((f) => ({ ...f, certificaciones: e.target.value }))} className="border-glass bg-glass" /></FormField>
+                <FormField label="Productos que suministra" full><Textarea rows={2} value={form.productos_que_suministra ?? ""} onChange={(e) => setForm((f) => ({ ...f, productos_que_suministra: e.target.value }))} className="border-glass bg-glass" /></FormField>
+                <FormField label="Observaciones" full><Textarea rows={2} value={form.observaciones ?? ""} onChange={(e) => setForm((f) => ({ ...f, observaciones: e.target.value }))} className="border-glass bg-glass" /></FormField>
+                <FormField label="Estado">
+                  <Select value={form.estado ?? "activo"} onValueChange={(v) => setForm((f) => ({ ...f, estado: v as "activo" | "inactivo" | "bloqueado" }))}>
+                    <SelectTrigger className="h-10 border-glass bg-glass"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="activo">Activo</SelectItem>
+                      <SelectItem value="inactivo">Inactivo</SelectItem>
+                      <SelectItem value="bloqueado">Bloqueado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormField>
+              </>
+            ) : (
+              <>
+                <KV label="Nombre comercial" value={prov.nombre_comercial} />
+                <KV label="RUC" value={prov.ruc} mono />
+                <KV label="País" value={prov.pais} />
+                <KV label="Ciudad" value={prov.ciudad} />
+                <KV label="Contacto" value={prov.contacto_nombre} />
+                <KV label="Cargo" value={prov.contacto_cargo} />
+                <KV label="Email" value={prov.contacto_email} mono />
+                <KV label="Teléfono" value={prov.contacto_telefono} mono />
+                <KV label="Pago default" value={prov.condiciones_pago_default} />
+                <KV label="Moneda" value={prov.moneda_default} mono />
+                <KV label="Tiempo entrega" value={prov.tiempo_entrega_default_dias ? `${prov.tiempo_entrega_default_dias} días` : null} mono />
+                <KV label="Incoterm" value={prov.incoterm_default} mono />
+                <KV label="Certificaciones" value={prov.certificaciones} full />
+                <KV label="Suministra" value={prov.productos_que_suministra} full />
+                <KV label="Observaciones" value={prov.observaciones} full />
+              </>
+            )}
           </div>
-        </div>
-        <div className="flex gap-2">
-          {!editing ? (
-            <>
-              <Button variant="outline" onClick={() => setEditing(true)}>
-                <Pencil className="mr-2 h-4 w-4" /> Editar
-              </Button>
-              {prov.estado === "activo" && (
-                <Button variant="outline" onClick={handleArchivar}>
-                  <Trash2 className="mr-2 h-4 w-4" /> Archivar
-                </Button>
-              )}
-            </>
+        </Panel>
+
+        <Panel
+          title="Items que suministra"
+          subtitle={`${prov.item_proveedores.length} ítem${prov.item_proveedores.length === 1 ? "" : "s"} asociado${prov.item_proveedores.length === 1 ? "" : "s"}`}
+          padded={prov.item_proveedores.length === 0}
+        >
+          {prov.item_proveedores.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Aún no se han asociado items a este proveedor. Desde la ficha de un item de bodega podrás agregarlo a la lista de proveedores.
+            </p>
           ) : (
-            <>
-              <Button onClick={handleSave}><Save className="mr-2 h-4 w-4" /> Guardar</Button>
-              <Button variant="outline" onClick={() => { setEditing(false); load(); }}>
-                <X className="mr-2 h-4 w-4" /> Cancelar
-              </Button>
-            </>
+            <Table>
+              <TableHeader>
+                <TableRow className="border-glass bg-glass hover:bg-glass">
+                  <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Código item</TableHead>
+                  <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Descripción</TableHead>
+                  <TableHead className="text-right font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Precio</TableHead>
+                  <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Unidad</TableHead>
+                  <TableHead className="text-right font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Tiempo entrega</TableHead>
+                  <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Principal</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {prov.item_proveedores.map((ip) => (
+                  <TableRow key={ip.id} className="border-glass hover:bg-glass">
+                    <TableCell className="font-mono text-xs text-copper">{ip.items?.codigo_interno ?? "—"}</TableCell>
+                    <TableCell className="text-sm">{ip.items?.nombre ?? "—"}</TableCell>
+                    <TableCell className="text-right font-mono text-sm tabular-nums">{fmtMoneda(ip.precio_unitario, ip.moneda)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{ip.unidad_medida}</TableCell>
+                    <TableCell className="text-right font-mono text-xs">{ip.tiempo_entrega_dias != null ? `${ip.tiempo_entrega_dias}d` : <span className="text-muted-foreground/50">—</span>}</TableCell>
+                    <TableCell>{ip.es_principal && <Badge variant="copper">Principal</Badge>}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
-        </div>
+        </Panel>
       </div>
 
-      <section className="rounded-md border bg-white p-6">
-        <h2 className="mb-4 text-sm font-semibold uppercase text-muted-foreground">Identificación y contacto</h2>
-        <div className="grid grid-cols-2 gap-4">
-          {editing ? (
-            <>
-              <div className="col-span-2"><Label>Razón social</Label><Input value={form.razon_social ?? ""} onChange={(e) => setForm((f) => ({ ...f, razon_social: e.target.value }))} /></div>
-              <div><Label>Nombre comercial</Label><Input value={form.nombre_comercial ?? ""} onChange={(e) => setForm((f) => ({ ...f, nombre_comercial: e.target.value }))} /></div>
-              <div><Label>RUC</Label><Input value={form.ruc ?? ""} onChange={(e) => setForm((f) => ({ ...f, ruc: e.target.value }))} /></div>
-              <div><Label>País</Label><Input value={form.pais ?? ""} onChange={(e) => setForm((f) => ({ ...f, pais: e.target.value }))} /></div>
-              <div><Label>Ciudad</Label><Input value={form.ciudad ?? ""} onChange={(e) => setForm((f) => ({ ...f, ciudad: e.target.value }))} /></div>
-              <div><Label>Contacto</Label><Input value={form.contacto_nombre ?? ""} onChange={(e) => setForm((f) => ({ ...f, contacto_nombre: e.target.value }))} /></div>
-              <div><Label>Cargo</Label><Input value={form.contacto_cargo ?? ""} onChange={(e) => setForm((f) => ({ ...f, contacto_cargo: e.target.value }))} /></div>
-              <div><Label>Email</Label><Input type="email" value={form.contacto_email ?? ""} onChange={(e) => setForm((f) => ({ ...f, contacto_email: e.target.value }))} /></div>
-              <div><Label>Teléfono</Label><Input value={form.contacto_telefono ?? ""} onChange={(e) => setForm((f) => ({ ...f, contacto_telefono: e.target.value }))} /></div>
-              <div><Label>Condiciones de pago</Label><Input value={form.condiciones_pago_default ?? ""} onChange={(e) => setForm((f) => ({ ...f, condiciones_pago_default: e.target.value }))} /></div>
-              <div><Label>Moneda</Label><Input value={form.moneda_default ?? "USD"} maxLength={3} onChange={(e) => setForm((f) => ({ ...f, moneda_default: e.target.value }))} /></div>
-              <div><Label>Tiempo entrega días</Label><Input type="number" value={form.tiempo_entrega_default_dias ?? ""} onChange={(e) => setForm((f) => ({ ...f, tiempo_entrega_default_dias: e.target.value ? Number(e.target.value) : null }))} /></div>
-              <div className="col-span-2"><Label>Certificaciones</Label><Textarea rows={2} value={form.certificaciones ?? ""} onChange={(e) => setForm((f) => ({ ...f, certificaciones: e.target.value }))} /></div>
-              <div className="col-span-2"><Label>Productos que suministra</Label><Textarea rows={2} value={form.productos_que_suministra ?? ""} onChange={(e) => setForm((f) => ({ ...f, productos_que_suministra: e.target.value }))} /></div>
-              <div className="col-span-2"><Label>Observaciones</Label><Textarea rows={2} value={form.observaciones ?? ""} onChange={(e) => setForm((f) => ({ ...f, observaciones: e.target.value }))} /></div>
-              <div><Label>Estado</Label>
-                <select className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={form.estado ?? "activo"} onChange={(e) => setForm((f) => ({ ...f, estado: e.target.value as "activo" | "inactivo" | "bloqueado" }))}>
-                  <option value="activo">Activo</option>
-                  <option value="inactivo">Inactivo</option>
-                  <option value="bloqueado">Bloqueado</option>
-                </select>
-              </div>
-            </>
-          ) : (
-            <>
-              <KV label="Nombre comercial" value={prov.nombre_comercial} />
-              <KV label="RUC" value={prov.ruc} />
-              <KV label="País" value={prov.pais} />
-              <KV label="Ciudad" value={prov.ciudad} />
-              <KV label="Contacto" value={prov.contacto_nombre} />
-              <KV label="Cargo" value={prov.contacto_cargo} />
-              <KV label="Email" value={prov.contacto_email} />
-              <KV label="Teléfono" value={prov.contacto_telefono} />
-              <KV label="Pago default" value={prov.condiciones_pago_default} />
-              <KV label="Moneda" value={prov.moneda_default} />
-              <KV label="Tiempo entrega" value={prov.tiempo_entrega_default_dias ? `${prov.tiempo_entrega_default_dias} días` : null} />
-              <KV label="Incoterm" value={prov.incoterm_default} />
-              <KV label="Certificaciones" value={prov.certificaciones} span={2} />
-              <KV label="Suministra" value={prov.productos_que_suministra} span={2} />
-              <KV label="Observaciones" value={prov.observaciones} span={2} />
-            </>
-          )}
-        </div>
-      </section>
-
-      <section className="rounded-md border bg-white p-6">
-        <h2 className="mb-4 text-sm font-semibold uppercase text-muted-foreground">
-          Items que suministra ({prov.item_proveedores.length})
-        </h2>
-        {prov.item_proveedores.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Aún no se han asociado items a este proveedor. Desde la ficha de un item de bodega podrás agregarlo a la lista de proveedores.
-          </p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Código item</TableHead>
-                <TableHead>Descripción</TableHead>
-                <TableHead className="text-right">Precio</TableHead>
-                <TableHead>Unidad</TableHead>
-                <TableHead className="text-right">Tiempo entrega</TableHead>
-                <TableHead>Principal</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {prov.item_proveedores.map((ip) => (
-                <TableRow key={ip.id}>
-                  <TableCell className="font-mono text-xs">{ip.items?.codigo_interno ?? "—"}</TableCell>
-                  <TableCell>{ip.items?.nombre ?? "—"}</TableCell>
-                  <TableCell className="text-right">{fmtMoneda(ip.precio_unitario, ip.moneda)}</TableCell>
-                  <TableCell>{ip.unidad_medida}</TableCell>
-                  <TableCell className="text-right">{ip.tiempo_entrega_dias != null ? `${ip.tiempo_entrega_dias} días` : "—"}</TableCell>
-                  <TableCell>{ip.es_principal && <Badge className="bg-blue-100 text-blue-800">Principal</Badge>}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </section>
+      <Toaster richColors theme="dark" />
     </div>
   );
 }
 
-function KV({ label, value, span = 1 }: { label: string; value: string | null | undefined; span?: 1 | 2 }) {
+function FormField({ label, full, children }: { label: string; full?: boolean; children: React.ReactNode }) {
   return (
-    <div className={span === 2 ? "col-span-2" : ""}>
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="text-sm">{value ?? "—"}</div>
+    <div className={`space-y-1.5 ${full ? "md:col-span-2" : ""}`}>
+      <Label className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground">{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+function KV({ label, value, full, mono }: { label: string; value: string | null | undefined; full?: boolean; mono?: boolean }) {
+  return (
+    <div className={full ? "md:col-span-2" : ""}>
+      <dt className="mb-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dd className={`text-sm text-foreground/90 ${mono ? "font-mono" : ""}`}>{value ?? "—"}</dd>
     </div>
   );
 }

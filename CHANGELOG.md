@@ -6,6 +6,68 @@ El formato sigue Keep a Changelog y este proyecto adhiere a Semantic Versioning.
 
 ---
 
+## [0.15.3] — 2026-05-25 — Voltage OS Ola 3B: compras + proveedores
+
+Migra al lenguaje Voltage OS las 10 paginas del modulo de compras y
+las paginas de proveedores que faltaron en la Ola 3A.
+
+Compras (7 paginas):
+
+- `/compras`: dashboard con 5 StatCards (OCs abiertas, solicitudes
+  pendientes, recepciones, alertas de stock, proveedores), Panel
+  destacado de "Comprado este mes" con monto copper glow, tabla de
+  alertas con checkbox accent-copper y boton "Generar SC", quick
+  links a las sub-paginas con icono y hover copper.
+- `/compras/solicitudes`: filtros como pills tone-based (copper activo,
+  glass inactivos), tabla con codigos copper enlazables.
+- `/compras/solicitudes/[id]`: PageHeader con badges multiples, panel
+  de total destacado, panel de acciones con botones tone-based
+  (Enviar/Aprobar=primary, Rechazar=destructive, Cancelar=ghost),
+  panel de motivo de rechazo, tabla de lineas con codigos copper,
+  metadatos en grid de 4 cols.
+- `/compras/ordenes-compra`: mismo patron de pills, badge tone por
+  estado (copper para aprobada, teal para enviada/confirmada,
+  success para recibida_total).
+- `/compras/ordenes-compra/[id]`: 4 Panels (total, acciones,
+  motivo rechazo, confirmacion proveedor), tabla de lineas con
+  progress bar de recepcion en el header del panel, panel de
+  recepciones de esta OC con badges.
+- `/compras/recepciones`: filtros pills, tabla con codigos OC en teal
+  (cross-link).
+- `/compras/recepciones/[id]`: PageHeader con metadatos en el meta,
+  panel de acciones para borrador (Confirmar / Anular), tabla de
+  lineas con recibida en green, rechazada en rose, badge tonal por
+  inspeccion.
+- `/compras/recepciones/nueva`: 2 Panels (documentos, lineas a
+  recibir), Selects shadcn (no `<select>` nativo), inputs h-8
+  compactos para cantidades/precio/inspeccion/ubicacion.
+
+Proveedores (faltantes de Ola 3A):
+
+- `/admin/proveedores/nuevo`: 4 Panels tematicos (identificacion,
+  contacto, condiciones, capacidades), FormField helper.
+- `/admin/proveedores/[id]`: header con badge de estado y rating
+  con Star amber, botones tone-based (Editar/Archivar/Guardar/
+  Cancelar), 2 Panels (identificacion+contacto, items que
+  suministra), KV component con soporte de mono. Mismo grid en
+  modo edicion y vista.
+
+Patron consistente para todos:
+- PageHeader con breadcrumb completo de compras
+- HeaderActionGhost para "← Dashboard" o "← Volver"
+- Panel glass con headers font-mono uppercase
+- Filtros como botones pill copper activo / glass inactivo
+- Tablas con header font-mono [10px] tracking-wider
+- Codigos en copper, RUC/factura/datos en font-mono
+- Empty states tematicos con icono + mensaje
+
+Toda la Ola 3 sub-bloque "compras + auth + admin" cerrada.
+Pendiente Ola 3C: /inventario/*, /transformadores/*, /portal/*,
+/notificaciones, y refactor cuidadoso de hitos en
+/expedientes/[id].
+
+---
+
 ## [0.15.2] — 2026-05-25 — Voltage OS Ola 3A: admin + auth
 
 Migra al lenguaje Voltage OS las paginas de administracion y autenticacion:
