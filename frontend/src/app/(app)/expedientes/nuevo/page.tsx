@@ -2,20 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ChevronLeft, FolderOpen } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Toaster, toast } from "sonner";
+import { PageHeader, HeaderActionGhost } from "@/components/page-header";
+import { Panel } from "@/components/panel";
 import { listClientes, Cliente } from "@/lib/clientes";
 import {
   CanalOrigen,
@@ -43,10 +39,7 @@ export default function NuevoExpedientePage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!clienteId) {
-      setError("Selecciona un cliente");
-      return;
-    }
+    if (!clienteId) { setError("Seleccioná un cliente"); return; }
     setSubmitting(true);
     try {
       const res = await createExpediente({
@@ -58,12 +51,11 @@ export default function NuevoExpedientePage() {
       toast.success(`Expediente ${res.data.codigo} creado`);
       router.push(`/expedientes/${res.data.id}`);
     } catch (err) {
-      const msg =
-        err instanceof ApiError
-          ? typeof err.body === "object" && err.body !== null && "error" in err.body
-            ? String((err.body as { error: string }).error)
-            : `Error ${err.status}`
-          : "Error inesperado";
+      const msg = err instanceof ApiError
+        ? typeof err.body === "object" && err.body !== null && "error" in err.body
+          ? String((err.body as { error: string }).error)
+          : `Error ${err.status}`
+        : "Error inesperado";
       setError(msg);
       toast.error(msg);
     } finally {
@@ -72,106 +64,104 @@ export default function NuevoExpedientePage() {
   }
 
   return (
-    <div className="space-y-6">
-      <header>
-        <Button variant="ghost" size="sm" asChild className="mb-2">
-          <Link href="/expedientes">
-            <ChevronLeft className="mr-1 h-4 w-4" /> Volver a expedientes
-          </Link>
-        </Button>
-        <h2 className="text-3xl font-bold">Nuevo expediente</h2>
-        <p className="text-muted-foreground">
-          Registra el pedido de un cliente. Al guardar se instancia automaticamente la hoja de ruta de hitos.
-        </p>
-      </header>
+    <div>
+      <PageHeader
+        breadcrumb={[{ href: "/dashboard", label: "Panel" }, { href: "/expedientes", label: "Expedientes" }, { label: "Nuevo" }]}
+        title="Nuevo"
+        titleAccent="expediente"
+        meta={<span>Al guardar se instancia automáticamente la hoja de ruta de hitos</span>}
+        actions={<HeaderActionGhost href="/expedientes" icon={<ChevronLeft className="h-3.5 w-3.5" />}>Volver</HeaderActionGhost>}
+      />
 
-      <form onSubmit={handleSubmit} className="space-y-4 max-w-2xl">
-        <div className="space-y-2">
-          <Label htmlFor="cliente">Cliente *</Label>
-          <Select
-            value={clienteId?.toString() ?? ""}
-            onValueChange={(v) => setClienteId(v ? Number(v) : null)}
-          >
-            <SelectTrigger id="cliente">
-              <SelectValue placeholder="Selecciona un cliente" />
-            </SelectTrigger>
-            <SelectContent>
-              {clientes.map((c) => (
-                <SelectItem key={c.id} value={c.id.toString()}>
-                  {c.razon_social} ({c.ruc_cedula})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="tipo_servicio">Tipo de servicio estimado *</Label>
-            <Select value={tipoServicio} onValueChange={(v) => setTipoServicio(v as TipoServicioEstimado)}>
-              <SelectTrigger id="tipo_servicio">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="reparacion">Reparacion</SelectItem>
-                <SelectItem value="fabricacion">Fabricacion</SelectItem>
-                <SelectItem value="mantenimiento">Mantenimiento</SelectItem>
-                <SelectItem value="otro">Otro</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Se confirma luego de la visita tecnica. Define el flujo inicial de hitos.
-            </p>
+      <form onSubmit={handleSubmit} className="space-y-6 pt-6">
+        <Panel title="Cliente y origen" icon={<FolderOpen className="h-3.5 w-3.5" />}>
+          <div className="space-y-5">
+            <FormField label="Cliente" required htmlFor="cliente">
+              <Select value={clienteId?.toString() ?? ""} onValueChange={(v) => setClienteId(v ? Number(v) : null)}>
+                <SelectTrigger id="cliente" className="h-10 border-glass bg-glass"><SelectValue placeholder="Seleccioná un cliente" /></SelectTrigger>
+                <SelectContent>
+                  {clientes.map((c) => (
+                    <SelectItem key={c.id} value={c.id.toString()}>
+                      {c.razon_social} <span className="font-mono text-xs text-muted-foreground">({c.ruc_cedula})</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <FormField label="Tipo de servicio estimado" required htmlFor="tipo_servicio">
+                <Select value={tipoServicio} onValueChange={(v) => setTipoServicio(v as TipoServicioEstimado)}>
+                  <SelectTrigger id="tipo_servicio" className="h-10 border-glass bg-glass"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="reparacion">Reparación</SelectItem>
+                    <SelectItem value="fabricacion">Fabricación</SelectItem>
+                    <SelectItem value="mantenimiento">Mantenimiento</SelectItem>
+                    <SelectItem value="otro">Otro</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-xs text-muted-foreground">Se confirma luego de la visita técnica. Define el flujo inicial de hitos.</p>
+              </FormField>
+              <FormField label="Canal de origen" htmlFor="canal">
+                <Select value={canal || "_"} onValueChange={(v) => setCanal(v === "_" ? "" : (v as CanalOrigen))}>
+                  <SelectTrigger id="canal" className="h-10 border-glass bg-glass"><SelectValue placeholder="Seleccioná el canal" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_">— Sin especificar —</SelectItem>
+                    <SelectItem value="web">Web</SelectItem>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    <SelectItem value="telefono">Teléfono</SelectItem>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="referido">Referido</SelectItem>
+                    <SelectItem value="visita_directa">Visita directa</SelectItem>
+                    <SelectItem value="otro">Otro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormField>
+            </div>
           </div>
+        </Panel>
 
-          <div className="space-y-2">
-            <Label htmlFor="canal">Canal de origen</Label>
-            <Select value={canal || "_"} onValueChange={(v) => setCanal(v === "_" ? "" : (v as CanalOrigen))}>
-              <SelectTrigger id="canal">
-                <SelectValue placeholder="Selecciona el canal" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_">— Sin especificar —</SelectItem>
-                <SelectItem value="web">Web</SelectItem>
-                <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                <SelectItem value="telefono">Telefono</SelectItem>
-                <SelectItem value="email">Email</SelectItem>
-                <SelectItem value="referido">Referido</SelectItem>
-                <SelectItem value="visita_directa">Visita directa</SelectItem>
-                <SelectItem value="otro">Otro</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="descripcion">Descripcion del problema / requerimiento</Label>
-          <Textarea
-            id="descripcion"
-            rows={5}
-            value={descripcion}
-            onChange={(e) => setDescripcion(e.target.value)}
-            placeholder="Ej: Transformador de 500 KVA con falla en bobinado primario, requiere diagnostico en sitio."
-          />
-        </div>
+        <Panel title="Descripción del problema" subtitle="Información que ayudará al diagnóstico técnico">
+          <FormField label="Descripción / requerimiento" htmlFor="descripcion">
+            <Textarea id="descripcion" rows={5} value={descripcion} onChange={(e) => setDescripcion(e.target.value)}
+              placeholder="Ej: Transformador de 500 kVA con falla en bobinado primario, requiere diagnóstico en sitio."
+              className="border-glass bg-glass" />
+          </FormField>
+        </Panel>
 
         {error && (
-          <p className="text-sm text-destructive" role="alert">
+          <div className="rounded-xl border border-rose-500/30 bg-rose-500/[0.06] px-4 py-3 text-sm text-rose-300 inset-highlight" role="alert">
             {error}
-          </p>
+          </div>
         )}
 
-        <div className="flex justify-end gap-2 border-t pt-4">
-          <Button type="button" variant="outline" onClick={() => router.push("/expedientes")} disabled={submitting}>
+        <div className="flex justify-end gap-2 border-t border-glass pt-5">
+          <button type="button" onClick={() => router.push("/expedientes")} disabled={submitting}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-glass-mid bg-glass px-4 py-2 text-sm font-medium text-foreground/90 transition hover:border-glass-strong hover:bg-glass-elev disabled:opacity-40">
             Cancelar
-          </Button>
-          <Button type="submit" disabled={submitting}>
-            {submitting ? "Creando..." : "Crear expediente"}
-          </Button>
+          </button>
+          <button type="submit" disabled={submitting}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-b from-copper to-copper-deep px-4 py-2 text-sm font-medium text-white shadow-sm glow-copper-sm inset-highlight-md transition hover:glow-copper disabled:opacity-60">
+            {submitting ? "Creando…" : "Crear expediente"}
+          </button>
         </div>
       </form>
 
-      <Toaster richColors position="top-right" />
+      <Toaster richColors position="top-right" theme="dark" />
+    </div>
+  );
+}
+
+function FormField({
+  label, required, htmlFor, children,
+}: {
+  label: string; required?: boolean; htmlFor?: string; children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={htmlFor} className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground">
+        {label}{required && <span className="ml-1 text-copper">*</span>}
+      </Label>
+      {children}
     </div>
   );
 }

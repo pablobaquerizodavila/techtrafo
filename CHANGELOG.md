@@ -6,6 +6,38 @@ El formato sigue Keep a Changelog y este proyecto adhiere a Semantic Versioning.
 
 ---
 
+## [0.15.1] — 2026-05-25 — Voltage OS Ola 2B: formularios `nueva/o`
+
+Migra al lenguaje Voltage OS los 5 formularios de creacion:
+
+- `/ot/nueva`: 3 Panels tematicos (contrato+equipo, planificacion, detalles),
+  selects encadenados (contrato -> transformadores del cliente).
+- `/cotizaciones/nueva`: selector de modo (manual / desde plantilla) con
+  botones tone-based copper, plantilla seleccionada como card glass con
+  badges de margen/contingencia/IVA/componentes (badge `copper` y `teal`).
+- `/contratos/nuevo`: 4 Panels (fechas, monto, plan de pagos, observaciones).
+  Tabla del plan de pagos con inputs compactos h-8 border-glass, footer
+  con suma vs total (green si coincide, amber si no).
+- `/expedientes/nuevo`: 2 Panels (cliente+origen, descripcion).
+- `/transformadores/nuevo`: 4 Panels (identificacion, tecnicas, dimensiones,
+  ciclo de vida). 18 campos en grids de 2-4 columnas, inputs numericos
+  con font-mono.
+
+Patron consistente para todos:
+
+- PageHeader sticky con breadcrumb pill y back ghost.
+- FormField helper local: Label font-mono uppercase + asterisco copper.
+- Botones: Cancelar ghost glass, accion primaria copper con glow.
+- Error inline como callout rose con border + bg.
+- Toaster con `theme='dark'`.
+
+Con esto se completa la **Ola 2 (detalle + formularios)**. Quedan para
+la Ola 3 las paginas auxiliares: /admin/*, /compras/*, /inventario/*,
+/transformadores/* (no nueva), /portal/*, /notificaciones, /perfil,
+/login, /register.
+
+---
+
 ## [0.15.0] — 2026-05-25 — Voltage OS: identidad visual del panel
 
 Rediseno visual integral del panel de gestion (panel.techtrafo.com) con
