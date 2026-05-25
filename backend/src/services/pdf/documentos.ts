@@ -333,6 +333,21 @@ const INSPECCION_FIELDS: Array<{ key: string; label: string; unit?: string }> = 
   { key: "voltaje_secundario_v",      label: "Voltaje secundario", unit: "V" },
 ];
 
+// Campos especificos del informe (separados para renderizar en su propio bloque).
+const DIAGNOSTICO_FIELDS: Array<{ key: string; label: string; unit?: string }> = [
+  { key: "causa_raiz",          label: "Causa raíz" },
+  { key: "severidad",           label: "Severidad" },
+  { key: "vida_util_restante",  label: "Vida útil restante" },
+  { key: "riesgo_si_no_actuar", label: "Riesgo si no se actúa" },
+];
+
+const ESTIMACION_FIELDS: Array<{ key: string; label: string; unit?: string }> = [
+  { key: "repuestos_locales",              label: "Repuestos locales" },
+  { key: "tiempo_aprovisionamiento_dias",  label: "Aprovisionamiento", unit: "días" },
+  { key: "tiempo_estimado_dias",           label: "Tiempo de trabajo", unit: "días" },
+  { key: "costo_estimado_rango",           label: "Rango de costo (USD)" },
+];
+
 function fmtCampo(v: unknown, unit?: string): string {
   if (v === null || v === undefined || v === "") return "—";
   if (typeof v === "boolean") return v ? "Sí" : "No";
@@ -366,17 +381,55 @@ export function renderInformeTecnico(doc: Doc, inf: DataInformeTecnico, nivel: N
 
   // Datos estandarizados del formulario de inspeccion (JSONB).
   if (inf.datos_inspeccion && Object.keys(inf.datos_inspeccion).length > 0) {
-    titulo(doc, "Datos de inspección");
-    const filas = INSPECCION_FIELDS
-      .map((f) => ({ label: f.label, valor: fmtCampo(inf.datos_inspeccion![f.key], f.unit) }))
-      .filter((f) => f.valor !== "—");
-    if (filas.length > 0) bloqueDatos(doc, filas, 2);
+    const di = inf.datos_inspeccion;
 
-    const hallazgosArr = inf.datos_inspeccion.hallazgos;
+    // 1) Inspeccion (campos heredados de la visita)
+    const filasInsp = INSPECCION_FIELDS
+      .map((f) => ({ label: f.label, valor: fmtCampo(di[f.key], f.unit) }))
+      .filter((f) => f.valor !== "—");
+    if (filasInsp.length > 0) {
+      titulo(doc, "Datos de inspección");
+      bloqueDatos(doc, filasInsp, 2);
+    }
+    const hallazgosArr = di.hallazgos;
     if (Array.isArray(hallazgosArr) && hallazgosArr.length > 0) {
       subtitulo(doc, "Hallazgos detectados");
       parrafo(doc, hallazgosArr.map((h) => `• ${String(h).replace(/_/g, " ")}`).join("\n"));
       doc.moveDown(0.3);
+    }
+
+    // 2) Diagnostico estructurado (propio del informe)
+    const filasDx = DIAGNOSTICO_FIELDS
+      .map((f) => ({ label: f.label, valor: fmtCampo(di[f.key], f.unit) }))
+      .filter((f) => f.valor !== "—");
+    if (filasDx.length > 0) {
+      titulo(doc, "Diagnóstico técnico");
+      bloqueDatos(doc, filasDx, 2);
+    }
+    const componentes = di.componentes_afectados;
+    if (Array.isArray(componentes) && componentes.length > 0) {
+      subtitulo(doc, "Componentes afectados");
+      parrafo(doc, componentes.map((c) => `• ${String(c).replace(/_/g, " ")}`).join("\n"));
+      doc.moveDown(0.3);
+    }
+
+    // 3) Trabajos requeridos
+    const trabajos = di.trabajos_requeridos;
+    if (Array.isArray(trabajos) && trabajos.length > 0) {
+      titulo(doc, "Trabajos requeridos");
+      parrafo(doc, trabajos.map((t) => `• ${String(t).replace(/_/g, " ")}`).join("\n"));
+      doc.moveDown(0.3);
+    }
+
+    // 4) Estimaciones (solo nivel 2+, no se muestra en resumen N1)
+    if (nivel >= 2) {
+      const filasEst = ESTIMACION_FIELDS
+        .map((f) => ({ label: f.label, valor: fmtCampo(di[f.key], f.unit) }))
+        .filter((f) => f.valor !== "—");
+      if (filasEst.length > 0) {
+        titulo(doc, "Estimaciones");
+        bloqueDatos(doc, filasEst, 2);
+      }
     }
   }
 

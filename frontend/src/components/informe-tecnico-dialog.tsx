@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileDown, Mail, Send } from "lucide-react";
+import { FileDown, Mail, Pencil, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,7 @@ import {
   InformeTecnico, enviarInformePorEmail, getInforme,
 } from "@/lib/informes-tecnicos";
 import { ApiError } from "@/lib/api";
+import { InformeTecnicoForm } from "./informe-tecnico-form";
 
 interface Props {
   open: boolean;
@@ -22,7 +23,10 @@ interface Props {
   informeId: number | null;
 }
 
+type Mode = "view" | "edit" | "email";
+
 const LABELS: Record<string, string> = {
+  // Heredados de la visita
   estado_general: "Estado general",
   estado_aceite: "Estado del aceite",
   color_aceite: "Color del aceite",
@@ -31,6 +35,21 @@ const LABELS: Record<string, string> = {
   resistencia_aislamiento_mohm: "Resistencia aislamiento (MΩ)",
   voltaje_primario_v: "Voltaje primario (V)",
   voltaje_secundario_v: "Voltaje secundario (V)",
+  // Propios del informe
+  causa_raiz: "Causa raíz",
+  severidad: "Severidad",
+  vida_util_restante: "Vida útil restante",
+  riesgo_si_no_actuar: "Riesgo si no se actúa",
+  repuestos_locales: "Repuestos locales",
+  tiempo_aprovisionamiento_dias: "Tiempo aprovisionamiento (días)",
+  tiempo_estimado_dias: "Tiempo trabajo estimado (días)",
+  costo_estimado_rango: "Rango de costo (USD)",
+};
+
+const LISTAS: Record<string, string> = {
+  hallazgos: "Hallazgos detectados",
+  componentes_afectados: "Componentes afectados",
+  trabajos_requeridos: "Trabajos requeridos",
 };
 
 function fmtValor(v: unknown): string {
@@ -43,7 +62,7 @@ function fmtValor(v: unknown): string {
 export function InformeTecnicoDialog({ open, onClose, informeId }: Props) {
   const [inf, setInf] = useState<InformeTecnico | null>(null);
   const [loading, setLoading] = useState(false);
-  const [emailMode, setEmailMode] = useState(false);
+  const [mode, setMode] = useState<Mode>("view");
   const [to, setTo] = useState("");
   const [cc, setCc] = useState("");
   const [asunto, setAsunto] = useState("");
@@ -53,7 +72,7 @@ export function InformeTecnicoDialog({ open, onClose, informeId }: Props) {
   useEffect(() => {
     if (!open || !informeId) {
       setInf(null);
-      setEmailMode(false);
+      setMode("view");
       return;
     }
     setLoading(true);
@@ -88,7 +107,7 @@ export function InformeTecnicoDialog({ open, onClose, informeId }: Props) {
           ? `SMTP en dry-run · destinatario: ${res.destinatario}`
           : `Email enviado a ${res.destinatario} (${res.adjunto_kb} KB)`,
       );
-      setEmailMode(false);
+      setMode("view");
     } catch (err) {
       const code = err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error";
       toast.error(code);
@@ -103,11 +122,16 @@ export function InformeTecnicoDialog({ open, onClose, informeId }: Props) {
     window.open(`${apiBase}/api/pdf/informe-tecnico/${informeId}?nivel=2`, "_blank", "noopener,noreferrer");
   }
 
+  const editable = inf && (inf.estado === "borrador" || inf.estado === "rechazado");
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{inf ? `Informe técnico ${inf.numero}` : "Informe técnico"}</DialogTitle>
+          <DialogTitle>
+            {inf ? `Informe técnico ${inf.numero}` : "Informe técnico"}
+            {mode === "edit" && " · edición"}
+          </DialogTitle>
           {inf && (
             <DialogDescription>
               Expediente {inf.expedientes?.codigo}{inf.expedientes?.clientes?.razon_social && ` · ${inf.expedientes.clientes.razon_social}`}
@@ -117,7 +141,7 @@ export function InformeTecnicoDialog({ open, onClose, informeId }: Props) {
 
         {loading && <p className="text-muted-foreground">Cargando...</p>}
 
-        {inf && !emailMode && (
+        {inf && mode === "view" && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
@@ -159,16 +183,20 @@ export function InformeTecnicoDialog({ open, onClose, informeId }: Props) {
                     );
                   })}
                 </div>
-                {Array.isArray(inf.datos_inspeccion.hallazgos) && inf.datos_inspeccion.hallazgos.length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-xs font-semibold text-muted-foreground">Hallazgos detectados</p>
-                    <ul className="ml-4 list-disc text-sm">
-                      {(inf.datos_inspeccion.hallazgos as string[]).map((h) => (
-                        <li key={h}>{h.replace(/_/g, " ")}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                {Object.entries(LISTAS).map(([k, label]) => {
+                  const lista = (inf.datos_inspeccion as Record<string, unknown>)[k];
+                  if (!Array.isArray(lista) || lista.length === 0) return null;
+                  return (
+                    <div key={k} className="mt-2">
+                      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
+                      <ul className="ml-4 list-disc text-sm">
+                        {(lista as string[]).map((h) => (
+                          <li key={h}>{h.replace(/_/g, " ")}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
               </section>
             )}
 
@@ -188,10 +216,21 @@ export function InformeTecnicoDialog({ open, onClose, informeId }: Props) {
           </div>
         )}
 
-        {inf && emailMode && (
+        {inf && mode === "edit" && (
+          <InformeTecnicoForm
+            informe={inf}
+            onCancel={() => setMode("view")}
+            onSaved={(actualizado) => {
+              setInf(actualizado);
+              setMode("view");
+            }}
+          />
+        )}
+
+        {inf && mode === "email" && (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              El PDF se adjuntará automáticamente. El correo sale desde <strong>notificaciones@medicvip.org</strong>.
+              El PDF se adjuntará automáticamente. El correo sale desde <strong>notificaciones@techtrafo.com</strong>.
             </p>
             <div className="space-y-1">
               <Label htmlFor="to">Para *</Label>
@@ -212,27 +251,35 @@ export function InformeTecnicoDialog({ open, onClose, informeId }: Props) {
           </div>
         )}
 
-        <DialogFooter className="gap-2">
-          {!emailMode ? (
-            <>
-              <Button variant="outline" onClick={onClose}>Cerrar</Button>
-              <Button variant="outline" onClick={descargarPdf}>
-                <FileDown className="mr-1 h-4 w-4" /> Descargar PDF
-              </Button>
-              <Button onClick={() => setEmailMode(true)}>
-                <Mail className="mr-1 h-4 w-4" /> Enviar por email
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="outline" onClick={() => setEmailMode(false)} disabled={enviando}>← Volver</Button>
-              <Button onClick={handleEnviar} disabled={enviando || !to.trim()}>
-                <Send className="mr-1 h-4 w-4" />
-                {enviando ? "Enviando..." : "Enviar"}
-              </Button>
-            </>
-          )}
-        </DialogFooter>
+        {/* Footer solo si NO estamos en edit (el form tiene su propio footer) */}
+        {mode !== "edit" && (
+          <DialogFooter className="gap-2">
+            {mode === "view" ? (
+              <>
+                <Button variant="outline" onClick={onClose}>Cerrar</Button>
+                {editable && (
+                  <Button variant="outline" onClick={() => setMode("edit")}>
+                    <Pencil className="mr-1 h-4 w-4" /> Editar
+                  </Button>
+                )}
+                <Button variant="outline" onClick={descargarPdf}>
+                  <FileDown className="mr-1 h-4 w-4" /> Descargar PDF
+                </Button>
+                <Button onClick={() => setMode("email")}>
+                  <Mail className="mr-1 h-4 w-4" /> Enviar por email
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setMode("view")} disabled={enviando}>← Volver</Button>
+                <Button onClick={handleEnviar} disabled={enviando || !to.trim()}>
+                  <Send className="mr-1 h-4 w-4" />
+                  {enviando ? "Enviando..." : "Enviar"}
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );
