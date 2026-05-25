@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { withAppUser } from "../db/withAppUser";
 import { requireAuth, requirePermission } from "../auth/middleware";
+import { notificarRevisionCotizacion } from "../services/notificaciones";
 
 const router = Router();
 router.use(requireAuth);
@@ -658,6 +659,10 @@ router.post("/:id/revision-interna/solicitar", requirePermission("cotizaciones",
       `;
       await logRevisionHistorial(tx, id, 1, "solicitar", userId, req.user!.rol_nombre ?? null, null);
     });
+    // Notificar al rol del nivel 1 (gerencia_comercial). Best-effort.
+    void notificarRevisionCotizacion({
+      cotizacion_id: id, evento: "solicitada", nivel: 1, actor_user_id: userId,
+    }).catch((e) => console.error("[notif] cot rev solicitada fallo:", e));
     res.json({ status: "solicitada", nivel: 1, rol_destino: rolDeNivel(1) });
   } catch (err) {
     if (err instanceof Error) {
@@ -708,6 +713,11 @@ router.post("/:id/revision-interna/aprobar", requirePermission("cotizaciones", "
       `;
       await logRevisionHistorial(tx, id, nivelActual, "aprobar", userId, req.user!.rol_nombre ?? null, parsed.data.notas ?? null);
     });
+    // Notificar al solicitante original (vendedor) que ya fue aprobada
+    const cotPostAprobacion = await prisma.cotizaciones.findUnique({ where: { id }, select: { revision_interna_nivel: true } });
+    void notificarRevisionCotizacion({
+      cotizacion_id: id, evento: "aprobada", nivel: cotPostAprobacion?.revision_interna_nivel ?? 1, actor_user_id: userId, mensaje: parsed.data.notas ?? null,
+    }).catch((e) => console.error("[notif] cot rev aprobada fallo:", e));
     res.json({ status: "aprobada" });
   } catch (err) {
     if (err instanceof Error) {
@@ -758,6 +768,10 @@ router.post("/:id/revision-interna/rechazar", requirePermission("cotizaciones", 
       `;
       await logRevisionHistorial(tx, id, nivelActual, "rechazar", userId, req.user!.rol_nombre ?? null, motivo);
     });
+    const cotPostRechazo = await prisma.cotizaciones.findUnique({ where: { id }, select: { revision_interna_nivel: true } });
+    void notificarRevisionCotizacion({
+      cotizacion_id: id, evento: "rechazada", nivel: cotPostRechazo?.revision_interna_nivel ?? 1, actor_user_id: userId, mensaje: motivo,
+    }).catch((e) => console.error("[notif] cot rev rechazada fallo:", e));
     res.json({ status: "rechazada" });
   } catch (err) {
     if (err instanceof Error) {
@@ -808,6 +822,10 @@ router.post("/:id/revision-interna/escalar", requirePermission("cotizaciones", "
       `;
       await logRevisionHistorial(tx, id, nivelActual, "escalar", userId, req.user!.rol_nombre ?? null, mensaje);
     });
+    // Notificar al rol del nuevo nivel
+    void notificarRevisionCotizacion({
+      cotizacion_id: id, evento: "escalada", nivel: nivelNuevo, actor_user_id: userId, mensaje,
+    }).catch((e) => console.error("[notif] cot rev escalada fallo:", e));
     res.json({ status: "escalada", nivel: nivelNuevo, rol_destino: rolDeNivel(nivelNuevo) });
   } catch (err) {
     if (err instanceof Error) {

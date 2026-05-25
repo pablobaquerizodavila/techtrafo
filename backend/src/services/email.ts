@@ -200,6 +200,56 @@ export function templateEscalacionHito(c: ExpedienteContextoEmail & {
   return { subject, html, text };
 }
 
+// ===================================================================
+// Revision interna de cotizacion
+// ===================================================================
+export type EventoRevisionCotizacion = "solicitada" | "escalada" | "aprobada" | "rechazada";
+
+export function templateRevisionInternaCotizacion(c: {
+  evento: EventoRevisionCotizacion;
+  cotizacion_codigo: string;
+  cotizacion_id: number;
+  cliente_nombre: string;
+  total: string;
+  nivel: number;
+  nivel_label: string;     // "Gerencia Comercial" | "Gerencia General" | "Presidencia"
+  actor_nombre: string;    // quien solicito/escalo/aprobo/rechazo
+  mensaje?: string | null; // motivo de rechazo / mensaje de escalacion / notas
+}) {
+  const link = `${env.PANEL_URL.replace(/\/$/, "")}/cotizaciones/${c.cotizacion_id}`;
+  const verboMap: Record<EventoRevisionCotizacion, string> = {
+    solicitada: "Solicitud de revisión",
+    escalada:   "Escalación recibida",
+    aprobada:   "Cotización aprobada",
+    rechazada:  "Cotización rechazada",
+  };
+  const verbo = verboMap[c.evento];
+  const accionMsg: Record<EventoRevisionCotizacion, string> = {
+    solicitada: `<strong>${c.actor_nombre}</strong> solicita tu revisión y aprobación como <strong>${c.nivel_label}</strong>.`,
+    escalada:   `<strong>${c.actor_nombre}</strong> ha escalado la cotización a <strong>${c.nivel_label}</strong> para que decida sobre la aprobación.`,
+    aprobada:   `<strong>${c.actor_nombre}</strong> aprobó la cotización en nivel <strong>${c.nivel_label}</strong>. Ya puede enviarse al cliente.`,
+    rechazada:  `<strong>${c.actor_nombre}</strong> rechazó la cotización en nivel <strong>${c.nivel_label}</strong>. Revisa el motivo y corrige antes de re-solicitar.`,
+  };
+  const subject = `[TECHTRAFO] ${verbo} · Cotización ${c.cotizacion_codigo}`;
+  const mensajeBlock = c.mensaje
+    ? `<p><strong>${c.evento === "rechazada" ? "Motivo del rechazo" : c.evento === "escalada" ? "Mensaje" : "Notas"}:</strong></p>
+       <blockquote style="border-left:3px solid #cbd5e1;padding-left:10px;margin:8px 0;color:#475569;">${c.mensaje.replace(/\n/g, "<br>")}</blockquote>`
+    : "";
+  const html = layout(
+    `${verbo} — ${c.cotizacion_codigo}`,
+    `<p>${accionMsg[c.evento]}</p>
+     <ul>
+       <li><strong>Cotización:</strong> ${c.cotizacion_codigo}</li>
+       <li><strong>Cliente:</strong> ${c.cliente_nombre}</li>
+       <li><strong>Total:</strong> ${c.total}</li>
+     </ul>
+     ${mensajeBlock}
+     <p><a href="${link}" style="display:inline-block;background:#2563eb;color:white;padding:8px 14px;border-radius:6px;text-decoration:none;">Abrir cotización en el panel</a></p>`,
+  );
+  const text = `${verbo}: cotizacion ${c.cotizacion_codigo} - ${c.cliente_nombre} - total ${c.total}. ${c.actor_nombre} en nivel ${c.nivel_label}.${c.mensaje ? ` Mensaje: ${c.mensaje}` : ""} Link: ${link}`;
+  return { subject, html, text };
+}
+
 export function templateGarantiaPorVencer(c: {
   garantia_codigo: string;
   cliente_nombre: string;

@@ -13,11 +13,13 @@
  */
 import { prisma } from "../db/client";
 import {
+  EventoRevisionCotizacion,
   templateEscalacionHito,
   templateGarantiaPorVencer,
   templateHitoEsperaAprobacion,
   templateHitoEstancado,
   templateHitoResolucion,
+  templateRevisionInternaCotizacion,
   ExpedienteContextoEmail,
 } from "./email";
 
@@ -28,7 +30,11 @@ export type TipoNotificacion =
   | "hito_rechazado"
   | "hito_escalado"
   | "garantia_vence_30d"
-  | "garantia_vence_7d";
+  | "garantia_vence_7d"
+  | "cotizacion_revision_solicitada"
+  | "cotizacion_revision_escalada"
+  | "cotizacion_revision_aprobada"
+  | "cotizacion_revision_rechazada";
 
 interface CreateInput {
   tipo: TipoNotificacion;
@@ -345,4 +351,115 @@ export async function notificarGarantiaPorVencer(input: GarantiaPorVencerInput):
     },
   });
   return creada !== null;
+}
+
+// ===================================================================
+// Revision interna de cotizacion
+// ===================================================================
+const NIVEL_LABEL: Record<number, string> = {
+  1: "Gerencia Comercial",
+  2: "Gerencia General",
+  3: "Presidencia",
+};
+const NIVEL_ROL: Record<number, string> = {
+  1: "gerencia_comercial",
+  2: "gerencia_general",
+  3: "presidencia",
+};
+
+/**
+ * Notifica un evento de la revision interna de una cotizacion.
+ *
+ * Destinatarios segun evento:
+ *   - "solicitada" / "escalada" → todos los usuarios con el rol del nivel destino
+ *   - "aprobada" / "rechazada"  → el solicitante original (vendedor) que pidio la revision
+ *
+ * Devuelve el numero de notificaciones encoladas.
+ */
+export async function notificarRevisionCotizacion(input: {
+  cotizacion_id: number;
+  evento: EventoRevisionCotizacion;
+  // Para solicitada/escalada: nivel destino (al que se notifica)
+  // Para aprobada/rechazada: nivel en que se resolvio
+  nivel: number;
+  actor_user_id: string;        // quien hizo la accion (vendedor / aprobador / escalador)
+  mensaje?: string | null;      // motivo del rechazo / mensaje de escalacion / notas
+}): Promise<number> {
+  const cot = await prisma.cotizaciones.findUnique({
+    where: { id: input.cotizacion_id },
+    include: { clientes: { select: { razon_social: true } } },
+  });
+  if (!cot) return 0;
+
+  const actor = await prisma.usuarios.findUnique({
+    where: { id: input.actor_user_id },
+    select: { nombres: true, apellidos: true },
+  });
+  const actorNombre = actor ? `${actor.nombres} ${actor.apellidos}` : "Usuario del equipo";
+
+  // Resolver destinatarios segun evento
+  let destinatarios: Array<{ id: string; email: string | null }> = [];
+  if (input.evento === "solicitada" || input.evento === "escalada") {
+    const rolNombre = NIVEL_ROL[input.nivel];
+    if (!rolNombre) return 0;
+    const rol = await prisma.roles.findFirst({
+      where: { nombre: rolNombre, activo: true },
+      select: { id: true },
+    });
+    if (!rol) return 0;
+    destinatarios = await prisma.usuarios.findMany({
+      where: { rol_id: rol.id, estado_aprobacion: "aprobado", activo: true },
+      select: { id: true, email: true },
+    });
+  } else {
+    // aprobada / rechazada → notificar al solicitante original
+    if (cot.revision_interna_solicitada_por) {
+      const solicitante = await prisma.usuarios.findUnique({
+        where: { id: cot.revision_interna_solicitada_por },
+        select: { id: true, email: true },
+      });
+      if (solicitante) destinatarios = [solicitante];
+    }
+  }
+
+  if (destinatarios.length === 0) return 0;
+
+  const tipoMap: Record<EventoRevisionCotizacion, TipoNotificacion> = {
+    solicitada: "cotizacion_revision_solicitada",
+    escalada: "cotizacion_revision_escalada",
+    aprobada: "cotizacion_revision_aprobada",
+    rechazada: "cotizacion_revision_rechazada",
+  };
+
+  let creadas = 0;
+  for (const u of destinatarios) {
+    if (!u.email) continue;
+    const tpl = templateRevisionInternaCotizacion({
+      evento: input.evento,
+      cotizacion_codigo: cot.codigo,
+      cotizacion_id: input.cotizacion_id,
+      cliente_nombre: cot.clientes?.razon_social ?? "—",
+      total: `$${cot.total.toString()}`,
+      nivel: input.nivel,
+      nivel_label: NIVEL_LABEL[input.nivel] ?? `Nivel ${input.nivel}`,
+      actor_nombre: actorNombre,
+      mensaje: input.mensaje ?? null,
+    });
+    const created = await crear({
+      tipo: tipoMap[input.evento],
+      destinatario_id: u.id,
+      destinatario_email: u.email,
+      asunto: tpl.subject,
+      cuerpo_html: tpl.html,
+      cuerpo_texto: tpl.text,
+      contexto: {
+        cotizacion_id: input.cotizacion_id,
+        cotizacion_codigo: cot.codigo,
+        nivel: input.nivel,
+        actor_user_id: input.actor_user_id,
+      },
+    });
+    if (created) creadas++;
+  }
+  return creadas;
 }
