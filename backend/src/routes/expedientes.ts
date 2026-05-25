@@ -74,6 +74,67 @@ async function generarCodigoExpediente(tx: Prisma.TransactionClient, year: numbe
 }
 
 // ===================================================================
+// Gating de acciones sobre hitos.
+//
+// Regla: solo los roles designados al hito (responsable o aprobador) pueden
+// interactuar con el. Excepcion: roles de override (presidencia / gerencia
+// general / gerencia comercial) y super_admin pueden todo. El resto recibe 403.
+//
+// NOTA: 'presidencia' ademas tiene es_super_admin=true en el seed, asi que
+// queda cubierto por ese atajo. Lo incluyo en la lista por claridad y para
+// proteger ante cambios futuros del flag.
+// ===================================================================
+const ROLES_OVERRIDE_EXPEDIENTE = ["presidencia", "gerencia_general", "gerencia_comercial"];
+
+interface ActorUser {
+  id: string;
+  rol_id: number | null;
+  rol_nombre: string | null;
+  es_super_admin: boolean;
+}
+
+function esOverrideExpediente(user: ActorUser): boolean {
+  if (user.es_super_admin) return true;
+  return !!user.rol_nombre && ROLES_OVERRIDE_EXPEDIENTE.includes(user.rol_nombre);
+}
+
+type AccionHito =
+  | "iniciar"
+  | "aprobar"
+  | "rechazar"
+  | "reintentar"
+  | "reabrir_anterior"
+  | "escalar"
+  | "editar_sla";
+
+function puedeActuarEnHito(
+  user: ActorUser,
+  hito: { responsable_id: string | null; rol_aprobador_id: number | null },
+  accion: AccionHito,
+): boolean {
+  if (esOverrideExpediente(user)) return true;
+  switch (accion) {
+    case "iniciar":
+      // Sin responsable: lo reclama quien arranca. Con responsable: debe ser el mismo.
+      return hito.responsable_id === null || hito.responsable_id === user.id;
+    case "aprobar":
+    case "rechazar":
+      // Solo el rol designado como aprobador del hito
+      return hito.rol_aprobador_id !== null && user.rol_id === hito.rol_aprobador_id;
+    case "reintentar":
+    case "reabrir_anterior":
+    case "escalar":
+      // El responsable del hito rechazado (o el que lo era al momento del rechazo)
+      return hito.responsable_id !== null && hito.responsable_id === user.id;
+    case "editar_sla":
+      // Solo override
+      return false;
+    default:
+      return false;
+  }
+}
+
+// ===================================================================
 // GET /api/expedientes  -  lista paginada con filtros
 // ===================================================================
 router.get("/", requirePermission("expedientes", "read"), async (req, res) => {
@@ -407,6 +468,10 @@ router.patch("/:id/hitos/:hitoId", requirePermission("expedientes", "write"), as
     res.status(404).json({ error: "not_found" });
     return;
   }
+  if (!puedeActuarEnHito(req.user!, hito, "editar_sla")) {
+    res.status(403).json({ error: "rol_no_designado", accion: "editar_sla" });
+    return;
+  }
 
   await withAppUser(userId, async (tx) => {
     await tx.$executeRaw`
@@ -450,6 +515,7 @@ router.post("/:id/hitos/:hitoId/iniciar", requirePermission("expedientes", "writ
       if (hito.estado !== "no_iniciado" && hito.estado !== "bloqueado") {
         throw new Error("estado_invalido");
       }
+      if (!puedeActuarEnHito(req.user!, hito, "iniciar")) throw new Error("rol_no_designado");
 
       const respId = parsed.data.responsable_id ?? userId;
       await tx.$executeRaw`
@@ -477,6 +543,10 @@ router.post("/:id/hitos/:hitoId/iniciar", requirePermission("expedientes", "writ
       }
       if (err.message === "estado_invalido") {
         res.status(409).json({ error: "estado_invalido" });
+        return;
+      }
+      if (err.message === "rol_no_designado") {
+        res.status(403).json({ error: "rol_no_designado", accion: "iniciar" });
         return;
       }
     }
@@ -510,12 +580,9 @@ router.post("/:id/hitos/:hitoId/aprobar", requirePermission("expedientes", "apro
       });
       if (!hito || Number(hito.expediente_id) !== id) throw new Error("not_found");
 
-      // Chequear rol aprobador si el hito lo exige
-      if (hito.requiere_aprobacion && hito.rol_aprobador_id) {
-        // El user actual debe tener ese rol o ser super_admin
-        if (!req.user!.es_super_admin && req.user!.rol_id !== hito.rol_aprobador_id) {
-          throw new Error("rol_aprobador_incorrecto");
-        }
+      // Solo el rol designado como aprobador (o un rol override) puede aprobar.
+      if (!puedeActuarEnHito(req.user!, hito, "aprobar")) {
+        throw new Error("rol_no_designado");
       }
 
       if (hito.estado === "completado") throw new Error("ya_completado");
@@ -571,8 +638,8 @@ router.post("/:id/hitos/:hitoId/aprobar", requirePermission("expedientes", "apro
         res.status(404).json({ error: "not_found" });
         return;
       }
-      if (err.message === "rol_aprobador_incorrecto") {
-        res.status(403).json({ error: "rol_aprobador_incorrecto" });
+      if (err.message === "rol_no_designado") {
+        res.status(403).json({ error: "rol_no_designado", accion: "aprobar" });
         return;
       }
       if (err.message === "ya_completado") {
@@ -608,10 +675,9 @@ router.post("/:id/hitos/:hitoId/rechazar", requirePermission("expedientes", "apr
       const hito = await tx.expediente_hitos.findUnique({ where: { id: hitoId } });
       if (!hito || Number(hito.expediente_id) !== id) throw new Error("not_found");
 
-      if (hito.requiere_aprobacion && hito.rol_aprobador_id) {
-        if (!req.user!.es_super_admin && req.user!.rol_id !== hito.rol_aprobador_id) {
-          throw new Error("rol_aprobador_incorrecto");
-        }
+      // Solo el rol designado como aprobador (o un rol override) puede rechazar.
+      if (!puedeActuarEnHito(req.user!, hito, "rechazar")) {
+        throw new Error("rol_no_designado");
       }
 
       await tx.$executeRaw`
@@ -637,8 +703,8 @@ router.post("/:id/hitos/:hitoId/rechazar", requirePermission("expedientes", "apr
         res.status(404).json({ error: "not_found" });
         return;
       }
-      if (err.message === "rol_aprobador_incorrecto") {
-        res.status(403).json({ error: "rol_aprobador_incorrecto" });
+      if (err.message === "rol_no_designado") {
+        res.status(403).json({ error: "rol_no_designado", accion: "rechazar" });
         return;
       }
     }
@@ -665,6 +731,7 @@ router.post("/:id/hitos/:hitoId/reintentar", requirePermission("expedientes", "w
       const hito = await tx.expediente_hitos.findUnique({ where: { id: hitoId } });
       if (!hito || Number(hito.expediente_id) !== id) throw new Error("not_found");
       if (hito.estado !== "rechazado") throw new Error("solo_hito_rechazado");
+      if (!puedeActuarEnHito(req.user!, hito, "reintentar")) throw new Error("rol_no_designado");
 
       await tx.$executeRaw`
         UPDATE comercial.expediente_hitos
@@ -684,6 +751,7 @@ router.post("/:id/hitos/:hitoId/reintentar", requirePermission("expedientes", "w
     if (err instanceof Error) {
       if (err.message === "not_found") { res.status(404).json({ error: "not_found" }); return; }
       if (err.message === "solo_hito_rechazado") { res.status(409).json({ error: "solo_hito_rechazado" }); return; }
+      if (err.message === "rol_no_designado") { res.status(403).json({ error: "rol_no_designado", accion: "reintentar" }); return; }
     }
     throw err;
   }
@@ -721,6 +789,7 @@ router.post("/:id/hitos/:hitoId/reabrir-anterior", requirePermission("expediente
       if (!anterior || Number(anterior.expediente_id) !== id) throw new Error("anterior_not_found");
       if (anterior.orden >= actual.orden) throw new Error("hito_anterior_invalido");
       if (actual.estado !== "rechazado") throw new Error("solo_hito_rechazado");
+      if (!puedeActuarEnHito(req.user!, actual, "reabrir_anterior")) throw new Error("rol_no_designado");
 
       // Reabre ambos: anterior queda no_iniciado, actual tambien (vuelve a estar disponible)
       await tx.$executeRaw`
@@ -741,9 +810,14 @@ router.post("/:id/hitos/:hitoId/reabrir-anterior", requirePermission("expediente
       const map: Record<string, number> = {
         not_found: 404, anterior_not_found: 404,
         hito_anterior_invalido: 409, solo_hito_rechazado: 409,
+        rol_no_designado: 403,
       };
       const code = map[err.message];
-      if (code) { res.status(code).json({ error: err.message }); return; }
+      if (code) {
+        const body: Record<string, unknown> = { error: err.message };
+        if (err.message === "rol_no_designado") body.accion = "reabrir_anterior";
+        res.status(code).json(body); return;
+      }
     }
     throw err;
   }
@@ -780,6 +854,7 @@ router.post("/:id/hitos/:hitoId/escalar", requirePermission("expedientes", "writ
       const hito = await tx.expediente_hitos.findUnique({ where: { id: hitoId } });
       if (!hito || Number(hito.expediente_id) !== id) throw new Error("not_found");
       if (hito.estado !== "rechazado") throw new Error("solo_hito_rechazado");
+      if (!puedeActuarEnHito(req.user!, hito, "escalar")) throw new Error("rol_no_designado");
 
       const metadataActual = (hito.metadata as Record<string, unknown>) ?? {};
       const metadataNueva = {
@@ -816,6 +891,7 @@ router.post("/:id/hitos/:hitoId/escalar", requirePermission("expedientes", "writ
     if (err instanceof Error) {
       if (err.message === "not_found") { res.status(404).json({ error: "not_found" }); return; }
       if (err.message === "solo_hito_rechazado") { res.status(409).json({ error: "solo_hito_rechazado" }); return; }
+      if (err.message === "rol_no_designado") { res.status(403).json({ error: "rol_no_designado", accion: "escalar" }); return; }
     }
     throw err;
   }
@@ -835,6 +911,11 @@ router.post("/:id/cancelar", requirePermission("expedientes", "write"), async (r
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) {
     res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  // Cancelar el expediente es decision de alto nivel — solo override puede.
+  if (!esOverrideExpediente(req.user!)) {
+    res.status(403).json({ error: "rol_no_designado", accion: "cancelar_expediente" });
     return;
   }
   const parsed = cancelarSchema.safeParse(req.body);

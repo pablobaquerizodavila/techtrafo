@@ -40,11 +40,13 @@ import {
   canalOrigenLabel,
   cancelarExpediente,
   escalarHito,
+  esOverrideExpediente,
   estadoExpedienteVariant,
   estadoHitoIcon,
   estadoHitoVariant,
   getExpediente,
   iniciarHito,
+  puedeActuarEnHito,
   reabrirHitoAnterior,
   reactivarExpediente,
   rechazarHito,
@@ -469,8 +471,17 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
         <div className="space-y-2">
           {hitos.map((h) => {
             const isWorking = working === h.id;
-            const puedeIniciar = h.estado === "no_iniciado" || h.estado === "bloqueado";
-            const puedeAprobar = h.estado === "en_curso";
+            const estadoPermiteIniciar = h.estado === "no_iniciado" || h.estado === "bloqueado";
+            const estadoPermiteAprobar = h.estado === "en_curso";
+            // Gating por rol — el backend valida igual, esto solo oculta botones.
+            const canIniciar  = estadoPermiteIniciar  && puedeActuarEnHito(currentUser, h, "iniciar");
+            const canAprobar  = estadoPermiteAprobar  && puedeActuarEnHito(currentUser, h, "aprobar");
+            const canRechazar = estadoPermiteAprobar  && puedeActuarEnHito(currentUser, h, "rechazar");
+            const canReintentar  = puedeActuarEnHito(currentUser, h, "reintentar");
+            const canReabrir     = puedeActuarEnHito(currentUser, h, "reabrir_anterior");
+            const canEscalar     = puedeActuarEnHito(currentUser, h, "escalar");
+            const canCancelarExp = esOverrideExpediente(currentUser);
+            const canEditarSla   = esOverrideExpediente(currentUser);
             return (
               <div
                 key={h.id}
@@ -528,25 +539,33 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
                         <strong>Motivo rechazo:</strong> {h.motivo_rechazo}
                       </p>
                     )}
-                    {h.estado === "rechazado" && (
+                    {h.estado === "rechazado" && (canReintentar || canReabrir || canEscalar || canCancelarExp) && (
                       <div className="mt-2 rounded-md border border-orange-300 bg-orange-50 p-3">
                         <p className="mb-2 text-xs font-semibold text-orange-900">¿Cómo seguimos?</p>
                         <div className="flex flex-wrap gap-2">
-                          <Button size="sm" variant="outline" onClick={() => handleReintentarHito(h)} disabled={savingRechazoAccion}>
-                            <RotateCcw className="mr-1 h-3.5 w-3.5" /> Reintentar este hito
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => setRechazoDialog({ kind: "reabrir-anterior", hito: h, hitoAnteriorId: null })} disabled={savingRechazoAccion}>
-                            <Undo2 className="mr-1 h-3.5 w-3.5" /> Volver a un hito anterior
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => {
-                            const defaultRol = rolesGerencia.find((r) => r.nombre === "gerencia_comercial") ?? rolesGerencia[0] ?? null;
-                            setRechazoDialog({ kind: "escalar", hito: h, mensaje: "", rolDestinoId: defaultRol?.id ?? null });
-                          }} disabled={savingRechazoAccion}>
-                            <ArrowUpToLine className="mr-1 h-3.5 w-3.5" /> Escalar
-                          </Button>
-                          <Button size="sm" variant="destructive" onClick={() => setRechazoDialog({ kind: "cancelar", motivo: h.motivo_rechazo ?? "" })} disabled={savingRechazoAccion}>
-                            <Ban className="mr-1 h-3.5 w-3.5" /> Cerrar expediente
-                          </Button>
+                          {canReintentar && (
+                            <Button size="sm" variant="outline" onClick={() => handleReintentarHito(h)} disabled={savingRechazoAccion}>
+                              <RotateCcw className="mr-1 h-3.5 w-3.5" /> Reintentar este hito
+                            </Button>
+                          )}
+                          {canReabrir && (
+                            <Button size="sm" variant="outline" onClick={() => setRechazoDialog({ kind: "reabrir-anterior", hito: h, hitoAnteriorId: null })} disabled={savingRechazoAccion}>
+                              <Undo2 className="mr-1 h-3.5 w-3.5" /> Volver a un hito anterior
+                            </Button>
+                          )}
+                          {canEscalar && (
+                            <Button size="sm" variant="outline" onClick={() => {
+                              const defaultRol = rolesGerencia.find((r) => r.nombre === "gerencia_comercial") ?? rolesGerencia[0] ?? null;
+                              setRechazoDialog({ kind: "escalar", hito: h, mensaje: "", rolDestinoId: defaultRol?.id ?? null });
+                            }} disabled={savingRechazoAccion}>
+                              <ArrowUpToLine className="mr-1 h-3.5 w-3.5" /> Escalar
+                            </Button>
+                          )}
+                          {canCancelarExp && (
+                            <Button size="sm" variant="destructive" onClick={() => setRechazoDialog({ kind: "cancelar", motivo: h.motivo_rechazo ?? "" })} disabled={savingRechazoAccion}>
+                              <Ban className="mr-1 h-3.5 w-3.5" /> Cerrar expediente
+                            </Button>
+                          )}
                         </div>
                       </div>
                     )}
@@ -556,29 +575,31 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
 
                     {/* Acciones */}
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {puedeIniciar && (
+                      {canIniciar && (
                         <Button size="sm" variant="outline" onClick={() => handleIniciar(h)} disabled={isWorking}>
                           <Play className="mr-1 h-3.5 w-3.5" /> Iniciar
                         </Button>
                       )}
-                      {puedeAprobar && (
-                        <>
-                          <Button size="sm" onClick={() => handleAprobar(h)} disabled={isWorking}>
-                            <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Aprobar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleRechazar(h)}
-                            disabled={isWorking}
-                          >
-                            <XCircle className="mr-1 h-3.5 w-3.5" /> Rechazar
-                          </Button>
-                        </>
+                      {canAprobar && (
+                        <Button size="sm" onClick={() => handleAprobar(h)} disabled={isWorking}>
+                          <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Aprobar
+                        </Button>
                       )}
-                      <Button size="sm" variant="ghost" onClick={() => openSlaDialog(h)} title="Editar SLA solo para este expediente">
-                        <Clock className="mr-1 h-3.5 w-3.5" /> SLA
-                      </Button>
+                      {canRechazar && (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleRechazar(h)}
+                          disabled={isWorking}
+                        >
+                          <XCircle className="mr-1 h-3.5 w-3.5" /> Rechazar
+                        </Button>
+                      )}
+                      {canEditarSla && (
+                        <Button size="sm" variant="ghost" onClick={() => openSlaDialog(h)} title="Editar SLA solo para este expediente">
+                          <Clock className="mr-1 h-3.5 w-3.5" /> SLA
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>

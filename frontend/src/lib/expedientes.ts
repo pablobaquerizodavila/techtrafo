@@ -251,3 +251,65 @@ export function canalOrigenLabel(c: CanalOrigen | null): string {
     otro: "Otro",
   }[c];
 }
+
+// ===================================================================
+// Gating de acciones sobre hitos (mirror del helper del backend en
+// backend/src/routes/expedientes.ts). Regla:
+//
+//   - super_admin o roles override (presidencia / gerencia_general /
+//     gerencia_comercial): pueden todo
+//   - iniciar: el responsable asignado (o si no hay responsable, cualquiera)
+//   - aprobar / rechazar: solo el rol que coincide con rol_aprobador_id
+//   - reintentar / reabrir_anterior / escalar: el responsable del hito
+//   - editar_sla: solo override
+//
+// Esto es para hide/disable de botones en la UI. El backend es la fuente de
+// verdad y devuelve 403 con error="rol_no_designado" si alguien intenta saltarse.
+// ===================================================================
+const ROLES_OVERRIDE_EXPEDIENTE = ["presidencia", "gerencia_general", "gerencia_comercial"];
+
+export type AccionHito =
+  | "iniciar"
+  | "aprobar"
+  | "rechazar"
+  | "reintentar"
+  | "reabrir_anterior"
+  | "escalar"
+  | "editar_sla";
+
+export interface UserGate {
+  id: string;
+  rol_id: number | null;
+  rol_nombre: string | null;
+  es_super_admin: boolean;
+}
+
+export function esOverrideExpediente(user: UserGate | null): boolean {
+  if (!user) return false;
+  if (user.es_super_admin) return true;
+  return !!user.rol_nombre && ROLES_OVERRIDE_EXPEDIENTE.includes(user.rol_nombre);
+}
+
+export function puedeActuarEnHito(
+  user: UserGate | null,
+  hito: { responsable_id: string | null; rol_aprobador_id: number | null },
+  accion: AccionHito,
+): boolean {
+  if (!user) return false;
+  if (esOverrideExpediente(user)) return true;
+  switch (accion) {
+    case "iniciar":
+      return hito.responsable_id === null || hito.responsable_id === user.id;
+    case "aprobar":
+    case "rechazar":
+      return hito.rol_aprobador_id !== null && user.rol_id === hito.rol_aprobador_id;
+    case "reintentar":
+    case "reabrir_anterior":
+    case "escalar":
+      return hito.responsable_id !== null && hito.responsable_id === user.id;
+    case "editar_sla":
+      return false;
+    default:
+      return false;
+  }
+}
