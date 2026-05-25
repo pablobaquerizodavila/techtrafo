@@ -3,7 +3,7 @@
 > Plataforma de gestión empresarial para TECHTRAFO, empresa dedicada a la reparación, mantenimiento, ensamblaje y fabricación de transformadores eléctricos de 150 kVA hasta 10 MVA en Samborondón, Ecuador.
 
 ![Estado](https://img.shields.io/badge/estado-en%20producci%C3%B3n%20interna-success)
-![Versión](https://img.shields.io/badge/versión-0.12.0-blue)
+![Versión](https://img.shields.io/badge/versión-0.13.0-blue)
 ![Licencia](https://img.shields.io/badge/licencia-privada-red)
 
 **URLs públicas:**
@@ -20,7 +20,11 @@ Sistema digital integral que orquesta toda la operación de TECHTRAFO desde el p
 
 **Cubre hoy:**
 - **Comercial** — clientes, cotizaciones con revisiones, contratos con plan de pagos
+- **Cotizaciones automáticas desde plantilla** — plantillas maestras con componentes (materia prima de bodega + mano de obra h×tarifa + servicios externos + ensayos + transporte + indirectos); al generar una cotización el sistema **verifica stock contra bodega** y marca líneas como **pendientes de aprovisionamiento** con días estimados; el **costo se sincroniza automáticamente desde `inventario.items.costo_referencia`** al momento de emitir, no se cachea en la plantilla
+- **Revisión interna escalonada de cotizaciones** — antes de poder enviar al cliente, una cotización pasa por `Gerencia Comercial → Gerencia General → Presidencia` (nivel actual avanza con "Escalar"); cada nivel puede aprobar, rechazar (vuelve al vendedor con motivo) o escalar; aprobación final habilita `Enviar al cliente`; historial completo de eventos persistido en `cotizacion_revision_interna_historial`; **notificaciones email automáticas** al rol destino al solicitar/escalar y al vendedor al aprobar/rechazar
 - **Expedientes** — hoja de ruta del pedido del cliente con hitos auditables, **gates de aprobación**, **cronómetros en tiempo real por hito**, **4 acciones post-rechazo** (reintentar / reabrir hito anterior / escalar a otro rol / cancelar expediente) y **reactivación** desde estado terminal para Presidencia/Gerencia General/Gerencia Comercial
+- **Gating de acciones por rol designado** — solo el responsable del hito o el rol aprobador pueden interactuar con él; override automático para Presidencia / Gerencia General / Gerencia Comercial; backend valida con 403 si alguien intenta saltarse y el frontend oculta botones que el usuario no puede usar
+- **Atajos contextuales en hitos** — desde el detalle del expediente, cada hito muestra un botón "Ver / Emitir documento" según corresponda (cotización, contrato, OT, informe técnico) para que el aprobador revise sin perder contexto. "Emitir" linkea a `/cotizaciones/nueva?expediente_id=X` con auto-link al expediente al guardar
 - **SLA editable** — plantilla maestra de hitos y override per-expediente desde la UI, con badge de "estancado" calculado en vivo
 - **Visita técnica con formulario estandarizado** — secciones de datos generales, mediciones (V/I/aceite), hallazgos check-list, recomendación; al guardar genera **Informe Técnico** numerado automáticamente y descargable como PDF o despachable por email al cliente
 - **Producción** — Órdenes de Trabajo (OT) con pipelines de pasos por tipo de ruta (9 / 11 / 6 pasos para reparación / fabricación / mantenimiento) y gates de QA, **Gantt visual** plan vs real, **evidencias** (fotos / PDFs) por paso y **trazabilidad** completa de cambios
@@ -87,12 +91,12 @@ PC Ubuntu 192.168.0.23  (Docker Compose stack)
 
 ### Modelo de datos
 
-5 schemas en PostgreSQL, ~45 tablas + 7+ vistas:
+5 schemas en PostgreSQL, ~48 tablas + 7+ vistas:
 
 | Schema | Tablas principales | Qué contiene |
 |---|---|---|
 | `core` | roles, **usuarios (con `cliente_id` opcional y `token_version`)**, configuracion, auditoria, notificaciones | Auth, audit log, cola de email, revocación JWT |
-| `comercial` | clientes, cliente_contactos, cotizaciones, cotizacion_lineas, cotizacion_revisiones, contratos, contrato_pagos, expedientes, expediente_hitos, hito_plantillas, visitas_tecnicas (con `datos_inspeccion JSONB`), informes_tecnicos (con `datos_inspeccion JSONB`), hito_estados_cliente | Pipeline comercial + hoja de ruta + formulario estandarizado de visita |
+| `comercial` | clientes, cliente_contactos, cotizaciones (con campos de **revisión interna**: estado/nivel/solicitada_por/resuelta_por/motivo), cotizacion_lineas (con `pendiente_aprovisionamiento`, `tiempo_aprovisionamiento_dias`, `categoria`), cotizacion_revisiones, **cotizacion_plantillas + plantilla_componentes**, **cotizacion_revision_interna_historial**, contratos, contrato_pagos, expedientes (con `plantilla_id` opcional), expediente_hitos, hito_plantillas, visitas_tecnicas, informes_tecnicos, hito_estados_cliente | Pipeline comercial + plantillas de cotización + revisión interna jerárquica + hoja de ruta + formulario estandarizado de visita |
 | `inventario` | categorias_item, ubicaciones, items, lotes, series, stock, movimientos_stock | Bodega con trazabilidad por lote/serie |
 | `produccion` | ot, ot_pasos, ot_evidencias, paso_plantillas, transformadores, areas, causas_demora, reprocesos, tiempos_trabajo | OT con pasos y gates + transformadores + áreas/causas/tiempos |
 | `posventa` | garantias (con FK opcional a transformadores), reclamos, intervenciones | Garantías + reclamos + dictámenes |
@@ -133,7 +137,7 @@ techtrafo/
 │   │   └── block-credential-scans.conf           # snippet anti scan .env/.git/wp-*
 │   └── scripts/
 ├── database/
-│   ├── migrations/                               # 001 init -> 016 datos-inspeccion
+│   ├── migrations/                               # 001 init -> 018 cotizacion-plantillas
 │   └── seeds/
 ├── backend/
 │   ├── Dockerfile.dev
@@ -146,7 +150,9 @@ techtrafo/
 │       ├── auth/                                 # JWT + bcrypt + permisos + token_version + CSRF
 │       ├── routes/
 │       │   ├── health.ts, auth.ts, clientes.ts
-│       │   ├── cotizaciones.ts, contratos.ts, inventario.ts
+│       │   ├── cotizaciones.ts                    # CRUD + transiciones + revisión interna + desde-plantilla
+│       │   ├── cotizacion-plantillas.ts            # CRUD plantillas + componentes (override-only)
+│       │   ├── contratos.ts, inventario.ts
 │       │   ├── admin.ts                          # usuarios + roles + reset password + hito-plantillas
 │       │   ├── expedientes.ts                    # incluye reintentar/reabrir/escalar/cancelar/reactivar
 │       │   ├── visitas-tecnicas.ts, informes-tecnicos.ts
@@ -180,7 +186,7 @@ techtrafo/
         │       ├── produccion/
         │       ├── notificaciones/
         │       ├── perfil/                       # self-service email + password
-        │       └── admin/usuarios, admin/roles, admin/hito-plantillas
+        │       └── admin/usuarios, admin/roles, admin/hito-plantillas, admin/cotizacion-plantillas
         ├── components/
         │   ├── ui/                               # shadcn
         │   ├── cronometro.tsx                    # contador horas:minutos en vivo
@@ -226,7 +232,7 @@ Bloques principales:
 - **Panel/Portal**: `PANEL_URL=https://panel.techtrafo.com`, `PORTAL_URL=https://portal.techtrafo.com`, `NOTIF_WORKER_INTERVAL_SECONDS=300`, `GARANTIAS_WORKER_INTERVAL_SECONDS=86400`
 - **Uploads**: `UPLOAD_DIR=/uploads`
 
-## API endpoints actuales (v0.12.0)
+## API endpoints actuales (v0.13.0)
 
 ### Public
 | Método | Ruta | Descripción |
@@ -242,10 +248,11 @@ Bloques principales:
 | Usuario actual | `/api/auth/me` | GET / PATCH (self-service email) |
 | Cambio password | `/api/auth/change-password` | POST (rate-limited) |
 | Clientes | `/api/clientes` | GET (paginado/filtros), GET `:id`, POST, PATCH, DELETE (soft) — todos con `requirePermission` |
-| Cotizaciones | `/api/cotizaciones` | CRUD + transiciones + revisiones |
+| Cotizaciones | `/api/cotizaciones` | CRUD + transiciones + revisiones + **POST `/desde-plantilla`** (genera con check de stock) + **revisión interna** (`/:id/revision-interna/{solicitar,aprobar,rechazar,escalar}` + `/historial`) |
+| Plantillas cotización | `/api/cotizacion-plantillas` | CRUD plantillas + componentes (solo override roles) |
 | Contratos | `/api/contratos` | CRUD + plan de pagos |
 | Inventario | `/api/inventario` | Catálogo + stock + movimientos |
-| Expedientes | `/api/expedientes` | CRUD + `/:id/hitos/:hitoId/{iniciar,aprobar,rechazar,reintentar,reabrir-anterior,escalar}` + PATCH SLA + `/:id/{cancelar,reactivar}` + `/dashboard/resumen` |
+| Expedientes | `/api/expedientes` | CRUD + `/:id/hitos/:hitoId/{iniciar,aprobar,rechazar,reintentar,reabrir-anterior,escalar}` con **gating por rol designado + override** + PATCH SLA (solo override) + `/:id/{cancelar,reactivar}` (solo override) + `/dashboard/resumen` |
 | Visitas técnicas | `/api/visitas-tecnicas` | CRUD + persistencia de `datos_inspeccion JSONB` |
 | Informes técnicos | `/api/informes-tecnicos` | CRUD + auto-numeración INF-YYYY-NNNN + descargar PDF + enviar por email |
 | OT | `/api/ot` | CRUD + transiciones + pasos + Gantt + evidencias + dashboard |
@@ -341,7 +348,49 @@ Bloques principales:
 - `/api/notificaciones` y `/api/notificaciones/resumen` filtran con `NOT EXISTS` contra expedientes en estado `cancelado/ganado/perdido`
 - Las notificaciones siguen en DB para auditoría pero no aparecen en la UI
 
+### Gating de acciones en expedientes por rol designado (v0.13.0)
+- Cada acción sobre un hito (iniciar / aprobar / rechazar / reintentar / reabrir / escalar) requiere que el usuario sea el **responsable** o el **rol aprobador** del hito, o pertenezca a un rol **override** (`presidencia` / `gerencia_general` / `gerencia_comercial`) o sea `super_admin`
+- Editar SLA del hito y cancelar el expediente: solo override
+- Backend valida con 403 `rol_no_designado`; frontend oculta botones que el usuario no puede usar (defensa en profundidad)
+
+### Atajos contextuales y auto-link en expedientes (v0.13.0)
+- Cada hito muestra un botón "Ver / Emitir documento" según corresponda (cotización, contrato, OT, informe técnico)
+- Click en "Emitir cotización" → `/cotizaciones/nueva?expediente_id=X` con cliente pre-seleccionado
+- Al crear cotización desde ese flow: el backend hace **auto-link** (`expedientes.cotizacion_id = nueva.id`), valida cliente coincide y estado activo, y redirige de vuelta al expediente
+
+### Revisión interna escalonada de cotizaciones (v0.13.0)
+- Migration 017: 6 columnas en `cotizaciones` (`revision_interna_estado/nivel/solicitada_por/...`) + tabla `cotizacion_revision_interna_historial`
+- Flujo: `borrador` → "Solicitar revisión interna" → `pendiente nivel 1` (Gerencia Comercial) → puede aprobar / rechazar (devuelve a vendedor con motivo) / escalar a nivel 2 (Gerencia General) → puede repetir / escalar a nivel 3 (Presidencia, tope) → aprobada → habilita "Enviar al cliente"
+- 4 endpoints: `POST /api/cotizaciones/:id/revision-interna/{solicitar,aprobar,rechazar,escalar}` + `GET /historial`
+- Solo el rol del nivel actual (o override) puede actuar — backend valida 403 `rol_no_designado`
+- Bloqueo: `enviar` al cliente devuelve 409 `revision_interna_pendiente` si no fue aprobada
+- Panel visual en `/cotizaciones/[id]` con badge de estado por color + botones contextuales + historial expandible
+- **Notificaciones email automáticas** (templates en `email.ts > templateRevisionInternaCotizacion`):
+  - Solicitar / Escalar → notifica a todos los usuarios del rol destino
+  - Aprobar / Rechazar → notifica al vendedor original
+
+### Plantillas de cotización con check de stock (v0.13.0)
+- Migration 018: tablas `cotizacion_plantillas` + `plantilla_componentes` + 3 columnas nuevas en `cotizacion_lineas` (`pendiente_aprovisionamiento`, `tiempo_aprovisionamiento_dias`, `categoria`) + `cotizaciones.plantilla_id` + `cotizaciones.contingencia_porcentaje`
+- CRUD de plantillas en `/admin/cotizacion-plantillas` (solo override)
+- Cabecera de plantilla: código, nombre, tipo de servicio, rango kVA, margen % + contingencia % + IVA % + tiempo entrega base + condiciones de pago default
+- Componentes con 11 categorías: `materia_prima` / `consumible` / `mano_obra` / `servicio_externo` / `ensayo` / `transporte` / `documentacion` / `garantia` / `indirecto` / `imprevisto` / `otro`
+- Editor con **autocomplete de items de bodega**: el usuario tipea código (acepta letras+números) → datalist nativo sugiere; al elegir → autollena `unidad_medida`, `costo_unitario_default` (desde `costo_referencia` del item) y `descripcion` (si está vacía)
+- Endpoint `POST /api/cotizaciones/desde-plantilla` materializa la cotización:
+  - Para cada componente con `item_id`: **re-lee el costo actual** de `inventario.items` (no usa el cache de la plantilla — precio siempre sincronizado con bodega)
+  - Suma `inventario.stock` por item y compara contra cantidad pedida; si falta stock → marca línea con flag + tiempo de aprovisionamiento
+  - Calcula precio = `costo × (1+contingencia%) × (1+margen%)` cuando `precio_unitario_default=0`
+  - Tiempo entrega total = `base + max(días_aprovisionamiento)` con texto descriptivo
+- UI: badge amarillo "🛒 Pendiente compra · Xd" en líneas afectadas; categoría como badge gris
+- PDF: marca `*` en descripción de líneas pendientes + nota cursiva al pie de la tabla
+
+### Fixes técnicos relevantes (v0.13.0)
+- **PDF — recursión infinita en `pintarPie`**: `doc.text()` a `y=h-28` (debajo del bottom margin) disparaba `addPage` → listener `pageAdded` → loop infinito → "Maximum call stack size exceeded". Fix: bajar temporalmente `doc.page.margins.bottom=5` antes del footer y restaurar después. Cierra el bug que aparecía cuando un informe técnico extenso pasaba a 2+ páginas
+- **Prisma — `actualizado_por` rechazado en UpdateInput**: tras agregar nuevos FKs a `core.usuarios` (revisión interna), Prisma desambiguó las relaciones y el FK escalar dejó de exponerse en UpdateInput. Fix: usar `usuarios_cotizaciones_actualizado_porTousuarios: { connect: { id: userId } }` en PATCH y DELETE de cotizaciones
+- **Worker notificaciones**: solo dispara sobre expedientes en estado `activo` (no enqueuea ni envía cola pendiente de expedientes terminales)
+
 ### Roadmap próximo
+- Módulo de **compras** o asignación a bodega para resolver el aprovisionamiento de líneas pendientes — hoy el tiempo es manual por componente, cuando exista compras se podrá automatizar con datos reales de proveedores
+- Validación opcional de **margen mínimo** por gerencia general (rechazo automático si margen < X% configurable)
 - Object storage MinIO para evidencias y PDFs (hoy filesystem)
 - Más reglas de alerta SCADA (presión, vibración) cuando lleguen sensores físicos
 - Importación masiva de transformadores existentes desde Excel
