@@ -29,6 +29,10 @@ export interface CotizacionLinea {
   costo_unitario: number | null;
   subtotal_linea?: number;
   notas: string | null;
+  // Flags propios de la emisión desde plantilla
+  pendiente_aprovisionamiento?: boolean;
+  tiempo_aprovisionamiento_dias?: number | null;
+  categoria?: string | null;
 }
 
 export type EstadoRevisionInterna = "no_solicitada" | "pendiente" | "aprobada" | "rechazada";

@@ -36,6 +36,9 @@ export interface DataCotizacion {
     orden: number; descripcion: string; cantidad: string; unidad_medida: string;
     precio_unitario: string; descuento_linea_porcentaje: string; subtotal_linea: string;
     costo_unitario: string | null;
+    pendiente_aprovisionamiento?: boolean;
+    tiempo_aprovisionamiento_dias?: number | null;
+    categoria?: string | null;
   }>;
   cotizacion_revisiones?: Array<{ revision: number; created_at: Date | string; motivo: string | null }>;
 }
@@ -66,7 +69,11 @@ export function renderCotizacion(doc: Doc, cot: DataCotizacion, nivel: Nivel): v
     titulo(doc, "Detalle del servicio");
     const cols: ColumnaTabla<DataCotizacion["cotizacion_lineas"][0]>[] = [
       { label: "#", width: 25, align: "center", render: (l) => String(l.orden) },
-      { label: "Descripción", width: 220, render: (l) => l.descripcion },
+      { label: "Descripción", width: 220, render: (l) => {
+        // Marcar lineas pendientes de aprovisionamiento con un asterisco
+        const prefix = l.pendiente_aprovisionamiento ? "* " : "";
+        return `${prefix}${l.descripcion}`;
+      }},
       { label: "Cant.", width: 50, align: "right", render: (l) => Number(l.cantidad).toFixed(2) },
       { label: "Unidad", width: 45, align: "center", render: (l) => l.unidad_medida },
       { label: "P. Unit.", width: 65, align: "right", render: (l) => fmtMoney(l.precio_unitario) },
@@ -74,6 +81,21 @@ export function renderCotizacion(doc: Doc, cot: DataCotizacion, nivel: Nivel): v
       { label: "Subtotal", width: 60, align: "right", bold: true, render: (l) => fmtMoney(l.subtotal_linea) },
     ];
     tablaSimple(doc, cols, cot.cotizacion_lineas);
+
+    // Aviso de aprovisionamiento si hay lineas marcadas
+    const pendientes = cot.cotizacion_lineas.filter((l) => l.pendiente_aprovisionamiento);
+    if (pendientes.length > 0) {
+      const maxDias = Math.max(...pendientes.map((l) => l.tiempo_aprovisionamiento_dias ?? 0));
+      doc.moveDown(0.3);
+      doc.font("Helvetica-Oblique").fontSize(8).fillColor(COLORS.warning)
+         .text(
+           `* ${pendientes.length} línea${pendientes.length === 1 ? "" : "s"} sujeta${pendientes.length === 1 ? "" : "s"} a aprovisionamiento. ` +
+           `El tiempo de entrega total contempla un período adicional de hasta ${maxDias} día${maxDias === 1 ? "" : "s"} para conseguir el material en bodega.`,
+           { width: doc.page.width - 100 },
+         );
+      doc.fillColor("black");
+      doc.moveDown(0.3);
+    }
 
     // N=3+: agregar columna de costo + margen
     if (nivel >= 3) {

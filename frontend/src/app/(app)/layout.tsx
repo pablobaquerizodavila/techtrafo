@@ -125,6 +125,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                       <Link href="/admin/hito-plantillas" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
                         Hitos del catalogo
                       </Link>
+                      <Link href="/admin/cotizacion-plantillas" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
+                        Plantillas de cotizacion
+                      </Link>
                     </>
                   )}
                 </>

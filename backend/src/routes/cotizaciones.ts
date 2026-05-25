@@ -34,6 +34,10 @@ const lineaSchema = z.object({
   descuento_linea_porcentaje: z.number().min(0).max(100).default(0),
   costo_unitario: z.number().nonnegative().optional().nullable(),
   notas: z.string().optional().nullable(),
+  // Flags de emisión desde plantilla (se preservan al editar)
+  pendiente_aprovisionamiento: z.boolean().optional(),
+  tiempo_aprovisionamiento_dias: z.number().int().nonnegative().nullable().optional(),
+  categoria: z.string().max(30).nullable().optional(),
 });
 
 const cabeceraCreateSchema = z.object({
@@ -313,6 +317,9 @@ router.post("/", requirePermission("cotizaciones", "write"), async (req, res) =>
               costo_unitario: l.costo_unitario ?? null,
               subtotal_linea: calcularSubtotalLinea(l),
               notas: l.notas ?? null,
+              pendiente_aprovisionamiento: l.pendiente_aprovisionamiento ?? false,
+              tiempo_aprovisionamiento_dias: l.tiempo_aprovisionamiento_dias ?? null,
+              categoria: l.categoria ?? null,
             })),
           },
         },
@@ -642,6 +649,9 @@ router.patch("/:id", requirePermission("cotizaciones", "write"), async (req, res
             costo_unitario: l.costo_unitario ?? null,
             subtotal_linea: calcularSubtotalLinea(l),
             notas: l.notas ?? null,
+            pendiente_aprovisionamiento: l.pendiente_aprovisionamiento ?? false,
+            tiempo_aprovisionamiento_dias: l.tiempo_aprovisionamiento_dias ?? null,
+            categoria: l.categoria ?? null,
           })),
         });
       }

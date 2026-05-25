@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ShoppingCart } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -92,6 +93,10 @@ export function CotizacionForm({ initial, readOnly = false, onSubmit, onCancel }
         descuento_linea_porcentaje: Number(l.descuento_linea_porcentaje),
         costo_unitario: l.costo_unitario != null ? Number(l.costo_unitario) : null,
         notas: l.notas,
+        // Preservar flags de emisión desde plantilla al editar
+        pendiente_aprovisionamiento: l.pendiente_aprovisionamiento,
+        tiempo_aprovisionamiento_dias: l.tiempo_aprovisionamiento_dias,
+        categoria: l.categoria,
       }));
     }
     return [lineaVacia(1)];
@@ -168,6 +173,9 @@ export function CotizacionForm({ initial, readOnly = false, onSubmit, onCancel }
           descuento_linea_porcentaje: Number(l.descuento_linea_porcentaje),
           costo_unitario: l.costo_unitario != null ? Number(l.costo_unitario) : null,
           notas: l.notas,
+          pendiente_aprovisionamiento: l.pendiente_aprovisionamiento,
+          tiempo_aprovisionamiento_dias: l.tiempo_aprovisionamiento_dias,
+          categoria: l.categoria,
         })),
       });
     } catch (err) {
@@ -275,6 +283,22 @@ export function CotizacionForm({ initial, readOnly = false, onSubmit, onCancel }
                     placeholder="Descripcion del item o servicio"
                     disabled={readOnly}
                   />
+                  {(linea.categoria || linea.pendiente_aprovisionamiento) && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {linea.categoria && (
+                        <Badge variant="muted" className="text-[10px] capitalize">
+                          {linea.categoria.replace(/_/g, " ")}
+                        </Badge>
+                      )}
+                      {linea.pendiente_aprovisionamiento && (
+                        <Badge variant="warning" className="text-[10px]">
+                          <ShoppingCart className="mr-1 h-3 w-3" />
+                          Pendiente compra
+                          {linea.tiempo_aprovisionamiento_dias ? ` · ${linea.tiempo_aprovisionamiento_dias}d` : ""}
+                        </Badge>
+                      )}
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell>
                   <Input
