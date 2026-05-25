@@ -426,9 +426,12 @@ router.patch("/:id", requirePermission("cotizaciones", "write"), async (req, res
         });
       }
 
-      // Actualizar cabecera
+      // Actualizar cabecera.
+      // Nota: en el UpdateInput de Prisma `actualizado_por` no es un campo
+      // escalar (Prisma expone solo la relacion). Usamos connect a la
+      // relacion para setear el FK indirectamente.
       const cabeceraData: Prisma.cotizacionesUpdateInput = {
-        actualizado_por: userId,
+        usuarios_cotizaciones_actualizado_porTousuarios: { connect: { id: userId } },
         subtotal: totales.subtotal,
         iva_valor: totales.iva_valor,
         total: totales.total,
@@ -881,7 +884,10 @@ router.delete("/:id", requirePermission("cotizaciones", "delete"), async (req, r
       if (existing.estado === "convertida") throw new Error("estado_inmodificable");
       return tx.cotizaciones.update({
         where: { id },
-        data: { estado: "cancelada", actualizado_por: userId },
+        data: {
+          estado: "cancelada",
+          usuarios_cotizaciones_actualizado_porTousuarios: { connect: { id: userId } },
+        },
       });
     });
     res.status(204).end();
