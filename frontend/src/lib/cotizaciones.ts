@@ -31,6 +31,8 @@ export interface CotizacionLinea {
   notas: string | null;
 }
 
+export type EstadoRevisionInterna = "no_solicitada" | "pendiente" | "aprobada" | "rechazada";
+
 export interface Cotizacion {
   id: number;
   codigo: string;
@@ -57,9 +59,38 @@ export interface Cotizacion {
   fecha_aprobacion: string | null;
   created_at: string;
   updated_at: string;
+  // Revision interna (gerencia comercial -> general -> presidencia)
+  revision_interna_estado: EstadoRevisionInterna;
+  revision_interna_nivel: number | null;
+  revision_interna_solicitada_por: string | null;
+  revision_interna_solicitada_at: string | null;
+  revision_interna_resuelta_por: string | null;
+  revision_interna_resuelta_at: string | null;
+  revision_interna_motivo_rechazo: string | null;
   clientes?: { id: number; razon_social: string; ruc_cedula: string; segmento?: string | null; sector?: string | null };
   cotizacion_lineas?: CotizacionLinea[];
   cotizacion_revisiones?: Array<{ id: number; revision: number; motivo: string | null; creado_por: string | null; created_at: string }>;
+}
+
+export interface RevisionHistorialItem {
+  id: number;
+  nivel: number;
+  accion: "solicitar" | "aprobar" | "rechazar" | "escalar";
+  por_usuario_id: string | null;
+  rol_actuante: string | null;
+  notas: string | null;
+  created_at: string;
+  nombres: string | null;
+  apellidos: string | null;
+}
+
+export function nivelRevisionLabel(nivel: number | null): string {
+  if (!nivel) return "—";
+  return ({ 1: "Gerencia Comercial", 2: "Gerencia General", 3: "Presidencia" } as Record<number, string>)[nivel] ?? `Nivel ${nivel}`;
+}
+
+export function rolDeNivelRevision(nivel: number): string {
+  return ({ 1: "gerencia_comercial", 2: "gerencia_general", 3: "presidencia" } as Record<number, string>)[nivel] ?? "";
 }
 
 export interface CotizacionListResponse {
@@ -128,6 +159,25 @@ export async function transicionCotizacion(
 
 export async function archiveCotizacion(id: number): Promise<void> {
   await api.delete(`/api/cotizaciones/${id}`);
+}
+
+// -------------------------------------------------------------------
+// Revision interna (gerencia_comercial -> gerencia_general -> presidencia)
+// -------------------------------------------------------------------
+export async function solicitarRevisionInterna(id: number): Promise<{ status: string; nivel: number; rol_destino: string }> {
+  return api.post(`/api/cotizaciones/${id}/revision-interna/solicitar`);
+}
+export async function aprobarRevisionInterna(id: number, notas?: string): Promise<{ status: string }> {
+  return api.post(`/api/cotizaciones/${id}/revision-interna/aprobar`, notas ? { notas } : {});
+}
+export async function rechazarRevisionInterna(id: number, motivo: string): Promise<{ status: string }> {
+  return api.post(`/api/cotizaciones/${id}/revision-interna/rechazar`, { motivo });
+}
+export async function escalarRevisionInterna(id: number, mensaje: string): Promise<{ status: string; nivel: number; rol_destino: string }> {
+  return api.post(`/api/cotizaciones/${id}/revision-interna/escalar`, { mensaje });
+}
+export async function getRevisionHistorial(id: number): Promise<{ data: RevisionHistorialItem[] }> {
+  return api.get(`/api/cotizaciones/${id}/revision-interna/historial`);
 }
 
 // -------------------------------------------------------------------

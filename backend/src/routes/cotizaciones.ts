@@ -528,6 +528,13 @@ router.post("/:id/transicion", requirePermission("cotizaciones", "aprobar"), asy
         throw new Error(`transicion_invalida:${existing.estado}->${accion}`);
       }
 
+      // Bloqueo: no se puede 'enviar' al cliente hasta que la revision
+      // interna este aprobada (gerencia comercial -> gerencia general ->
+      // presidencia segun el escalamiento que haya seguido).
+      if (accion === "enviar" && existing.revision_interna_estado !== "aprobada") {
+        throw new Error("revision_interna_pendiente");
+      }
+
       // Notas para rechazada/cancelada/vencida con motivo
       let notasInternasNueva = existing.notas_internas;
       if (motivo && ["rechazada", "cancelada", "vencida"].includes(nuevoEstado)) {
@@ -569,9 +576,274 @@ router.post("/:id/transicion", requirePermission("cotizaciones", "aprobar"), asy
         res.status(409).json({ error: "transicion_invalida", details: err.message });
         return;
       }
+      if (err.message === "revision_interna_pendiente") {
+        res.status(409).json({ error: "revision_interna_pendiente" });
+        return;
+      }
     }
     throw err;
   }
+});
+
+// ===================================================================
+// REVISION INTERNA DE COTIZACION
+//
+// Antes de enviar al cliente, una cotizacion en borrador debe pasar por
+// revision interna jerarquica:
+//   nivel 1: gerencia_comercial
+//   nivel 2: gerencia_general (si nivel 1 escala)
+//   nivel 3: presidencia (tope)
+// Aprobacion final habilita la accion 'enviar' al cliente.
+// ===================================================================
+const NIVELES_REVISION = [
+  { nivel: 1, rol: "gerencia_comercial" },
+  { nivel: 2, rol: "gerencia_general" },
+  { nivel: 3, rol: "presidencia" },
+];
+
+function rolDeNivel(nivel: number): string {
+  return NIVELES_REVISION.find((n) => n.nivel === nivel)?.rol ?? "";
+}
+
+const ROLES_OVERRIDE_REV = ["presidencia", "gerencia_general", "gerencia_comercial"];
+
+function esRolOverrideRev(rolNombre: string | null, esSuperAdmin: boolean): boolean {
+  if (esSuperAdmin) return true;
+  return !!rolNombre && ROLES_OVERRIDE_REV.includes(rolNombre);
+}
+
+async function logRevisionHistorial(
+  tx: Prisma.TransactionClient,
+  cotizacionId: number,
+  nivel: number,
+  accion: "solicitar" | "aprobar" | "rechazar" | "escalar",
+  userId: string,
+  rolActuante: string | null,
+  notas: string | null,
+) {
+  await tx.$executeRaw`
+    INSERT INTO comercial.cotizacion_revision_interna_historial
+      (cotizacion_id, nivel, accion, por_usuario_id, rol_actuante, notas)
+    VALUES (${cotizacionId}, ${nivel}, ${accion}, ${userId}::uuid, ${rolActuante}, ${notas})
+  `;
+}
+
+// -------------------------------------------------------------------
+// POST /api/cotizaciones/:id/revision-interna/solicitar
+// El creador/vendedor solicita revision. Estado pasa a pendiente nivel 1.
+// -------------------------------------------------------------------
+router.post("/:id/revision-interna/solicitar", requirePermission("cotizaciones", "write"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+  const userId = req.user!.id;
+  try {
+    await withAppUser(userId, async (tx) => {
+      const cot = await tx.cotizaciones.findUnique({ where: { id } });
+      if (!cot) throw new Error("not_found");
+      if (cot.estado !== "borrador") throw new Error("cotizacion_no_borrador");
+      if (cot.revision_interna_estado === "pendiente") throw new Error("revision_ya_pendiente");
+      if (cot.revision_interna_estado === "aprobada") throw new Error("revision_ya_aprobada");
+
+      await tx.$executeRaw`
+        UPDATE comercial.cotizaciones
+           SET revision_interna_estado = 'pendiente',
+               revision_interna_nivel = 1,
+               revision_interna_solicitada_por = ${userId}::uuid,
+               revision_interna_solicitada_at = NOW(),
+               revision_interna_resuelta_por = NULL,
+               revision_interna_resuelta_at = NULL,
+               revision_interna_motivo_rechazo = NULL,
+               actualizado_por = ${userId}::uuid
+         WHERE id = ${id}
+      `;
+      await logRevisionHistorial(tx, id, 1, "solicitar", userId, req.user!.rol_nombre ?? null, null);
+    });
+    res.json({ status: "solicitada", nivel: 1, rol_destino: rolDeNivel(1) });
+  } catch (err) {
+    if (err instanceof Error) {
+      const map: Record<string, number> = {
+        not_found: 404,
+        cotizacion_no_borrador: 409,
+        revision_ya_pendiente: 409,
+        revision_ya_aprobada: 409,
+      };
+      const code = map[err.message];
+      if (code) { res.status(code).json({ error: err.message }); return; }
+    }
+    throw err;
+  }
+});
+
+// -------------------------------------------------------------------
+// POST /api/cotizaciones/:id/revision-interna/aprobar
+// El rol del nivel actual aprueba la cotizacion (final).
+// -------------------------------------------------------------------
+const aprobarRevSchema = z.object({ notas: z.string().max(1000).optional().nullable() });
+
+router.post("/:id/revision-interna/aprobar", requirePermission("cotizaciones", "write"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+  const parsed = aprobarRevSchema.safeParse(req.body ?? {});
+  if (!parsed.success) { res.status(400).json({ error: "invalid_payload" }); return; }
+  const userId = req.user!.id;
+  try {
+    await withAppUser(userId, async (tx) => {
+      const cot = await tx.cotizaciones.findUnique({ where: { id } });
+      if (!cot) throw new Error("not_found");
+      if (cot.revision_interna_estado !== "pendiente") throw new Error("revision_no_pendiente");
+      const nivelActual = cot.revision_interna_nivel ?? 1;
+      const rolEsperado = rolDeNivel(nivelActual);
+      // Validar rol del actor: debe ser el rol del nivel actual, o override
+      if (!esRolOverrideRev(req.user!.rol_nombre ?? null, req.user!.es_super_admin)
+          && req.user!.rol_nombre !== rolEsperado) {
+        throw new Error("rol_no_designado");
+      }
+      await tx.$executeRaw`
+        UPDATE comercial.cotizaciones
+           SET revision_interna_estado = 'aprobada',
+               revision_interna_resuelta_por = ${userId}::uuid,
+               revision_interna_resuelta_at = NOW(),
+               actualizado_por = ${userId}::uuid
+         WHERE id = ${id}
+      `;
+      await logRevisionHistorial(tx, id, nivelActual, "aprobar", userId, req.user!.rol_nombre ?? null, parsed.data.notas ?? null);
+    });
+    res.json({ status: "aprobada" });
+  } catch (err) {
+    if (err instanceof Error) {
+      const map: Record<string, number> = {
+        not_found: 404,
+        revision_no_pendiente: 409,
+        rol_no_designado: 403,
+      };
+      const code = map[err.message];
+      if (code) { res.status(code).json({ error: err.message }); return; }
+    }
+    throw err;
+  }
+});
+
+// -------------------------------------------------------------------
+// POST /api/cotizaciones/:id/revision-interna/rechazar
+// El rol del nivel actual rechaza. Vuelve al vendedor para correcciones.
+// -------------------------------------------------------------------
+const rechazarRevSchema = z.object({ motivo: z.string().min(1).max(2000) });
+
+router.post("/:id/revision-interna/rechazar", requirePermission("cotizaciones", "write"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+  const parsed = rechazarRevSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors }); return; }
+  const userId = req.user!.id;
+  const { motivo } = parsed.data;
+  try {
+    await withAppUser(userId, async (tx) => {
+      const cot = await tx.cotizaciones.findUnique({ where: { id } });
+      if (!cot) throw new Error("not_found");
+      if (cot.revision_interna_estado !== "pendiente") throw new Error("revision_no_pendiente");
+      const nivelActual = cot.revision_interna_nivel ?? 1;
+      const rolEsperado = rolDeNivel(nivelActual);
+      if (!esRolOverrideRev(req.user!.rol_nombre ?? null, req.user!.es_super_admin)
+          && req.user!.rol_nombre !== rolEsperado) {
+        throw new Error("rol_no_designado");
+      }
+      await tx.$executeRaw`
+        UPDATE comercial.cotizaciones
+           SET revision_interna_estado = 'rechazada',
+               revision_interna_resuelta_por = ${userId}::uuid,
+               revision_interna_resuelta_at = NOW(),
+               revision_interna_motivo_rechazo = ${motivo},
+               actualizado_por = ${userId}::uuid
+         WHERE id = ${id}
+      `;
+      await logRevisionHistorial(tx, id, nivelActual, "rechazar", userId, req.user!.rol_nombre ?? null, motivo);
+    });
+    res.json({ status: "rechazada" });
+  } catch (err) {
+    if (err instanceof Error) {
+      const map: Record<string, number> = {
+        not_found: 404,
+        revision_no_pendiente: 409,
+        rol_no_designado: 403,
+      };
+      const code = map[err.message];
+      if (code) { res.status(code).json({ error: err.message }); return; }
+    }
+    throw err;
+  }
+});
+
+// -------------------------------------------------------------------
+// POST /api/cotizaciones/:id/revision-interna/escalar
+// El rol del nivel actual escala al siguiente nivel. Tope: nivel 3.
+// -------------------------------------------------------------------
+const escalarRevSchema = z.object({ mensaje: z.string().min(1).max(2000) });
+
+router.post("/:id/revision-interna/escalar", requirePermission("cotizaciones", "write"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+  const parsed = escalarRevSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors }); return; }
+  const userId = req.user!.id;
+  const { mensaje } = parsed.data;
+  try {
+    let nivelNuevo = 0;
+    await withAppUser(userId, async (tx) => {
+      const cot = await tx.cotizaciones.findUnique({ where: { id } });
+      if (!cot) throw new Error("not_found");
+      if (cot.revision_interna_estado !== "pendiente") throw new Error("revision_no_pendiente");
+      const nivelActual = cot.revision_interna_nivel ?? 1;
+      if (nivelActual >= 3) throw new Error("nivel_tope_alcanzado");
+      const rolEsperado = rolDeNivel(nivelActual);
+      if (!esRolOverrideRev(req.user!.rol_nombre ?? null, req.user!.es_super_admin)
+          && req.user!.rol_nombre !== rolEsperado) {
+        throw new Error("rol_no_designado");
+      }
+      nivelNuevo = nivelActual + 1;
+      await tx.$executeRaw`
+        UPDATE comercial.cotizaciones
+           SET revision_interna_nivel = ${nivelNuevo},
+               actualizado_por = ${userId}::uuid
+         WHERE id = ${id}
+      `;
+      await logRevisionHistorial(tx, id, nivelActual, "escalar", userId, req.user!.rol_nombre ?? null, mensaje);
+    });
+    res.json({ status: "escalada", nivel: nivelNuevo, rol_destino: rolDeNivel(nivelNuevo) });
+  } catch (err) {
+    if (err instanceof Error) {
+      const map: Record<string, number> = {
+        not_found: 404,
+        revision_no_pendiente: 409,
+        nivel_tope_alcanzado: 409,
+        rol_no_designado: 403,
+      };
+      const code = map[err.message];
+      if (code) { res.status(code).json({ error: err.message }); return; }
+    }
+    throw err;
+  }
+});
+
+// -------------------------------------------------------------------
+// GET /api/cotizaciones/:id/revision-interna/historial
+// Eventos del flujo de revision interna para mostrar en la UI
+// -------------------------------------------------------------------
+router.get("/:id/revision-interna/historial", requirePermission("cotizaciones", "read"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+  const data = await prisma.$queryRaw<Array<{
+    id: bigint; nivel: number; accion: string; por_usuario_id: string | null;
+    rol_actuante: string | null; notas: string | null; created_at: Date;
+    nombres: string | null; apellidos: string | null;
+  }>>`
+    SELECT h.id, h.nivel, h.accion, h.por_usuario_id, h.rol_actuante, h.notas, h.created_at,
+           u.nombres, u.apellidos
+      FROM comercial.cotizacion_revision_interna_historial h
+      LEFT JOIN core.usuarios u ON u.id = h.por_usuario_id
+     WHERE h.cotizacion_id = ${id}
+     ORDER BY h.created_at ASC
+  `;
+  res.json({ data: data.map((r) => ({ ...r, id: Number(r.id) })) });
 });
 
 // -------------------------------------------------------------------
