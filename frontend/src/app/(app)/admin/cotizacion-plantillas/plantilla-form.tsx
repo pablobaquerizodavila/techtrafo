@@ -12,6 +12,7 @@ import {
   CATEGORIAS_LABEL, CategoriaComponente, CotizacionPlantilla,
   PlantillaComponente, PlantillaCreateInput, TipoServicioPlantilla,
 } from "@/lib/cotizacion-plantillas";
+import { Item, listItems } from "@/lib/inventario";
 
 interface Props {
   initial?: CotizacionPlantilla | null;
@@ -50,6 +51,9 @@ export function PlantillaForm({ initial, onSubmit, onCancel }: Props) {
   const [componentes, setComponentes] = useState<PlantillaComponente[]>([]);
   const [saving, setSaving] = useState(false);
 
+  // Catalogo de items de bodega — se carga una vez y se usa para autocompletar
+  const [items, setItems] = useState<Item[]>([]);
+
   useEffect(() => {
     if (initial?.plantilla_componentes) {
       setComponentes(initial.plantilla_componentes.map((c) => ({
@@ -63,6 +67,13 @@ export function PlantillaForm({ initial, onSubmit, onCancel }: Props) {
     }
   }, [initial]);
 
+  useEffect(() => {
+    // Traemos hasta 500 items activos para el autocomplete del componente.
+    listItems({ limit: 500, estado: "activo" })
+      .then((r) => setItems(r.data))
+      .catch(() => setItems([]));
+  }, []);
+
   function updateComp<K extends keyof PlantillaComponente>(i: number, key: K, value: PlantillaComponente[K]) {
     setComponentes((arr) => arr.map((c, idx) => idx === i ? { ...c, [key]: value } : c));
   }
@@ -71,6 +82,45 @@ export function PlantillaForm({ initial, onSubmit, onCancel }: Props) {
   }
   function removeComp(i: number) {
     setComponentes((arr) => arr.filter((_, idx) => idx !== i));
+  }
+
+  /**
+   * Cuando el usuario escribe / elige un código del autocomplete, intentamos
+   * matchear con un item de bodega:
+   *   - Si encuentra match: vincula `item_id`, autofilla unidad_medida, costo,
+   *     y descripción (solo si la fila estaba vacía).
+   *   - Si no encuentra: item_id queda null (modo manual / componente sin bodega).
+   */
+  function onCodigoItemChange(i: number, codigoInterno: string) {
+    const limpio = codigoInterno.trim();
+    if (limpio === "") {
+      updateComp(i, "item_id", null);
+      return;
+    }
+    const item = items.find((x) => x.codigo_interno.toLowerCase() === limpio.toLowerCase());
+    if (item) {
+      setComponentes((arr) => arr.map((c, idx) => {
+        if (idx !== i) return c;
+        return {
+          ...c,
+          item_id: item.id,
+          unidad_medida: item.unidad_medida || c.unidad_medida,
+          costo_unitario_default: Number(item.costo_referencia ?? 0) || c.costo_unitario_default,
+          // Solo sobrescribimos descripción si estaba vacía (no pisar lo que el user escribió)
+          descripcion: c.descripcion.trim() === "" ? item.nombre : c.descripcion,
+        };
+      }));
+    } else {
+      // Texto que no matchea ningun item -> componente manual
+      updateComp(i, "item_id", null);
+    }
+  }
+
+  // Helper para mostrar el codigo del item asociado a una fila (cuando se carga edicion)
+  function codigoDeFila(c: PlantillaComponente): string {
+    if (!c.item_id) return "";
+    const it = items.find((x) => x.id === c.item_id);
+    return it?.codigo_interno ?? "";
   }
 
   async function handleSubmit() {
@@ -110,6 +160,17 @@ export function PlantillaForm({ initial, onSubmit, onCancel }: Props) {
 
   return (
     <div className="space-y-6">
+      {/* Datalist con todos los items de bodega — compartido por todas las filas */}
+      <datalist id="items-bodega">
+        {items.map((it) => (
+          <option
+            key={it.id}
+            value={it.codigo_interno}
+            label={`${it.nombre} · costo $${Number(it.costo_referencia).toFixed(2)} / ${it.unidad_medida}`}
+          />
+        ))}
+      </datalist>
+
       {/* Cabecera */}
       <section className="grid grid-cols-2 gap-3 rounded-md border p-4">
         <div className="space-y-1">
@@ -184,61 +245,104 @@ export function PlantillaForm({ initial, onSubmit, onCancel }: Props) {
               <TableHead className="w-8">#</TableHead>
               <TableHead className="w-40">Categoría</TableHead>
               <TableHead>Descripción</TableHead>
-              <TableHead className="w-20">item_id</TableHead>
+              <TableHead className="w-32">Código bodega</TableHead>
               <TableHead className="w-20">Cant.</TableHead>
               <TableHead className="w-20">Unid.</TableHead>
               <TableHead className="w-28">Precio U.</TableHead>
-              <TableHead className="w-24">Costo U.</TableHead>
+              <TableHead className="w-28">Costo U.</TableHead>
               <TableHead className="w-20">Días apro.</TableHead>
               <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {componentes.map((c, i) => (
-              <TableRow key={i}>
-                <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                <TableCell>
-                  <Select value={c.categoria} onValueChange={(v) => updateComp(i, "categoria", v as CategoriaComponente)}>
-                    <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {(Object.keys(CATEGORIAS_LABEL) as CategoriaComponente[]).map((k) => (
-                        <SelectItem key={k} value={k}>{CATEGORIAS_LABEL[k]}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-                <TableCell>
-                  <Input className="h-8" value={c.descripcion} onChange={(e) => updateComp(i, "descripcion", e.target.value)} placeholder="Descripción de la línea" />
-                </TableCell>
-                <TableCell>
-                  <Input className="h-8" type="number" value={c.item_id ?? ""} onChange={(e) => updateComp(i, "item_id", e.target.value ? Number(e.target.value) : null)} placeholder="—" title="ID del item de bodega (opcional). Si se setea, se valida stock al usar la plantilla." />
-                </TableCell>
-                <TableCell>
-                  <Input className="h-8" type="number" step="0.01" value={c.cantidad_default} onChange={(e) => updateComp(i, "cantidad_default", Number(e.target.value))} />
-                </TableCell>
-                <TableCell>
-                  <Input className="h-8" value={c.unidad_medida} onChange={(e) => updateComp(i, "unidad_medida", e.target.value)} />
-                </TableCell>
-                <TableCell>
-                  <Input className="h-8" type="number" step="0.01" value={c.precio_unitario_default} onChange={(e) => updateComp(i, "precio_unitario_default", Number(e.target.value))} />
-                </TableCell>
-                <TableCell>
-                  <Input className="h-8" type="number" step="0.01" value={c.costo_unitario_default ?? ""} onChange={(e) => updateComp(i, "costo_unitario_default", e.target.value ? Number(e.target.value) : null)} placeholder="—" title="Costo interno (opcional). Si no hay precio_unitario, se calcula desde costo × (1+contingencia) × (1+margen)" />
-                </TableCell>
-                <TableCell>
-                  <Input className="h-8" type="number" value={c.tiempo_aprovisionamiento_default} onChange={(e) => updateComp(i, "tiempo_aprovisionamiento_default", Number(e.target.value))} title="Días estimados si NO hay stock (solo aplica si tiene item_id)" />
-                </TableCell>
-                <TableCell>
-                  <Button type="button" variant="ghost" size="icon" onClick={() => removeComp(i)} disabled={componentes.length === 1}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
+            {componentes.map((c, i) => {
+              const codigoItem = codigoDeFila(c);
+              const itemVinculado = c.item_id ? items.find((x) => x.id === c.item_id) : null;
+              return (
+                <TableRow key={i}>
+                  <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                  <TableCell>
+                    <Select value={c.categoria} onValueChange={(v) => updateComp(i, "categoria", v as CategoriaComponente)}>
+                      <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {(Object.keys(CATEGORIAS_LABEL) as CategoriaComponente[]).map((k) => (
+                          <SelectItem key={k} value={k}>{CATEGORIAS_LABEL[k]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      className="h-8"
+                      value={c.descripcion}
+                      onChange={(e) => updateComp(i, "descripcion", e.target.value)}
+                      placeholder="Descripción de la línea"
+                    />
+                    {itemVinculado && (
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        🔗 {itemVinculado.nombre}
+                      </p>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      className="h-8 font-mono text-xs"
+                      list="items-bodega"
+                      value={codigoItem || ""}
+                      onChange={(e) => onCodigoItemChange(i, e.target.value)}
+                      placeholder="—"
+                      title="Código de bodega (autocomplete). Si lo dejas vacío, el componente no se valida contra stock."
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input className="h-8" type="number" step="0.01" value={c.cantidad_default} onChange={(e) => updateComp(i, "cantidad_default", Number(e.target.value))} />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      className="h-8"
+                      value={c.unidad_medida}
+                      onChange={(e) => updateComp(i, "unidad_medida", e.target.value)}
+                      disabled={!!c.item_id}
+                      title={c.item_id ? "Heredado del item de bodega" : "Editable libremente"}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input className="h-8" type="number" step="0.01" value={c.precio_unitario_default} onChange={(e) => updateComp(i, "precio_unitario_default", Number(e.target.value))} title="Si lo dejas en 0, se calcula automáticamente al generar como Costo × (1+contingencia) × (1+margen)" />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      className="h-8"
+                      type="number"
+                      step="0.01"
+                      value={c.costo_unitario_default ?? ""}
+                      onChange={(e) => updateComp(i, "costo_unitario_default", e.target.value ? Number(e.target.value) : null)}
+                      placeholder="—"
+                      disabled={!!c.item_id}
+                      title={c.item_id ? "Sincronizado con costo_referencia del item en bodega — al generar la cotización se re-lee el valor actual" : "Editable manual"}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      className="h-8"
+                      type="number"
+                      value={c.tiempo_aprovisionamiento_default}
+                      onChange={(e) => updateComp(i, "tiempo_aprovisionamiento_default", Number(e.target.value))}
+                      disabled={!c.item_id}
+                      title={c.item_id ? "Días si NO hay stock al generar" : "Solo aplica si la línea tiene código de bodega"}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeComp(i)} disabled={componentes.length === 1}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
         <p className="text-xs text-muted-foreground">
-          <strong>item_id</strong>: si se setea, al generar la cotización se valida stock en bodega; si falta, la línea queda marcada como pendiente de aprovisionamiento con los <strong>Días apro.</strong> indicados. <strong>Costo U.</strong>: si <strong>Precio U.</strong>={"0"}, se calcula como costo × (1+contingencia%) × (1+margen%).
+          <strong>Código bodega</strong>: empezá a tipear y aparecen sugerencias (acepta letras y números). Al elegir, se autocompletan <em>unidad</em>, <em>costo</em> y <em>descripción</em> (si está vacía). El costo se mantiene sincronizado con bodega — cuando generes la cotización, el sistema usa el costo actual del item, no el guardado en la plantilla.
         </p>
       </section>
 

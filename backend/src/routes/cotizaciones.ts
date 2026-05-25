@@ -440,8 +440,27 @@ router.post("/desde-plantilla", requirePermission("cotizaciones", "write"), asyn
         let pendiente = false;
         let tiempoApro: number | null = null;
 
-        // Check de stock solo si la linea apunta a un item de bodega
+        // Si el componente referencia un item de bodega, re-leemos costo
+        // y unidad ACTUAL desde inventario.items (no la copia guardada en
+        // la plantilla). Asi la cotizacion siempre refleja los precios mas
+        // recientes de bodega aunque la plantilla sea vieja.
+        let costoUnitario: number | null = c.costo_unitario_default ? Number(c.costo_unitario_default) : null;
+        let unidadMedida = c.unidad_medida;
+        let descripcionLinea = c.descripcion;
+
         if (c.item_id) {
+          const item = await tx.items.findUnique({ where: { id: c.item_id } });
+          if (item) {
+            // Costo actualizado de bodega tiene prioridad
+            const costoActual = Number(item.costo_referencia ?? 0);
+            if (costoActual > 0) costoUnitario = costoActual;
+            // Unidad consistente con el item
+            unidadMedida = item.unidad_medida || unidadMedida;
+            // Si la descripcion de la plantilla esta vacia o es el nombre del item, usar el nombre actual
+            if (!descripcionLinea || descripcionLinea.trim() === "") descripcionLinea = item.nombre;
+          }
+
+          // Check de stock (suma de todas las ubicaciones)
           const stockAgg = await tx.stock.aggregate({
             where: { item_id: c.item_id },
             _sum: { cantidad: true },
@@ -456,11 +475,10 @@ router.post("/desde-plantilla", requirePermission("cotizaciones", "write"), asyn
 
         // Calculo de precio_unitario:
         //   - Si la plantilla provee precio_unitario_default > 0, se usa ese.
-        //   - Si no, y hay costo_unitario_default, aplicar margen + contingencia.
+        //   - Si no, y hay costo (re-leido o de plantilla), aplicar margen + contingencia.
         let precioU = Number(c.precio_unitario_default);
-        if (precioU <= 0 && c.costo_unitario_default) {
-          const costo = Number(c.costo_unitario_default);
-          precioU = Math.round(costo * (1 + contingencia / 100) * (1 + margen / 100) * 100) / 100;
+        if (precioU <= 0 && costoUnitario) {
+          precioU = Math.round(costoUnitario * (1 + contingencia / 100) * (1 + margen / 100) * 100) / 100;
         }
 
         const subtotalLinea = Math.round(cantidad * precioU * 100) / 100;
@@ -468,12 +486,12 @@ router.post("/desde-plantilla", requirePermission("cotizaciones", "write"), asyn
         lineas.push({
           orden: c.orden,
           item_id: c.item_id ? Number(c.item_id) : null,
-          descripcion: c.descripcion,
+          descripcion: descripcionLinea,
           cantidad,
-          unidad_medida: c.unidad_medida,
+          unidad_medida: unidadMedida,
           precio_unitario: precioU,
           descuento_linea_porcentaje: 0,
-          costo_unitario: c.costo_unitario_default ? Number(c.costo_unitario_default) : null,
+          costo_unitario: costoUnitario,
           notas: c.notas,
           categoria: c.categoria,
           pendiente_aprovisionamiento: pendiente,
