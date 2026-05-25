@@ -254,13 +254,13 @@ export function CotizacionForm({ initial, readOnly = false, onSubmit, onCancel }
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12">#</TableHead>
+              <TableHead className="w-10">#</TableHead>
               <TableHead>Descripcion</TableHead>
               <TableHead className="w-24">Cant.</TableHead>
               <TableHead className="w-20">Unidad</TableHead>
-              <TableHead className="w-28">Precio U.</TableHead>
-              <TableHead className="w-20">Desc %</TableHead>
-              <TableHead className="w-28 text-right">Subtotal</TableHead>
+              <TableHead className="w-32">Precio U.</TableHead>
+              <TableHead className="w-24">Desc %</TableHead>
+              <TableHead className="w-32 text-right">Subtotal</TableHead>
               {!readOnly && <TableHead className="w-12"></TableHead>}
             </TableRow>
           </TableHeader>
