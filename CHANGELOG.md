@@ -6,6 +6,76 @@ El formato sigue Keep a Changelog y este proyecto adhiere a Semantic Versioning.
 
 ---
 
+## [0.16.0] — 2026-05-25 — Voltage OS Ola 3C: cierre del rebrand
+
+Ultima ola del rebrand. Migra al lenguaje Voltage OS las paginas que
+quedaban: inventario, transformadores, portal cliente y notificaciones.
+
+Con esta ola, **el rebrand Voltage OS queda completo al 100%** salvo el
+refactor de los hitos internos en /expedientes/[id] (logica compleja
+que decidimos no tocar para no introducir bugs).
+
+Inventario (4 paginas):
+
+- `/inventario` (hub): PageHeader con LED copper si hay alertas, 3
+  StatCard como atajos (Items copper, Stock teal, Movimientos),
+  Panel de "Atencion requerida" con tonos amber/rose si hay alertas,
+  Panel "Acerca de Bodega" con descripcion del flujo.
+- `/inventario/items` (catalogo): PageHeader + HeaderActionPrimary,
+  filtros compactos h-8, badges de trazabilidad (Serie=warning,
+  Lote=teal, Sin stock/Cantidad=muted), precio en copper, acciones
+  Pencil/Archive con tono.
+- `/inventario/stock`: 2 Panels paralelos para alertas (reorden=amber,
+  vencimiento=rose) con empty state celebrativo green cuando estan en
+  cero, tabla con codigo copper y cantidad mono.
+- `/inventario/movimientos`: filtro Select compacto, tabla con flecha
+  origen->destino en copper, cantidad mono semibold.
+
+Transformadores (2 paginas):
+
+- `/transformadores` (lista): codigo copper, capacidad en ttteal con
+  glow, badge copper para OT count con icono Factory.
+- `/transformadores/[id]` (detalle): hero card glow copper con
+  capacidad ttteal grande, 4 StatCards de historial (intervenciones,
+  completadas green, en curso copper, ultima fecha), 2 grids con
+  caracteristicas tecnicas y cliente, timeline de OT con estado
+  tonal por intervencion.
+
+Portal cliente (2 paginas):
+
+- `/portal` (mi cuenta): 4 StatCard del resumen, ExpedienteCard con
+  badge tonal por estado, progress bar gradient ttteal->copper.
+- `/portal/expediente/[id]` (detalle pedido): hero card destacado
+  con gradient copper italico del estado actual, progress bar grande,
+  Panel "Tu equipo" con datos tecnicos, timeline con iconos animados
+  (CheckCircle2 verde, Clock copper animate-pulse glow, Circle muted),
+  documentos (Cotizacion copper, Contrato teal).
+
+Notificaciones (1 pagina):
+
+- `/notificaciones`: PageHeader con LED copper si hay estancamientos,
+  list-items con border-l tonal por tipo (estancado/rechazado=rose,
+  espera=amber, aprobado=green), icono en mini-box glass, badge
+  enviado/pendiente, link expediente en copper.
+
+Total Voltage OS rebrand:
+- Foundation: tokens, fonts, sidebar, dashboard, /produccion
+- Ola 1: 6 listas + 3 componentes shared (PageHeader, Panel, StatCard)
+- Ola 2A: 5 detalle [id] + 4 sub-paneles OT
+- Ola 2B: 5 formularios nueva/o
+- Ola 3A: auth (login/register/perfil) + admin (8 paginas)
+- Ola 3B: compras (8 paginas) + proveedores (2)
+- Ola 3C: inventario (4) + transformadores (2) + portal (2) + notif (1)
+
+**Total ~55 paginas + 4 sub-componentes + 3 shared components = todo el
+panel.techtrafo.com en lenguaje Voltage OS coherente.**
+
+Backup de cada ola en `\\\\NAS1821\\Carpeta Hellius\\Documentos Helius\\
+companias\\Desarrollos\\Techtrafo\\tech-trafo-commit-backup\\code\\`
+como snapshots zip con timestamp + sha corto.
+
+---
+
 ## [0.15.3] — 2026-05-25 — Voltage OS Ola 3B: compras + proveedores
 
 Migra al lenguaje Voltage OS las 10 paginas del modulo de compras y

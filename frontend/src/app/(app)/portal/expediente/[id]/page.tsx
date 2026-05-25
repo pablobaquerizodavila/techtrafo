@@ -1,12 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
-import {
-  ChevronLeft, CheckCircle2, Clock, Circle, Zap, Calendar, FileText, FileSignature,
-} from "lucide-react";
+import { ChevronLeft, CheckCircle2, Clock, Circle, Zap, Calendar, FileText, FileSignature } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { PageHeader, HeaderActionGhost } from "@/components/page-header";
+import { Panel } from "@/components/panel";
 import { PortalExpedienteDetalle, getMiExpediente } from "@/lib/portal";
 import { ApiError } from "@/lib/api";
 
@@ -24,27 +22,30 @@ export default function MiExpedienteDetallePage({ params }: PageProps) {
     if (!id) return;
     setLoading(true);
     setError(null);
-    try {
-      const r = await getMiExpediente(id);
-      setExp(r.data);
-    } catch (err) {
+    try { const r = await getMiExpediente(id); setExp(r.data); }
+    catch (err) {
       if (err instanceof ApiError && err.status === 404) setError("Este pedido no existe o no te pertenece");
       else setError(err instanceof Error ? err.message : "Error cargando");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, [id]);
 
   useEffect(() => { if (id) load(); }, [id, load]);
 
-  if (loading && !exp) return <div className="text-muted-foreground">Cargando...</div>;
+  if (loading && !exp) {
+    return (
+      <div className="flex h-[40vh] items-center justify-center text-muted-foreground">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-copper border-t-transparent" />
+          <span className="text-sm">Cargando…</span>
+        </div>
+      </div>
+    );
+  }
   if (error) {
     return (
-      <div className="space-y-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/portal"><ChevronLeft className="mr-1 h-4 w-4" /> Volver</Link>
-        </Button>
-        <p className="text-destructive">{error}</p>
+      <div>
+        <PageHeader breadcrumb={[{ label: "Portal" }, { label: "Error" }]} title="Pedido" titleAccent="no disponible" actions={<HeaderActionGhost href="/portal" icon={<ChevronLeft className="h-3.5 w-3.5" />}>Volver</HeaderActionGhost>} />
+        <div className="pt-6"><div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-6 text-rose-200 inset-highlight"><p className="text-sm">{error}</p></div></div>
       </div>
     );
   }
@@ -54,167 +55,176 @@ export default function MiExpedienteDetallePage({ params }: PageProps) {
     .replace(/^./, (c) => c.toUpperCase());
 
   return (
-    <div className="space-y-6">
-      <header>
-        <Button variant="ghost" size="sm" asChild className="mb-2">
-          <Link href="/portal"><ChevronLeft className="mr-1 h-4 w-4" /> Volver a mis pedidos</Link>
-        </Button>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-3xl font-bold">{exp.codigo}</h2>
-            <p className="text-muted-foreground">
-              {tipoLabel}
-              {exp.transformadores && (
-                <>
-                  {" · "}
-                  <span>
-                    {exp.transformadores.marca} {exp.transformadores.modelo}{" "}
-                    {exp.transformadores.capacidad_kva >= 1000
-                      ? `${(exp.transformadores.capacidad_kva / 1000).toFixed(0)} MVA`
-                      : `${exp.transformadores.capacidad_kva} kVA`}
-                  </span>
-                </>
-              )}
-            </p>
-          </div>
-          <Badge variant={exp.estado === "ganado" ? "success" : exp.estado === "activo" ? "default" : "muted"} className="text-base">
-            {exp.estado === "activo" ? "EN PROCESO" : exp.estado === "ganado" ? "COMPLETADO" : exp.estado.toUpperCase()}
-          </Badge>
-        </div>
-      </header>
-
-      {/* Estado actual ejecutivo */}
-      <section className="rounded-md border border-primary/30 bg-primary/5 p-6">
-        <p className="text-xs uppercase text-muted-foreground">Estado actual</p>
-        <h3 className="mt-1 text-2xl font-bold text-primary">{exp.portal_meta.fase_actual_label}</h3>
-        {exp.portal_meta.proximo_paso_label && (
-          <p className="mt-1 text-sm text-muted-foreground">
-            Próximo: {exp.portal_meta.proximo_paso_label}
-          </p>
-        )}
-        <div className="mt-4 flex items-center gap-3">
-          <div className="flex-1">
-            <div className="h-3 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full bg-primary transition-all"
-                style={{ width: `${exp.portal_meta.avance_pct}%` }}
-              />
-            </div>
-          </div>
-          <span className="text-2xl font-bold">{exp.portal_meta.avance_pct}%</span>
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {exp.portal_meta.completados} de {exp.portal_meta.total} etapas completadas
-        </p>
-      </section>
-
-      {/* Info equipo */}
-      {exp.transformadores && (
-        <section className="rounded-md border p-4">
-          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold">
-            <Zap className="h-4 w-4 text-yellow-600" /> Tu equipo
-          </h3>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm md:grid-cols-4">
-            <dt className="text-muted-foreground">Marca:</dt><dd>{exp.transformadores.marca ?? "—"}</dd>
-            <dt className="text-muted-foreground">Modelo:</dt><dd>{exp.transformadores.modelo ?? "—"}</dd>
-            <dt className="text-muted-foreground">Capacidad:</dt>
-            <dd className="font-mono">
-              {exp.transformadores.capacidad_kva >= 1000
-                ? `${(exp.transformadores.capacidad_kva / 1000).toFixed(0)} MVA`
-                : `${exp.transformadores.capacidad_kva} kVA`}
-            </dd>
-            <dt className="text-muted-foreground">Tipo:</dt><dd className="capitalize">{exp.transformadores.tipo}</dd>
-            {exp.transformadores.numero_serie && (
+    <div>
+      <PageHeader
+        breadcrumb={[{ label: "Portal" }, { href: "/portal", label: "Mis pedidos" }, { label: exp.codigo }]}
+        title={exp.codigo}
+        titleAccent={tipoLabel}
+        meta={
+          <>
+            <Badge variant={exp.estado === "ganado" ? "success" : exp.estado === "activo" ? "copper" : "muted"}>
+              {exp.estado === "activo" ? "en proceso" : exp.estado === "ganado" ? "completado" : exp.estado}
+            </Badge>
+            {exp.transformadores && (
               <>
-                <dt className="text-muted-foreground">Serie:</dt>
-                <dd className="font-mono">{exp.transformadores.numero_serie}</dd>
+                <span className="text-muted-foreground/40">·</span>
+                <span>{exp.transformadores.marca} {exp.transformadores.modelo}</span>
+                <span className="text-muted-foreground/40">·</span>
+                <span className="text-ttteal">
+                  {exp.transformadores.capacidad_kva >= 1000
+                    ? `${(exp.transformadores.capacidad_kva / 1000).toFixed(0)} MVA`
+                    : `${exp.transformadores.capacidad_kva} kVA`}
+                </span>
               </>
             )}
-          </dl>
-        </section>
-      )}
+          </>
+        }
+        actions={<HeaderActionGhost href="/portal" icon={<ChevronLeft className="h-3.5 w-3.5" />}>Volver</HeaderActionGhost>}
+      />
 
-      {/* Timeline simplificado */}
-      <section>
-        <h3 className="mb-3 text-lg font-bold">Ruta del proceso</h3>
-        <ol className="relative space-y-3 border-l-2 border-muted pl-6">
-          {exp.expediente_hitos.map((h) => {
-            const completado = h.estado === "completado";
-            const enCurso = h.estado === "en_curso";
-            const Icon = completado ? CheckCircle2 : enCurso ? Clock : Circle;
-            return (
-              <li key={h.id} className="relative">
-                <span
-                  className={`absolute -left-[34px] flex h-7 w-7 items-center justify-center rounded-full border-2 bg-background
-                    ${completado ? "border-green-500 text-green-600" : enCurso ? "border-primary text-primary animate-pulse" : "border-muted text-muted-foreground"}`}
-                >
-                  <Icon className="h-4 w-4" />
-                </span>
-                <div className={`rounded-md border p-3 ${enCurso ? "border-primary bg-primary/5" : completado ? "bg-green-50/50" : "bg-muted/20"}`}>
-                  <p className="font-semibold">
-                    {h.emoji && <span className="mr-1">{h.emoji}</span>}
-                    {h.label_cliente}
+      <div className="space-y-6 pt-6">
+        {/* Estado actual destacado */}
+        <section className="overflow-hidden rounded-xl border border-copper/30 bg-glass p-6 inset-highlight"
+          style={{ backgroundImage: "radial-gradient(ellipse 70% 100% at 0% 50%, rgba(255,107,53,0.10), transparent 60%)" }}>
+          <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Estado actual</p>
+          <h3 className="mt-1 font-display text-3xl font-semibold tracking-tight">
+            <span className="bg-gradient-to-br from-copper to-copper-soft bg-clip-text text-transparent">
+              {exp.portal_meta.fase_actual_label}
+            </span>
+          </h3>
+          {exp.portal_meta.proximo_paso_label && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Próximo: <span className="text-foreground">{exp.portal_meta.proximo_paso_label}</span>
+            </p>
+          )}
+          <div className="mt-5 flex items-center gap-4">
+            <div className="flex-1">
+              <div className="h-3 overflow-hidden rounded-full bg-glass-elev">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-ttteal to-copper transition-all"
+                  style={{ width: `${exp.portal_meta.avance_pct}%` }}
+                />
+              </div>
+            </div>
+            <span className="font-display text-3xl font-semibold tabular-nums text-copper text-glow-copper">{exp.portal_meta.avance_pct}%</span>
+          </div>
+          <p className="mt-2 font-mono text-[10.5px] text-muted-foreground">
+            {exp.portal_meta.completados} de {exp.portal_meta.total} etapas completadas
+          </p>
+        </section>
+
+        {/* Info equipo */}
+        {exp.transformadores && (
+          <Panel title="Tu equipo" icon={<Zap className="h-3.5 w-3.5" />}>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm md:grid-cols-4">
+              <KV label="Marca" value={exp.transformadores.marca ?? "—"} />
+              <KV label="Modelo" value={exp.transformadores.modelo ?? "—"} />
+              <KV label="Capacidad" value={
+                exp.transformadores.capacidad_kva >= 1000
+                  ? `${(exp.transformadores.capacidad_kva / 1000).toFixed(0)} MVA`
+                  : `${exp.transformadores.capacidad_kva} kVA`
+              } mono />
+              <KV label="Tipo" value={<span className="capitalize">{exp.transformadores.tipo}</span>} />
+              {exp.transformadores.numero_serie && (
+                <KV label="Serie" value={exp.transformadores.numero_serie} mono />
+              )}
+            </dl>
+          </Panel>
+        )}
+
+        {/* Timeline */}
+        <Panel title="Ruta del proceso" subtitle="Tu pedido paso a paso">
+          <ol className="relative space-y-3 border-l-2 border-glass pl-6">
+            {exp.expediente_hitos.map((h) => {
+              const completado = h.estado === "completado";
+              const enCurso = h.estado === "en_curso";
+              const Icon = completado ? CheckCircle2 : enCurso ? Clock : Circle;
+              return (
+                <li key={h.id} className="relative">
+                  <span
+                    className={`absolute -left-[34px] flex h-7 w-7 items-center justify-center rounded-full border-2
+                      ${completado ? "border-green-500/50 bg-green-500/15 text-green-300"
+                        : enCurso ? "border-copper/60 bg-copper/15 text-copper animate-pulse glow-copper-sm"
+                        : "border-glass-mid bg-glass-elev text-muted-foreground"}`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
+                  <div className={`rounded-xl border p-3
+                    ${enCurso ? "border-copper/30 bg-copper/[0.05]"
+                      : completado ? "border-green-500/25 bg-green-500/[0.04]"
+                      : "border-glass bg-glass"}`}>
+                    <p className="font-semibold">
+                      {h.emoji && <span className="mr-1.5">{h.emoji}</span>}
+                      {h.label_cliente}
+                    </p>
+                    {h.descripcion_cliente && (
+                      <p className="text-xs text-muted-foreground">{h.descripcion_cliente}</p>
+                    )}
+                    {(h.fecha_inicio || h.fecha_fin) && (
+                      <p className="mt-1 inline-flex items-center gap-1 font-mono text-[10.5px] text-muted-foreground">
+                        <Calendar className="h-3 w-3" />
+                        {h.fecha_inicio && <>Iniciado {new Date(h.fecha_inicio).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil" })}</>}
+                        {h.fecha_fin && <> · finalizado {new Date(h.fecha_fin).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil" })}</>}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </Panel>
+
+        {/* Documentos */}
+        {(exp.cotizaciones || exp.contratos) && (
+          <Panel title="Documentos" subtitle="Cotización y contrato vinculados">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {exp.cotizaciones && (
+                <div className="rounded-xl border border-glass bg-glass-elev p-4 text-sm inset-highlight">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-copper" />
+                    <p className="font-semibold">Cotización <span className="font-mono text-copper">{exp.cotizaciones.codigo}</span></p>
+                  </div>
+                  <p className="mt-1 font-mono text-[10.5px] text-muted-foreground">
+                    Emitida {new Date(exp.cotizaciones.fecha_emision).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil" })}
                   </p>
-                  {h.descripcion_cliente && (
-                    <p className="text-xs text-muted-foreground">{h.descripcion_cliente}</p>
-                  )}
-                  {(h.fecha_inicio || h.fecha_fin) && (
-                    <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
-                      <Calendar className="h-3 w-3" />
-                      {h.fecha_inicio && <>Iniciado {new Date(h.fecha_inicio).toLocaleDateString("es-EC")}</>}
-                      {h.fecha_fin && <> · finalizado {new Date(h.fecha_fin).toLocaleDateString("es-EC")}</>}
+                  <p className="mt-2 text-right font-mono text-lg font-semibold tabular-nums text-copper">USD {Number(exp.cotizaciones.total).toFixed(2)}</p>
+                  <Badge variant="outline" className="mt-1 capitalize">{exp.cotizaciones.estado}</Badge>
+                </div>
+              )}
+              {exp.contratos && (
+                <div className="rounded-xl border border-glass bg-glass-elev p-4 text-sm inset-highlight">
+                  <div className="flex items-center gap-2">
+                    <FileSignature className="h-5 w-5 text-ttteal" />
+                    <p className="font-semibold">Contrato <span className="font-mono text-ttteal">{exp.contratos.codigo}</span></p>
+                  </div>
+                  {exp.contratos.fecha_firma && (
+                    <p className="mt-1 font-mono text-[10.5px] text-muted-foreground">
+                      Firmado {new Date(exp.contratos.fecha_firma).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil" })}
                     </p>
                   )}
+                  <p className="mt-2 text-right font-mono text-lg font-semibold tabular-nums text-ttteal">USD {Number(exp.contratos.monto_total).toFixed(2)}</p>
+                  <Badge variant="outline" className="mt-1 capitalize">{exp.contratos.estado}</Badge>
                 </div>
-              </li>
-            );
-          })}
-        </ol>
-      </section>
+              )}
+            </div>
+          </Panel>
+        )}
 
-      {/* Documentos aprobados */}
-      {(exp.cotizaciones || exp.contratos) && (
-        <section>
-          <h3 className="mb-3 text-lg font-bold">Documentos</h3>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {exp.cotizaciones && (
-              <div className="rounded-md border p-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-primary" />
-                  <p className="font-semibold">Cotización {exp.cotizaciones.codigo}</p>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Emitida {new Date(exp.cotizaciones.fecha_emision).toLocaleDateString("es-EC")}
-                </p>
-                <p className="mt-1 font-mono text-right">USD {Number(exp.cotizaciones.total).toFixed(2)}</p>
-                <Badge variant="outline" className="mt-2 capitalize">{exp.cotizaciones.estado}</Badge>
-              </div>
-            )}
-            {exp.contratos && (
-              <div className="rounded-md border p-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <FileSignature className="h-5 w-5 text-primary" />
-                  <p className="font-semibold">Contrato {exp.contratos.codigo}</p>
-                </div>
-                {exp.contratos.fecha_firma && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Firmado {new Date(exp.contratos.fecha_firma).toLocaleDateString("es-EC")}
-                  </p>
-                )}
-                <p className="mt-1 font-mono text-right">USD {Number(exp.contratos.monto_total).toFixed(2)}</p>
-                <Badge variant="outline" className="mt-2 capitalize">{exp.contratos.estado}</Badge>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {exp.descripcion_problema && (
-        <section className="rounded-md border bg-muted/20 p-4 text-sm">
-          <h3 className="mb-1 font-semibold">Lo que pediste</h3>
-          <p className="whitespace-pre-wrap text-muted-foreground">{exp.descripcion_problema}</p>
-        </section>
-      )}
+        {exp.descripcion_problema && (
+          <Panel title="Lo que pediste">
+            <p className="whitespace-pre-wrap text-sm text-foreground/85">{exp.descripcion_problema}</p>
+          </Panel>
+        )}
+      </div>
     </div>
+  );
+}
+
+function KV({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
+  return (
+    <>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className={mono ? "font-mono text-foreground/90" : "text-foreground/90"}>{value}</dd>
+    </>
   );
 }

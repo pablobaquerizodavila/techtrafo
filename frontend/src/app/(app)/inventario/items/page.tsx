@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Search, Pencil, Archive } from "lucide-react";
+import { Plus, Search, Pencil, Archive, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader, HeaderActionPrimary } from "@/components/page-header";
+import { Panel } from "@/components/panel";
 import {
   Table,
   TableBody,
@@ -130,111 +132,116 @@ export default function ItemsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold">Items</h2>
-          <p className="text-muted-foreground">Catalogo maestro de bodega</p>
-        </div>
-        <Button onClick={() => setDialog({ kind: "create" })}>
-          <Plus className="mr-2 h-4 w-4" /> Nuevo item
-        </Button>
-      </header>
+    <div>
+      <PageHeader
+        breadcrumb={[{ href: "/dashboard", label: "Panel" }, { href: "/inventario", label: "Bodega" }, { label: "Items" }]}
+        title="Items"
+        titleAccent="del catálogo"
+        meta={<span>{total} item{total === 1 ? "" : "s"} · catálogo maestro de bodega</span>}
+        actions={
+          <HeaderActionPrimary onClick={() => setDialog({ kind: "create" })} icon={<Plus className="h-3.5 w-3.5" />}>
+            Nuevo item
+          </HeaderActionPrimary>
+        }
+      />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative w-72">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input value={qInput} onChange={(e) => setQInput(e.target.value)} placeholder="Buscar por codigo o nombre" className="pl-9" />
-        </div>
-        <Select
-          value={tipoItem || "_"}
-          onValueChange={(v) => { setPage(1); setTipoItem(v === "_" ? "" : v as TipoItem); }}
-        >
-          <SelectTrigger className="w-44"><SelectValue placeholder="Tipo" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_">Todos los tipos</SelectItem>
-            <SelectItem value="insumo">Insumo</SelectItem>
-            <SelectItem value="componente">Componente</SelectItem>
-            <SelectItem value="herramienta">Herramienta</SelectItem>
-            <SelectItem value="servicio">Servicio</SelectItem>
-            <SelectItem value="producto_terminado">Producto terminado</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={categoriaId === "" ? "_" : categoriaId.toString()}
-          onValueChange={(v) => { setPage(1); setCategoriaId(v === "_" ? "" : Number(v)); }}
-        >
-          <SelectTrigger className="w-56"><SelectValue placeholder="Categoria" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_">Todas las categorias</SelectItem>
-            {categorias.map((c) => (
-              <SelectItem key={c.id} value={c.id.toString()}>{c.nombre}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <div className="space-y-6 pt-6">
+        <Panel padded={false}>
+          <div className="flex flex-wrap items-center gap-2 border-b border-glass px-5 py-3">
+            <div className="relative flex-1 min-w-[18rem] max-w-sm">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input value={qInput} onChange={(e) => setQInput(e.target.value)} placeholder="Buscar por código o nombre…" className="h-8 border-glass bg-glass pl-8 text-sm" />
+            </div>
+            <Select value={tipoItem || "_"} onValueChange={(v) => { setPage(1); setTipoItem(v === "_" ? "" : v as TipoItem); }}>
+              <SelectTrigger className="h-8 w-44 border-glass bg-glass text-xs"><SelectValue placeholder="Tipo" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_">Todos los tipos</SelectItem>
+                <SelectItem value="insumo">Insumo</SelectItem>
+                <SelectItem value="componente">Componente</SelectItem>
+                <SelectItem value="herramienta">Herramienta</SelectItem>
+                <SelectItem value="servicio">Servicio</SelectItem>
+                <SelectItem value="producto_terminado">Producto terminado</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={categoriaId === "" ? "_" : categoriaId.toString()} onValueChange={(v) => { setPage(1); setCategoriaId(v === "_" ? "" : Number(v)); }}>
+              <SelectTrigger className="h-8 w-56 border-glass bg-glass text-xs"><SelectValue placeholder="Categoría" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_">Todas las categorías</SelectItem>
+                {categorias.map((c) => (
+                  <SelectItem key={c.id} value={c.id.toString()}>{c.nombre}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Codigo</TableHead>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Categoria</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Unidad</TableHead>
-              <TableHead>Trazabilidad</TableHead>
-              <TableHead className="text-right">Precio ref.</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Cargando...</TableCell></TableRow>
-            ) : error ? (
-              <TableRow><TableCell colSpan={8} className="text-center text-destructive">{error}</TableCell></TableRow>
-            ) : data.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Sin items que coincidan</TableCell></TableRow>
-            ) : (
-              data.map((it) => (
-                <TableRow key={it.id}>
-                  <TableCell className="font-mono text-xs">{it.codigo_interno}</TableCell>
-                  <TableCell className="font-medium">{it.nombre}</TableCell>
-                  <TableCell className="text-sm">{it.categorias_item?.nombre ?? "—"}</TableCell>
-                  <TableCell className="text-sm">{tipoItemLabel(it.tipo_item)}</TableCell>
-                  <TableCell className="text-sm">{it.unidad_medida}</TableCell>
-                  <TableCell>
-                    {it.controla_serie ? <Badge variant="warning">Serie</Badge>
-                     : it.controla_lote ? <Badge variant="default">Lote</Badge>
-                     : !it.controla_stock ? <Badge variant="muted">Sin stock</Badge>
-                     : <Badge variant="muted">Cantidad</Badge>}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">${Number(it.precio_referencia).toFixed(2)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => setDialog({ kind: "edit", item: it })} aria-label="Editar">
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    {it.estado !== "descontinuado" && (
-                      <Button variant="ghost" size="icon" onClick={() => handleArchive(it)} aria-label="Descontinuar">
-                        <Archive className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+          <Table>
+            <TableHeader>
+              <TableRow className="border-glass bg-glass hover:bg-glass">
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Código</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Nombre</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Categoría</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Tipo</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Unidad</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Trazabilidad</TableHead>
+                <TableHead className="text-right font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Precio ref.</TableHead>
+                <TableHead className="text-right"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow><TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">Cargando…</TableCell></TableRow>
+              ) : error ? (
+                <TableRow><TableCell colSpan={8} className="py-8 text-center text-sm text-rose-400">{error}</TableCell></TableRow>
+              ) : data.length === 0 ? (
+                <TableRow><TableCell colSpan={8} className="py-10 text-center">
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <Package className="h-5 w-5" />
+                    <span className="text-sm">Sin items que coincidan</span>
+                  </div>
+                </TableCell></TableRow>
+              ) : (
+                data.map((it) => (
+                  <TableRow key={it.id} className="border-glass hover:bg-glass">
+                    <TableCell className="font-mono text-xs text-copper">{it.codigo_interno}</TableCell>
+                    <TableCell className="font-medium">{it.nombre}</TableCell>
+                    <TableCell className="text-sm text-foreground/80">{it.categorias_item?.nombre ?? "—"}</TableCell>
+                    <TableCell className="text-sm capitalize text-foreground/80">{tipoItemLabel(it.tipo_item)}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{it.unidad_medida}</TableCell>
+                    <TableCell>
+                      {it.controla_serie ? <Badge variant="warning">Serie</Badge>
+                       : it.controla_lote ? <Badge variant="teal">Lote</Badge>
+                       : !it.controla_stock ? <Badge variant="muted">Sin stock</Badge>
+                       : <Badge variant="muted">Cantidad</Badge>}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm tabular-nums text-copper">${Number(it.precio_referencia).toFixed(2)}</TableCell>
+                    <TableCell className="text-right">
+                      <button type="button" onClick={() => setDialog({ kind: "edit", item: it })} aria-label="Editar"
+                        className="rounded-md p-1.5 text-muted-foreground hover:bg-glass-elev hover:text-copper">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      {it.estado !== "descontinuado" && (
+                        <button type="button" onClick={() => handleArchive(it)} aria-label="Descontinuar"
+                          className="ml-1 rounded-md p-1.5 text-rose-400 hover:bg-rose-500/10">
+                          <Archive className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
 
-      <div className="flex items-center justify-between text-sm">
-        <p className="text-muted-foreground">
-          {total === 0 ? "Sin resultados" : `${total} item${total === 1 ? "" : "s"} - pagina ${page}/${totalPages}`}
-        </p>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>Anterior</Button>
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>Siguiente</Button>
-        </div>
+          <div className="flex items-center justify-between border-t border-glass px-5 py-3 text-sm">
+            <p className="font-mono text-[11px] text-muted-foreground">
+              {total === 0 ? "Sin resultados" : `${total} item${total === 1 ? "" : "s"} · página ${page}/${totalPages}`}
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="border-glass-mid bg-glass">Anterior</Button>
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="border-glass-mid bg-glass">Siguiente</Button>
+            </div>
+          </div>
+        </Panel>
       </div>
 
       <Dialog open={dialog.kind !== "closed"} onOpenChange={(open) => !open && setDialog({ kind: "closed" })}>
@@ -255,7 +262,7 @@ export default function ItemsPage() {
         </DialogContent>
       </Dialog>
 
-      <Toaster richColors position="top-right" />
+      <Toaster richColors position="top-right" theme="dark" />
     </div>
   );
 }
