@@ -152,22 +152,25 @@ model contratos {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model cotizacion_lineas {
-  id                         BigInt       @id @default(autoincrement())
-  cotizacion_id              BigInt
-  orden                      Int          @default(1)
-  item_id                    BigInt?
-  descripcion                String
-  cantidad                   Decimal      @db.Decimal(14, 3)
-  unidad_medida              String       @default("unid") @db.VarChar(20)
-  precio_unitario            Decimal      @db.Decimal(14, 2)
-  descuento_linea_porcentaje Decimal      @default(0) @db.Decimal(5, 2)
-  costo_unitario             Decimal?     @db.Decimal(14, 2)
-  subtotal_linea             Decimal      @default(0) @db.Decimal(14, 2)
-  notas                      String?
-  created_at                 DateTime?    @default(now()) @db.Timestamptz(6)
-  updated_at                 DateTime?    @default(now()) @db.Timestamptz(6)
-  cotizaciones               cotizaciones @relation(fields: [cotizacion_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  items                      items?       @relation(fields: [item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  id                            BigInt       @id @default(autoincrement())
+  cotizacion_id                 BigInt
+  orden                         Int          @default(1)
+  item_id                       BigInt?
+  descripcion                   String
+  cantidad                      Decimal      @db.Decimal(14, 3)
+  unidad_medida                 String       @default("unid") @db.VarChar(20)
+  precio_unitario               Decimal      @db.Decimal(14, 2)
+  descuento_linea_porcentaje    Decimal      @default(0) @db.Decimal(5, 2)
+  costo_unitario                Decimal?     @db.Decimal(14, 2)
+  subtotal_linea                Decimal      @default(0) @db.Decimal(14, 2)
+  notas                         String?
+  created_at                    DateTime?    @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime?    @default(now()) @db.Timestamptz(6)
+  pendiente_aprovisionamiento   Boolean      @default(false)
+  tiempo_aprovisionamiento_dias Int?
+  categoria                     String?      @db.VarChar(30)
+  cotizaciones                  cotizaciones @relation(fields: [cotizacion_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  items                         items?       @relation(fields: [item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([cotizacion_id], map: "idx_cot_lineas_cotizacion")
   @@schema("comercial")
@@ -191,43 +194,56 @@ model cotizacion_revisiones {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model cotizaciones {
-  id                                              BigInt                  @id @default(autoincrement())
-  codigo                                          String?                 @unique @db.VarChar(30)
-  cliente_id                                      BigInt
-  contacto_id                                     BigInt?
-  tipo_servicio                                   String                  @db.VarChar(20)
-  fecha_emision                                   DateTime                @default(dbgenerated("CURRENT_DATE")) @db.Date
-  fecha_validez                                   DateTime?               @db.Date
-  moneda                                          String                  @default("USD") @db.VarChar(3)
-  subtotal                                        Decimal                 @default(0) @db.Decimal(14, 2)
-  descuento_global                                Decimal                 @default(0) @db.Decimal(14, 2)
-  iva_porcentaje                                  Decimal                 @default(15.00) @db.Decimal(5, 2)
-  iva_valor                                       Decimal                 @default(0) @db.Decimal(14, 2)
-  total                                           Decimal                 @default(0) @db.Decimal(14, 2)
-  margen_porcentaje                               Decimal?                @db.Decimal(5, 2)
-  condiciones_pago                                String?
-  tiempo_entrega                                  String?
-  observaciones                                   String?
-  notas_internas                                  String?
-  estado                                          String                  @default("borrador") @db.VarChar(20)
-  revision_actual                                 Int                     @default(1)
-  vendedor_id                                     String?                 @db.Uuid
-  aprobada_por                                    String?                 @db.Uuid
-  fecha_aprobacion                                DateTime?               @db.Timestamptz(6)
-  creado_por                                      String?                 @db.Uuid
-  actualizado_por                                 String?                 @db.Uuid
-  created_at                                      DateTime?               @default(now()) @db.Timestamptz(6)
-  updated_at                                      DateTime?               @default(now()) @db.Timestamptz(6)
-  contratos                                       contratos?
-  cotizacion_lineas                               cotizacion_lineas[]
-  cotizacion_revisiones                           cotizacion_revisiones[]
-  usuarios_cotizaciones_actualizado_porTousuarios usuarios?               @relation("cotizaciones_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  usuarios_cotizaciones_aprobada_porTousuarios    usuarios?               @relation("cotizaciones_aprobada_porTousuarios", fields: [aprobada_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  clientes                                        clientes                @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  cliente_contactos                               cliente_contactos?      @relation(fields: [contacto_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  usuarios_cotizaciones_creado_porTousuarios      usuarios?               @relation("cotizaciones_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  usuarios_cotizaciones_vendedor_idTousuarios     usuarios?               @relation("cotizaciones_vendedor_idTousuarios", fields: [vendedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  expedientes                                     expedientes[]
+  id                                                              BigInt                                  @id @default(autoincrement())
+  codigo                                                          String?                                 @unique @db.VarChar(30)
+  cliente_id                                                      BigInt
+  contacto_id                                                     BigInt?
+  tipo_servicio                                                   String                                  @db.VarChar(20)
+  fecha_emision                                                   DateTime                                @default(dbgenerated("CURRENT_DATE")) @db.Date
+  fecha_validez                                                   DateTime?                               @db.Date
+  moneda                                                          String                                  @default("USD") @db.VarChar(3)
+  subtotal                                                        Decimal                                 @default(0) @db.Decimal(14, 2)
+  descuento_global                                                Decimal                                 @default(0) @db.Decimal(14, 2)
+  iva_porcentaje                                                  Decimal                                 @default(15.00) @db.Decimal(5, 2)
+  iva_valor                                                       Decimal                                 @default(0) @db.Decimal(14, 2)
+  total                                                           Decimal                                 @default(0) @db.Decimal(14, 2)
+  margen_porcentaje                                               Decimal?                                @db.Decimal(5, 2)
+  condiciones_pago                                                String?
+  tiempo_entrega                                                  String?
+  observaciones                                                   String?
+  notas_internas                                                  String?
+  estado                                                          String                                  @default("borrador") @db.VarChar(20)
+  revision_actual                                                 Int                                     @default(1)
+  vendedor_id                                                     String?                                 @db.Uuid
+  aprobada_por                                                    String?                                 @db.Uuid
+  fecha_aprobacion                                                DateTime?                               @db.Timestamptz(6)
+  creado_por                                                      String?                                 @db.Uuid
+  actualizado_por                                                 String?                                 @db.Uuid
+  created_at                                                      DateTime?                               @default(now()) @db.Timestamptz(6)
+  updated_at                                                      DateTime?                               @default(now()) @db.Timestamptz(6)
+  revision_interna_estado                                         String                                  @default("no_solicitada") @db.VarChar(20)
+  revision_interna_nivel                                          Int?
+  revision_interna_solicitada_por                                 String?                                 @db.Uuid
+  revision_interna_solicitada_at                                  DateTime?                               @db.Timestamptz(6)
+  revision_interna_resuelta_por                                   String?                                 @db.Uuid
+  revision_interna_resuelta_at                                    DateTime?                               @db.Timestamptz(6)
+  revision_interna_motivo_rechazo                                 String?
+  plantilla_id                                                    BigInt?
+  contingencia_porcentaje                                         Decimal?                                @db.Decimal(5, 2)
+  contratos                                                       contratos?
+  cotizacion_lineas                                               cotizacion_lineas[]
+  cotizacion_revision_interna_historial                           cotizacion_revision_interna_historial[]
+  cotizacion_revisiones                                           cotizacion_revisiones[]
+  usuarios_cotizaciones_actualizado_porTousuarios                 usuarios?                               @relation("cotizaciones_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_cotizaciones_aprobada_porTousuarios                    usuarios?                               @relation("cotizaciones_aprobada_porTousuarios", fields: [aprobada_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  clientes                                                        clientes                                @relation(fields: [cliente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  cliente_contactos                                               cliente_contactos?                      @relation(fields: [contacto_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_cotizaciones_creado_porTousuarios                      usuarios?                               @relation("cotizaciones_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  cotizacion_plantillas                                           cotizacion_plantillas?                  @relation(fields: [plantilla_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_cotizaciones_revision_interna_resuelta_porTousuarios   usuarios?                               @relation("cotizaciones_revision_interna_resuelta_porTousuarios", fields: [revision_interna_resuelta_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_cotizaciones_revision_interna_solicitada_porTousuarios usuarios?                               @relation("cotizaciones_revision_interna_solicitada_porTousuarios", fields: [revision_interna_solicitada_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_cotizaciones_vendedor_idTousuarios                     usuarios?                               @relation("cotizaciones_vendedor_idTousuarios", fields: [vendedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  expedientes                                                     expedientes[]
 
   @@index([cliente_id], map: "idx_cotizaciones_cliente")
   @@index([codigo], map: "idx_cotizaciones_codigo")
@@ -291,89 +307,94 @@ model roles {
 }
 
 model usuarios {
-  id                                                            String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email                                                         String                  @unique @db.VarChar(255)
-  password_hash                                                 String                  @db.VarChar(255)
-  nombres                                                       String                  @db.VarChar(100)
-  apellidos                                                     String                  @db.VarChar(100)
-  rol_id                                                        Int?
-  telefono                                                      String?                 @db.VarChar(20)
-  activo                                                        Boolean?                @default(true)
-  ultimo_login                                                  DateTime?               @db.Timestamptz(6)
-  created_at                                                    DateTime?               @default(now()) @db.Timestamptz(6)
-  updated_at                                                    DateTime?               @default(now()) @db.Timestamptz(6)
-  estado_aprobacion                                             String                  @default("pendiente") @db.VarChar(20)
-  aprobado_por                                                  String?                 @db.Uuid
-  fecha_aprobacion                                              DateTime?               @db.Timestamptz(6)
-  motivo_rechazo                                                String?
-  telefono_solicitud                                            String?                 @db.VarChar(20)
-  cliente_id                                                    BigInt?
-  token_version                                                 Int                     @default(1)
-  cliente_contactos_cliente_contactos_actualizado_porTousuarios cliente_contactos[]     @relation("cliente_contactos_actualizado_porTousuarios")
-  cliente_contactos_cliente_contactos_creado_porTousuarios      cliente_contactos[]     @relation("cliente_contactos_creado_porTousuarios")
-  clientes_clientes_actualizado_porTousuarios                   clientes[]              @relation("clientes_actualizado_porTousuarios")
-  clientes_clientes_creado_porTousuarios                        clientes[]              @relation("clientes_creado_porTousuarios")
-  contrato_pagos_contrato_pagos_actualizado_porTousuarios       contrato_pagos[]        @relation("contrato_pagos_actualizado_porTousuarios")
-  contrato_pagos_contrato_pagos_creado_porTousuarios            contrato_pagos[]        @relation("contrato_pagos_creado_porTousuarios")
-  contratos_contratos_actualizado_porTousuarios                 contratos[]             @relation("contratos_actualizado_porTousuarios")
-  contratos_contratos_creado_porTousuarios                      contratos[]             @relation("contratos_creado_porTousuarios")
-  contratos_contratos_firmado_porTousuarios                     contratos[]             @relation("contratos_firmado_porTousuarios")
-  cotizacion_revisiones                                         cotizacion_revisiones[]
-  cotizaciones_cotizaciones_actualizado_porTousuarios           cotizaciones[]          @relation("cotizaciones_actualizado_porTousuarios")
-  cotizaciones_cotizaciones_aprobada_porTousuarios              cotizaciones[]          @relation("cotizaciones_aprobada_porTousuarios")
-  cotizaciones_cotizaciones_creado_porTousuarios                cotizaciones[]          @relation("cotizaciones_creado_porTousuarios")
-  cotizaciones_cotizaciones_vendedor_idTousuarios               cotizaciones[]          @relation("cotizaciones_vendedor_idTousuarios")
-  expediente_hitos_expediente_hitos_actualizado_porTousuarios   expediente_hitos[]      @relation("expediente_hitos_actualizado_porTousuarios")
-  expediente_hitos_expediente_hitos_aprobado_porTousuarios      expediente_hitos[]      @relation("expediente_hitos_aprobado_porTousuarios")
-  expediente_hitos_expediente_hitos_creado_porTousuarios        expediente_hitos[]      @relation("expediente_hitos_creado_porTousuarios")
-  expediente_hitos_expediente_hitos_responsable_idTousuarios    expediente_hitos[]      @relation("expediente_hitos_responsable_idTousuarios")
-  expedientes_expedientes_actualizado_porTousuarios             expedientes[]           @relation("expedientes_actualizado_porTousuarios")
-  expedientes_expedientes_creado_porTousuarios                  expedientes[]           @relation("expedientes_creado_porTousuarios")
-  expedientes_expedientes_ejecutivo_idTousuarios                expedientes[]           @relation("expedientes_ejecutivo_idTousuarios")
-  hito_plantillas_hito_plantillas_actualizado_porTousuarios     hito_plantillas[]       @relation("hito_plantillas_actualizado_porTousuarios")
-  hito_plantillas_hito_plantillas_creado_porTousuarios          hito_plantillas[]       @relation("hito_plantillas_creado_porTousuarios")
-  informes_tecnicos_informes_tecnicos_actualizado_porTousuarios informes_tecnicos[]     @relation("informes_tecnicos_actualizado_porTousuarios")
-  informes_tecnicos_informes_tecnicos_aprobado_porTousuarios    informes_tecnicos[]     @relation("informes_tecnicos_aprobado_porTousuarios")
-  informes_tecnicos_informes_tecnicos_creado_porTousuarios      informes_tecnicos[]     @relation("informes_tecnicos_creado_porTousuarios")
-  visitas_tecnicas_visitas_tecnicas_actualizado_porTousuarios   visitas_tecnicas[]      @relation("visitas_tecnicas_actualizado_porTousuarios")
-  visitas_tecnicas_visitas_tecnicas_creado_porTousuarios        visitas_tecnicas[]      @relation("visitas_tecnicas_creado_porTousuarios")
-  visitas_tecnicas_visitas_tecnicas_ingeniero_idTousuarios      visitas_tecnicas[]      @relation("visitas_tecnicas_ingeniero_idTousuarios")
-  auditoria                                                     auditoria[]
-  configuracion                                                 configuracion[]
-  notificaciones                                                notificaciones[]
-  usuarios                                                      usuarios?               @relation("usuariosTousuarios", fields: [aprobado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  other_usuarios                                                usuarios[]              @relation("usuariosTousuarios")
-  clientes_usuarios_cliente_idToclientes                        clientes?               @relation("usuarios_cliente_idToclientes", fields: [cliente_id], references: [id], onUpdate: NoAction)
-  roles                                                         roles?                  @relation(fields: [rol_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  categorias_item_categorias_item_actualizado_porTousuarios     categorias_item[]       @relation("categorias_item_actualizado_porTousuarios")
-  categorias_item_categorias_item_creado_porTousuarios          categorias_item[]       @relation("categorias_item_creado_porTousuarios")
-  items_items_actualizado_porTousuarios                         items[]                 @relation("items_actualizado_porTousuarios")
-  items_items_creado_porTousuarios                              items[]                 @relation("items_creado_porTousuarios")
-  lotes_lotes_actualizado_porTousuarios                         lotes[]                 @relation("lotes_actualizado_porTousuarios")
-  lotes_lotes_creado_porTousuarios                              lotes[]                 @relation("lotes_creado_porTousuarios")
-  movimientos_stock                                             movimientos_stock[]
-  series_series_actualizado_porTousuarios                       series[]                @relation("series_actualizado_porTousuarios")
-  series_series_creado_porTousuarios                            series[]                @relation("series_creado_porTousuarios")
-  ubicaciones_ubicaciones_actualizado_porTousuarios             ubicaciones[]           @relation("ubicaciones_actualizado_porTousuarios")
-  ubicaciones_ubicaciones_creado_porTousuarios                  ubicaciones[]           @relation("ubicaciones_creado_porTousuarios")
-  garantias_garantias_actualizado_porTousuarios                 garantias[]             @relation("garantias_actualizado_porTousuarios")
-  garantias_garantias_creado_porTousuarios                      garantias[]             @relation("garantias_creado_porTousuarios")
-  intervenciones_intervenciones_actualizado_porTousuarios       intervenciones[]        @relation("intervenciones_actualizado_porTousuarios")
-  intervenciones_intervenciones_creado_porTousuarios            intervenciones[]        @relation("intervenciones_creado_porTousuarios")
-  intervenciones_intervenciones_tecnico_idTousuarios            intervenciones[]        @relation("intervenciones_tecnico_idTousuarios")
-  reclamos_reclamos_actualizado_porTousuarios                   reclamos[]              @relation("reclamos_actualizado_porTousuarios")
-  reclamos_reclamos_creado_porTousuarios                        reclamos[]              @relation("reclamos_creado_porTousuarios")
-  reclamos_reclamos_dictaminado_porTousuarios                   reclamos[]              @relation("reclamos_dictaminado_porTousuarios")
-  ot_ot_actualizado_porTousuarios                               ot[]                    @relation("ot_actualizado_porTousuarios")
-  ot_ot_creado_porTousuarios                                    ot[]                    @relation("ot_creado_porTousuarios")
-  ot_ot_responsable_idTousuarios                                ot[]                    @relation("ot_responsable_idTousuarios")
-  ot_evidencias                                                 ot_evidencias[]
-  ot_pasos_ot_pasos_aprobado_porTousuarios                      ot_pasos[]              @relation("ot_pasos_aprobado_porTousuarios")
-  ot_pasos_ot_pasos_ejecutado_porTousuarios                     ot_pasos[]              @relation("ot_pasos_ejecutado_porTousuarios")
-  reprocesos                                                    reprocesos[]
-  tiempos_trabajo                                               tiempos_trabajo[]
-  transformadores_transformadores_actualizado_porTousuarios     transformadores[]       @relation("transformadores_actualizado_porTousuarios")
-  transformadores_transformadores_creado_porTousuarios          transformadores[]       @relation("transformadores_creado_porTousuarios")
+  id                                                                    String                                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                                                                 String                                  @unique @db.VarChar(255)
+  password_hash                                                         String                                  @db.VarChar(255)
+  nombres                                                               String                                  @db.VarChar(100)
+  apellidos                                                             String                                  @db.VarChar(100)
+  rol_id                                                                Int?
+  telefono                                                              String?                                 @db.VarChar(20)
+  activo                                                                Boolean?                                @default(true)
+  ultimo_login                                                          DateTime?                               @db.Timestamptz(6)
+  created_at                                                            DateTime?                               @default(now()) @db.Timestamptz(6)
+  updated_at                                                            DateTime?                               @default(now()) @db.Timestamptz(6)
+  estado_aprobacion                                                     String                                  @default("pendiente") @db.VarChar(20)
+  aprobado_por                                                          String?                                 @db.Uuid
+  fecha_aprobacion                                                      DateTime?                               @db.Timestamptz(6)
+  motivo_rechazo                                                        String?
+  telefono_solicitud                                                    String?                                 @db.VarChar(20)
+  cliente_id                                                            BigInt?
+  token_version                                                         Int                                     @default(1)
+  cliente_contactos_cliente_contactos_actualizado_porTousuarios         cliente_contactos[]                     @relation("cliente_contactos_actualizado_porTousuarios")
+  cliente_contactos_cliente_contactos_creado_porTousuarios              cliente_contactos[]                     @relation("cliente_contactos_creado_porTousuarios")
+  clientes_clientes_actualizado_porTousuarios                           clientes[]                              @relation("clientes_actualizado_porTousuarios")
+  clientes_clientes_creado_porTousuarios                                clientes[]                              @relation("clientes_creado_porTousuarios")
+  contrato_pagos_contrato_pagos_actualizado_porTousuarios               contrato_pagos[]                        @relation("contrato_pagos_actualizado_porTousuarios")
+  contrato_pagos_contrato_pagos_creado_porTousuarios                    contrato_pagos[]                        @relation("contrato_pagos_creado_porTousuarios")
+  contratos_contratos_actualizado_porTousuarios                         contratos[]                             @relation("contratos_actualizado_porTousuarios")
+  contratos_contratos_creado_porTousuarios                              contratos[]                             @relation("contratos_creado_porTousuarios")
+  contratos_contratos_firmado_porTousuarios                             contratos[]                             @relation("contratos_firmado_porTousuarios")
+  cotizacion_plantillas_cotizacion_plantillas_actualizado_porTousuarios cotizacion_plantillas[]                 @relation("cotizacion_plantillas_actualizado_porTousuarios")
+  cotizacion_plantillas_cotizacion_plantillas_creado_porTousuarios      cotizacion_plantillas[]                 @relation("cotizacion_plantillas_creado_porTousuarios")
+  cotizacion_revision_interna_historial                                 cotizacion_revision_interna_historial[]
+  cotizacion_revisiones                                                 cotizacion_revisiones[]
+  cotizaciones_cotizaciones_actualizado_porTousuarios                   cotizaciones[]                          @relation("cotizaciones_actualizado_porTousuarios")
+  cotizaciones_cotizaciones_aprobada_porTousuarios                      cotizaciones[]                          @relation("cotizaciones_aprobada_porTousuarios")
+  cotizaciones_cotizaciones_creado_porTousuarios                        cotizaciones[]                          @relation("cotizaciones_creado_porTousuarios")
+  cotizaciones_cotizaciones_revision_interna_resuelta_porTousuarios     cotizaciones[]                          @relation("cotizaciones_revision_interna_resuelta_porTousuarios")
+  cotizaciones_cotizaciones_revision_interna_solicitada_porTousuarios   cotizaciones[]                          @relation("cotizaciones_revision_interna_solicitada_porTousuarios")
+  cotizaciones_cotizaciones_vendedor_idTousuarios                       cotizaciones[]                          @relation("cotizaciones_vendedor_idTousuarios")
+  expediente_hitos_expediente_hitos_actualizado_porTousuarios           expediente_hitos[]                      @relation("expediente_hitos_actualizado_porTousuarios")
+  expediente_hitos_expediente_hitos_aprobado_porTousuarios              expediente_hitos[]                      @relation("expediente_hitos_aprobado_porTousuarios")
+  expediente_hitos_expediente_hitos_creado_porTousuarios                expediente_hitos[]                      @relation("expediente_hitos_creado_porTousuarios")
+  expediente_hitos_expediente_hitos_responsable_idTousuarios            expediente_hitos[]                      @relation("expediente_hitos_responsable_idTousuarios")
+  expedientes_expedientes_actualizado_porTousuarios                     expedientes[]                           @relation("expedientes_actualizado_porTousuarios")
+  expedientes_expedientes_creado_porTousuarios                          expedientes[]                           @relation("expedientes_creado_porTousuarios")
+  expedientes_expedientes_ejecutivo_idTousuarios                        expedientes[]                           @relation("expedientes_ejecutivo_idTousuarios")
+  hito_plantillas_hito_plantillas_actualizado_porTousuarios             hito_plantillas[]                       @relation("hito_plantillas_actualizado_porTousuarios")
+  hito_plantillas_hito_plantillas_creado_porTousuarios                  hito_plantillas[]                       @relation("hito_plantillas_creado_porTousuarios")
+  informes_tecnicos_informes_tecnicos_actualizado_porTousuarios         informes_tecnicos[]                     @relation("informes_tecnicos_actualizado_porTousuarios")
+  informes_tecnicos_informes_tecnicos_aprobado_porTousuarios            informes_tecnicos[]                     @relation("informes_tecnicos_aprobado_porTousuarios")
+  informes_tecnicos_informes_tecnicos_creado_porTousuarios              informes_tecnicos[]                     @relation("informes_tecnicos_creado_porTousuarios")
+  visitas_tecnicas_visitas_tecnicas_actualizado_porTousuarios           visitas_tecnicas[]                      @relation("visitas_tecnicas_actualizado_porTousuarios")
+  visitas_tecnicas_visitas_tecnicas_creado_porTousuarios                visitas_tecnicas[]                      @relation("visitas_tecnicas_creado_porTousuarios")
+  visitas_tecnicas_visitas_tecnicas_ingeniero_idTousuarios              visitas_tecnicas[]                      @relation("visitas_tecnicas_ingeniero_idTousuarios")
+  auditoria                                                             auditoria[]
+  configuracion                                                         configuracion[]
+  notificaciones                                                        notificaciones[]
+  usuarios                                                              usuarios?                               @relation("usuariosTousuarios", fields: [aprobado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_usuarios                                                        usuarios[]                              @relation("usuariosTousuarios")
+  clientes_usuarios_cliente_idToclientes                                clientes?                               @relation("usuarios_cliente_idToclientes", fields: [cliente_id], references: [id], onUpdate: NoAction)
+  roles                                                                 roles?                                  @relation(fields: [rol_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  categorias_item_categorias_item_actualizado_porTousuarios             categorias_item[]                       @relation("categorias_item_actualizado_porTousuarios")
+  categorias_item_categorias_item_creado_porTousuarios                  categorias_item[]                       @relation("categorias_item_creado_porTousuarios")
+  items_items_actualizado_porTousuarios                                 items[]                                 @relation("items_actualizado_porTousuarios")
+  items_items_creado_porTousuarios                                      items[]                                 @relation("items_creado_porTousuarios")
+  lotes_lotes_actualizado_porTousuarios                                 lotes[]                                 @relation("lotes_actualizado_porTousuarios")
+  lotes_lotes_creado_porTousuarios                                      lotes[]                                 @relation("lotes_creado_porTousuarios")
+  movimientos_stock                                                     movimientos_stock[]
+  series_series_actualizado_porTousuarios                               series[]                                @relation("series_actualizado_porTousuarios")
+  series_series_creado_porTousuarios                                    series[]                                @relation("series_creado_porTousuarios")
+  ubicaciones_ubicaciones_actualizado_porTousuarios                     ubicaciones[]                           @relation("ubicaciones_actualizado_porTousuarios")
+  ubicaciones_ubicaciones_creado_porTousuarios                          ubicaciones[]                           @relation("ubicaciones_creado_porTousuarios")
+  garantias_garantias_actualizado_porTousuarios                         garantias[]                             @relation("garantias_actualizado_porTousuarios")
+  garantias_garantias_creado_porTousuarios                              garantias[]                             @relation("garantias_creado_porTousuarios")
+  intervenciones_intervenciones_actualizado_porTousuarios               intervenciones[]                        @relation("intervenciones_actualizado_porTousuarios")
+  intervenciones_intervenciones_creado_porTousuarios                    intervenciones[]                        @relation("intervenciones_creado_porTousuarios")
+  intervenciones_intervenciones_tecnico_idTousuarios                    intervenciones[]                        @relation("intervenciones_tecnico_idTousuarios")
+  reclamos_reclamos_actualizado_porTousuarios                           reclamos[]                              @relation("reclamos_actualizado_porTousuarios")
+  reclamos_reclamos_creado_porTousuarios                                reclamos[]                              @relation("reclamos_creado_porTousuarios")
+  reclamos_reclamos_dictaminado_porTousuarios                           reclamos[]                              @relation("reclamos_dictaminado_porTousuarios")
+  ot_ot_actualizado_porTousuarios                                       ot[]                                    @relation("ot_actualizado_porTousuarios")
+  ot_ot_creado_porTousuarios                                            ot[]                                    @relation("ot_creado_porTousuarios")
+  ot_ot_responsable_idTousuarios                                        ot[]                                    @relation("ot_responsable_idTousuarios")
+  ot_evidencias                                                         ot_evidencias[]
+  ot_pasos_ot_pasos_aprobado_porTousuarios                              ot_pasos[]                              @relation("ot_pasos_aprobado_porTousuarios")
+  ot_pasos_ot_pasos_ejecutado_porTousuarios                             ot_pasos[]                              @relation("ot_pasos_ejecutado_porTousuarios")
+  reprocesos                                                            reprocesos[]
+  tiempos_trabajo                                                       tiempos_trabajo[]
+  transformadores_transformadores_actualizado_porTousuarios             transformadores[]                       @relation("transformadores_actualizado_porTousuarios")
+  transformadores_transformadores_creado_porTousuarios                  transformadores[]                       @relation("transformadores_creado_porTousuarios")
 
   @@index([email], map: "idx_usuarios_email")
   @@index([rol_id], map: "idx_usuarios_rol")
@@ -401,33 +422,34 @@ model categorias_item {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model items {
-  id                                       BigInt              @id @default(autoincrement())
-  codigo_interno                           String              @unique @db.VarChar(50)
+  id                                       BigInt                  @id @default(autoincrement())
+  codigo_interno                           String                  @unique @db.VarChar(50)
   categoria_id                             BigInt
-  nombre                                   String              @db.VarChar(200)
+  nombre                                   String                  @db.VarChar(200)
   descripcion                              String?
-  tipo_item                                String              @db.VarChar(30)
-  unidad_medida                            String              @default("unid") @db.VarChar(20)
-  controla_stock                           Boolean?            @default(true)
-  controla_lote                            Boolean?            @default(false)
-  controla_serie                           Boolean?            @default(false)
-  costo_referencia                         Decimal?            @default(0) @db.Decimal(14, 2)
-  precio_referencia                        Decimal?            @default(0) @db.Decimal(14, 2)
-  stock_minimo                             Decimal?            @default(0) @db.Decimal(14, 3)
-  stock_maximo                             Decimal?            @default(0) @db.Decimal(14, 3)
-  punto_reorden                            Decimal?            @default(0) @db.Decimal(14, 3)
-  proveedor_preferido                      String?             @db.VarChar(200)
-  peso_kg                                  Decimal?            @db.Decimal(10, 3)
+  tipo_item                                String                  @db.VarChar(30)
+  unidad_medida                            String                  @default("unid") @db.VarChar(20)
+  controla_stock                           Boolean?                @default(true)
+  controla_lote                            Boolean?                @default(false)
+  controla_serie                           Boolean?                @default(false)
+  costo_referencia                         Decimal?                @default(0) @db.Decimal(14, 2)
+  precio_referencia                        Decimal?                @default(0) @db.Decimal(14, 2)
+  stock_minimo                             Decimal?                @default(0) @db.Decimal(14, 3)
+  stock_maximo                             Decimal?                @default(0) @db.Decimal(14, 3)
+  punto_reorden                            Decimal?                @default(0) @db.Decimal(14, 3)
+  proveedor_preferido                      String?                 @db.VarChar(200)
+  peso_kg                                  Decimal?                @db.Decimal(10, 3)
   notas                                    String?
-  estado                                   String?             @default("activo") @db.VarChar(20)
-  creado_por                               String?             @db.Uuid
-  actualizado_por                          String?             @db.Uuid
-  created_at                               DateTime?           @default(now()) @db.Timestamptz(6)
-  updated_at                               DateTime?           @default(now()) @db.Timestamptz(6)
+  estado                                   String?                 @default("activo") @db.VarChar(20)
+  creado_por                               String?                 @db.Uuid
+  actualizado_por                          String?                 @db.Uuid
+  created_at                               DateTime?               @default(now()) @db.Timestamptz(6)
+  updated_at                               DateTime?               @default(now()) @db.Timestamptz(6)
   cotizacion_lineas                        cotizacion_lineas[]
-  usuarios_items_actualizado_porTousuarios usuarios?           @relation("items_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  categorias_item                          categorias_item     @relation(fields: [categoria_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  usuarios_items_creado_porTousuarios      usuarios?           @relation("items_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  plantilla_componentes                    plantilla_componentes[]
+  usuarios_items_actualizado_porTousuarios usuarios?               @relation("items_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  categorias_item                          categorias_item         @relation(fields: [categoria_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_items_creado_porTousuarios      usuarios?               @relation("items_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
   lotes                                    lotes[]
   movimientos_stock                        movimientos_stock[]
   series                                   series[]
@@ -1119,5 +1141,75 @@ model hito_estados_cliente {
   orden               Int     @default(0)
   emoji               String? @db.VarChar(8)
 
+  @@schema("comercial")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model cotizacion_revision_interna_historial {
+  id             BigInt       @id @default(autoincrement())
+  cotizacion_id  BigInt
+  nivel          Int
+  accion         String       @db.VarChar(20)
+  por_usuario_id String?      @db.Uuid
+  rol_actuante   String?      @db.VarChar(50)
+  notas          String?
+  created_at     DateTime     @default(now()) @db.Timestamptz(6)
+  cotizaciones   cotizaciones @relation(fields: [cotizacion_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  usuarios       usuarios?    @relation(fields: [por_usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([cotizacion_id, created_at(sort: Desc)], map: "idx_cot_rev_hist_cotizacion")
+  @@schema("comercial")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model cotizacion_plantillas {
+  id                                                       BigInt                  @id @default(autoincrement())
+  codigo                                                   String                  @unique @db.VarChar(30)
+  nombre                                                   String                  @db.VarChar(200)
+  descripcion                                              String?
+  tipo_servicio                                            String                  @db.VarChar(20)
+  capacidad_kva_min                                        Int?
+  capacidad_kva_max                                        Int?
+  margen_porcentaje_default                                Decimal                 @default(25.00) @db.Decimal(5, 2)
+  contingencia_porcentaje                                  Decimal                 @default(5.00) @db.Decimal(5, 2)
+  iva_porcentaje_default                                   Decimal                 @default(15.00) @db.Decimal(5, 2)
+  tiempo_entrega_base_dias                                 Int                     @default(30)
+  condiciones_pago_default                                 String?
+  observaciones_default                                    String?
+  activo                                                   Boolean                 @default(true)
+  creado_por                                               String?                 @db.Uuid
+  actualizado_por                                          String?                 @db.Uuid
+  created_at                                               DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at                                               DateTime                @default(now()) @db.Timestamptz(6)
+  usuarios_cotizacion_plantillas_actualizado_porTousuarios usuarios?               @relation("cotizacion_plantillas_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_cotizacion_plantillas_creado_porTousuarios      usuarios?               @relation("cotizacion_plantillas_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  cotizaciones                                             cotizaciones[]
+  plantilla_componentes                                    plantilla_componentes[]
+
+  @@index([tipo_servicio, activo], map: "idx_cot_plantillas_tipo")
+  @@schema("comercial")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model plantilla_componentes {
+  id                               BigInt                @id @default(autoincrement())
+  plantilla_id                     BigInt
+  orden                            Int                   @default(1)
+  categoria                        String                @default("materia_prima") @db.VarChar(30)
+  item_id                          BigInt?
+  descripcion                      String                @db.VarChar(500)
+  cantidad_default                 Decimal               @default(1) @db.Decimal(14, 4)
+  unidad_medida                    String                @default("unid") @db.VarChar(20)
+  precio_unitario_default          Decimal               @default(0) @db.Decimal(14, 4)
+  costo_unitario_default           Decimal?              @db.Decimal(14, 4)
+  tiempo_aprovisionamiento_default Int                   @default(0)
+  notas                            String?
+  created_at                       DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at                       DateTime              @default(now()) @db.Timestamptz(6)
+  items                            items?                @relation(fields: [item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  cotizacion_plantillas            cotizacion_plantillas @relation(fields: [plantilla_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([plantilla_id, orden], map: "idx_plant_comp_plantilla")
   @@schema("comercial")
 }

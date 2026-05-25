@@ -353,6 +353,226 @@ router.post("/", requirePermission("cotizaciones", "write"), async (req, res) =>
 });
 
 // -------------------------------------------------------------------
+// POST /api/cotizaciones/desde-plantilla
+// Materializa una cotizacion a partir de una plantilla:
+//   1. Lee componentes de la plantilla
+//   2. Para cada componente con item_id, consulta stock disponible
+//   3. Si stock < cantidad: marca la linea con pendiente_aprovisionamiento
+//   4. Aplica margen + contingencia al costo_unitario para el precio_unitario
+//      (si la plantilla provee precio explicito, se usa ese)
+//   5. Crea la cotizacion en borrador + opcionalmente la vincula al expediente
+// -------------------------------------------------------------------
+const desdePlantillaSchema = z.object({
+  plantilla_id: z.number().int().positive(),
+  cliente_id: z.number().int().positive(),
+  contacto_id: z.number().int().positive().nullable().optional(),
+  expediente_id: z.number().int().positive().nullable().optional(),
+  // Permite override de los valores default de la plantilla
+  margen_porcentaje: z.number().nonnegative().max(200).optional(),
+  contingencia_porcentaje: z.number().nonnegative().max(100).optional(),
+  iva_porcentaje: z.number().nonnegative().max(50).optional(),
+});
+
+router.post("/desde-plantilla", requirePermission("cotizaciones", "write"), async (req, res) => {
+  const parsed = desdePlantillaSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  const userId = req.user!.id;
+  const d = parsed.data;
+
+  try {
+    const cotizacion = await withAppUser(userId, async (tx) => {
+      // 1) Plantilla + componentes
+      const plantilla = await tx.cotizacion_plantillas.findUnique({
+        where: { id: d.plantilla_id },
+        include: { plantilla_componentes: { orderBy: { orden: "asc" } } },
+      });
+      if (!plantilla || !plantilla.activo) throw new Error("plantilla_no_disponible");
+      if (plantilla.plantilla_componentes.length === 0) throw new Error("plantilla_sin_componentes");
+
+      // 2) Validar cliente
+      const cliente = await tx.clientes.findUnique({ where: { id: d.cliente_id } });
+      if (!cliente || cliente.estado === "archivado") throw new Error("cliente_no_disponible");
+
+      // 3) Validar expediente si viene
+      if (d.expediente_id) {
+        const exp = await tx.expedientes.findUnique({ where: { id: d.expediente_id } });
+        if (!exp) throw new Error("expediente_no_encontrado");
+        if (exp.estado !== "activo") throw new Error("expediente_no_activo");
+        if (Number(exp.cliente_id) !== d.cliente_id) throw new Error("cliente_no_coincide");
+      }
+
+      // 4) Para cada componente, materializar la linea con check de stock
+      const margen = d.margen_porcentaje ?? Number(plantilla.margen_porcentaje_default);
+      const contingencia = d.contingencia_porcentaje ?? Number(plantilla.contingencia_porcentaje);
+      const iva = d.iva_porcentaje ?? Number(plantilla.iva_porcentaje_default);
+
+      type LineaMat = {
+        orden: number;
+        item_id: number | null;
+        descripcion: string;
+        cantidad: number;
+        unidad_medida: string;
+        precio_unitario: number;
+        descuento_linea_porcentaje: number;
+        costo_unitario: number | null;
+        notas: string | null;
+        categoria: string;
+        pendiente_aprovisionamiento: boolean;
+        tiempo_aprovisionamiento_dias: number | null;
+        subtotal_linea: number;
+      };
+
+      const lineas: LineaMat[] = [];
+      let maxTiempoApro = 0;
+
+      for (const c of plantilla.plantilla_componentes) {
+        const cantidad = Number(c.cantidad_default);
+        let pendiente = false;
+        let tiempoApro: number | null = null;
+
+        // Check de stock solo si la linea apunta a un item de bodega
+        if (c.item_id) {
+          const stockAgg = await tx.stock.aggregate({
+            where: { item_id: c.item_id },
+            _sum: { cantidad: true },
+          });
+          const disponible = Number(stockAgg._sum.cantidad ?? 0);
+          if (disponible < cantidad) {
+            pendiente = true;
+            tiempoApro = c.tiempo_aprovisionamiento_default;
+            if (tiempoApro > maxTiempoApro) maxTiempoApro = tiempoApro;
+          }
+        }
+
+        // Calculo de precio_unitario:
+        //   - Si la plantilla provee precio_unitario_default > 0, se usa ese.
+        //   - Si no, y hay costo_unitario_default, aplicar margen + contingencia.
+        let precioU = Number(c.precio_unitario_default);
+        if (precioU <= 0 && c.costo_unitario_default) {
+          const costo = Number(c.costo_unitario_default);
+          precioU = Math.round(costo * (1 + contingencia / 100) * (1 + margen / 100) * 100) / 100;
+        }
+
+        const subtotalLinea = Math.round(cantidad * precioU * 100) / 100;
+
+        lineas.push({
+          orden: c.orden,
+          item_id: c.item_id ? Number(c.item_id) : null,
+          descripcion: c.descripcion,
+          cantidad,
+          unidad_medida: c.unidad_medida,
+          precio_unitario: precioU,
+          descuento_linea_porcentaje: 0,
+          costo_unitario: c.costo_unitario_default ? Number(c.costo_unitario_default) : null,
+          notas: c.notas,
+          categoria: c.categoria,
+          pendiente_aprovisionamiento: pendiente,
+          tiempo_aprovisionamiento_dias: tiempoApro,
+          subtotal_linea: subtotalLinea,
+        });
+      }
+
+      // 5) Totales
+      const subtotal = lineas.reduce((acc, l) => acc + l.subtotal_linea, 0);
+      const ivaValor = Math.round(subtotal * (iva / 100) * 100) / 100;
+      const total = Math.round((subtotal + ivaValor) * 100) / 100;
+
+      // 6) Tiempo de entrega = base + max(aprovisionamiento)
+      const tiempoEntregaTotal = plantilla.tiempo_entrega_base_dias + maxTiempoApro;
+      const tiempoEntregaTexto = maxTiempoApro > 0
+        ? `${tiempoEntregaTotal} días (incluye ${maxTiempoApro} días de aprovisionamiento de materia prima)`
+        : `${tiempoEntregaTotal} días`;
+
+      // 7) Generar codigo
+      const year = new Date().getFullYear();
+      const codigo = await generarCodigoCotizacion(tx, year);
+
+      // 8) Crear cotizacion
+      const cot = await tx.cotizaciones.create({
+        data: {
+          codigo,
+          cliente_id: d.cliente_id,
+          contacto_id: d.contacto_id ?? null,
+          tipo_servicio: plantilla.tipo_servicio,
+          fecha_emision: new Date(),
+          moneda: "USD",
+          subtotal,
+          descuento_global: 0,
+          iva_porcentaje: iva,
+          iva_valor: ivaValor,
+          total,
+          margen_porcentaje: margen,
+          condiciones_pago: plantilla.condiciones_pago_default,
+          tiempo_entrega: tiempoEntregaTexto,
+          observaciones: plantilla.observaciones_default,
+          plantilla_id: plantilla.id,
+          contingencia_porcentaje: contingencia,
+          vendedor_id: userId,
+          creado_por: userId,
+          actualizado_por: userId,
+          cotizacion_lineas: {
+            create: lineas.map((l) => ({
+              orden: l.orden,
+              item_id: l.item_id,
+              descripcion: l.descripcion,
+              cantidad: l.cantidad,
+              unidad_medida: l.unidad_medida,
+              precio_unitario: l.precio_unitario,
+              descuento_linea_porcentaje: l.descuento_linea_porcentaje,
+              costo_unitario: l.costo_unitario,
+              subtotal_linea: l.subtotal_linea,
+              notas: l.notas,
+              categoria: l.categoria,
+              pendiente_aprovisionamiento: l.pendiente_aprovisionamiento,
+              tiempo_aprovisionamiento_dias: l.tiempo_aprovisionamiento_dias,
+            })),
+          },
+        },
+        include: {
+          cotizacion_lineas: { orderBy: { orden: "asc" } },
+          clientes: { select: { id: true, razon_social: true, ruc_cedula: true } },
+        },
+      });
+
+      // 9) Vincular al expediente si corresponde
+      if (d.expediente_id) {
+        await tx.$executeRaw`
+          UPDATE comercial.expedientes
+             SET cotizacion_id = ${cot.id},
+                 actualizado_por = ${userId}::uuid,
+                 updated_at = NOW()
+           WHERE id = ${d.expediente_id}
+        `;
+      }
+      return cot;
+    });
+    res.status(201).json({
+      data: cotizacion,
+      meta: {
+        lineas_pendientes_aprovisionamiento: cotizacion.cotizacion_lineas.filter((l) => l.pendiente_aprovisionamiento).length,
+      },
+    });
+  } catch (err) {
+    if (err instanceof Error) {
+      const map: Record<string, number> = {
+        plantilla_no_disponible: 404,
+        plantilla_sin_componentes: 409,
+        cliente_no_disponible: 400,
+        expediente_no_encontrado: 404,
+        expediente_no_activo: 409,
+        cliente_no_coincide: 409,
+      };
+      const code = map[err.message];
+      if (code) { res.status(code).json({ error: err.message }); return; }
+    }
+    throw err;
+  }
+});
+
+// -------------------------------------------------------------------
 // PATCH /api/cotizaciones/:id  -  editar (snapshot automatico si ya enviada)
 // -------------------------------------------------------------------
 router.patch("/:id", requirePermission("cotizaciones", "write"), async (req, res) => {
