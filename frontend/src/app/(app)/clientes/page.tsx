@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Search, Pencil, Archive } from "lucide-react";
+import { Plus, Search, Pencil, Archive, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Toaster, toast } from "sonner";
+import { PageHeader, HeaderActionPrimary } from "@/components/page-header";
+import { Panel } from "@/components/panel";
 import {
   Cliente,
   EstadoCliente,
@@ -79,11 +81,8 @@ export default function ClientesPage() {
     }
   }, [page, q, estado, segmento, sector]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
-  // Debounce de la busqueda
   useEffect(() => {
     const t = setTimeout(() => {
       setPage(1);
@@ -101,10 +100,7 @@ export default function ClientesPage() {
       setDialog({ kind: "closed" });
       load();
     } catch (err) {
-      const msg =
-        err instanceof ApiError && err.status === 409
-          ? "Ya existe un cliente con ese RUC/Cedula"
-          : "Error creando cliente";
+      const msg = err instanceof ApiError && err.status === 409 ? "Ya existe un cliente con ese RUC/Cédula" : "Error creando cliente";
       toast.error(msg);
       throw err;
     }
@@ -117,17 +113,14 @@ export default function ClientesPage() {
       setDialog({ kind: "closed" });
       load();
     } catch (err) {
-      const msg =
-        err instanceof ApiError && err.status === 409
-          ? "Ya existe un cliente con ese RUC/Cedula"
-          : "Error actualizando cliente";
+      const msg = err instanceof ApiError && err.status === 409 ? "Ya existe un cliente con ese RUC/Cédula" : "Error actualizando cliente";
       toast.error(msg);
       throw err;
     }
   }
 
   async function handleArchive(cliente: Cliente) {
-    const ok = window.confirm(`Archivar el cliente "${cliente.razon_social}"?`);
+    const ok = window.confirm(`¿Archivar el cliente "${cliente.razon_social}"?`);
     if (!ok) return;
     try {
       await archiveCliente(cliente.id);
@@ -139,175 +132,150 @@ export default function ClientesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold">Clientes</h2>
-          <p className="text-muted-foreground">Gestion de clientes y prospectos</p>
-        </div>
-        <Button onClick={() => setDialog({ kind: "create" })}>
-          <Plus className="mr-2 h-4 w-4" /> Nuevo cliente
-        </Button>
-      </header>
+    <div>
+      <PageHeader
+        breadcrumb={[{ href: "/dashboard", label: "Panel" }, { label: "Clientes" }]}
+        title="Cartera"
+        titleAccent="de clientes"
+        meta={<span>{total} cliente{total === 1 ? "" : "s"} · prospectos y vigentes</span>}
+        actions={
+          <HeaderActionPrimary onClick={() => setDialog({ kind: "create" })} icon={<Plus className="h-3.5 w-3.5" />}>
+            Nuevo cliente
+          </HeaderActionPrimary>
+        }
+      />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative w-72">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={qInput}
-            onChange={(e) => setQInput(e.target.value)}
-            placeholder="Buscar por razon social o RUC"
-            className="pl-9"
-          />
-        </div>
+      <div className="space-y-6 pt-6">
+        <Panel padded={false}>
+          {/* Filtros */}
+          <div className="flex flex-wrap items-center gap-2 border-b border-glass px-5 py-3">
+            <div className="relative flex-1 min-w-[16rem] max-w-xs">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={qInput}
+                onChange={(e) => setQInput(e.target.value)}
+                placeholder="Buscar por razón social o RUC…"
+                className="h-8 border-glass bg-glass pl-8 text-sm"
+              />
+            </div>
 
-        <Select
-          value={estado || "_"}
-          onValueChange={(v) => {
-            setPage(1);
-            setEstado(v === "_" ? "" : (v as EstadoCliente));
-          }}
-        >
-          <SelectTrigger className="w-44"><SelectValue placeholder="Estado" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_">Todos (vigentes)</SelectItem>
-            <SelectItem value="activo">Activo</SelectItem>
-            <SelectItem value="inactivo">Inactivo</SelectItem>
-            <SelectItem value="bloqueado">Bloqueado</SelectItem>
-            <SelectItem value="archivado">Archivado</SelectItem>
-          </SelectContent>
-        </Select>
+            <Select value={estado || "_"} onValueChange={(v) => { setPage(1); setEstado(v === "_" ? "" : (v as EstadoCliente)); }}>
+              <SelectTrigger className="h-8 w-40 border-glass bg-glass text-xs"><SelectValue placeholder="Estado" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_">Todos (vigentes)</SelectItem>
+                <SelectItem value="activo">Activo</SelectItem>
+                <SelectItem value="inactivo">Inactivo</SelectItem>
+                <SelectItem value="bloqueado">Bloqueado</SelectItem>
+                <SelectItem value="archivado">Archivado</SelectItem>
+              </SelectContent>
+            </Select>
 
-        <Select
-          value={segmento || "_"}
-          onValueChange={(v) => {
-            setPage(1);
-            setSegmento(v === "_" ? "" : (v as Segmento));
-          }}
-        >
-          <SelectTrigger className="w-44"><SelectValue placeholder="Segmento" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_">Todos los segmentos</SelectItem>
-            <SelectItem value="industrial">Industrial</SelectItem>
-            <SelectItem value="distribuidora">Distribuidora</SelectItem>
-            <SelectItem value="constructora">Constructora</SelectItem>
-            <SelectItem value="otro">Otro</SelectItem>
-          </SelectContent>
-        </Select>
+            <Select value={segmento || "_"} onValueChange={(v) => { setPage(1); setSegmento(v === "_" ? "" : (v as Segmento)); }}>
+              <SelectTrigger className="h-8 w-40 border-glass bg-glass text-xs"><SelectValue placeholder="Segmento" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_">Todos los segmentos</SelectItem>
+                <SelectItem value="industrial">Industrial</SelectItem>
+                <SelectItem value="distribuidora">Distribuidora</SelectItem>
+                <SelectItem value="constructora">Constructora</SelectItem>
+                <SelectItem value="otro">Otro</SelectItem>
+              </SelectContent>
+            </Select>
 
-        <Select
-          value={sector || "_"}
-          onValueChange={(v) => {
-            setPage(1);
-            setSector(v === "_" ? "" : (v as Sector));
-          }}
-        >
-          <SelectTrigger className="w-40"><SelectValue placeholder="Sector" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_">Privado y publico</SelectItem>
-            <SelectItem value="privado">Privado</SelectItem>
-            <SelectItem value="publico">Publico</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+            <Select value={sector || "_"} onValueChange={(v) => { setPage(1); setSector(v === "_" ? "" : (v as Sector)); }}>
+              <SelectTrigger className="h-8 w-36 border-glass bg-glass text-xs"><SelectValue placeholder="Sector" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_">Privado y público</SelectItem>
+                <SelectItem value="privado">Privado</SelectItem>
+                <SelectItem value="publico">Público</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>RUC / Cedula</TableHead>
-              <TableHead>Razon social</TableHead>
-              <TableHead>Segmento</TableHead>
-              <TableHead>Sector</TableHead>
-              <TableHead>Ciudad</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
-                  Cargando...
-                </TableCell>
+          {/* Tabla */}
+          <Table>
+            <TableHeader>
+              <TableRow className="border-glass bg-glass hover:bg-glass">
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">RUC / Cédula</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Razón social</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Segmento</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Sector</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Ciudad</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Estado</TableHead>
+                <TableHead className="text-right font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Acciones</TableHead>
               </TableRow>
-            ) : error ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center text-destructive">
-                  {error}
-                </TableCell>
-              </TableRow>
-            ) : data.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
-                  No hay clientes que coincidan con los filtros.
-                </TableCell>
-              </TableRow>
-            ) : (
-              data.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-mono text-xs">{c.ruc_cedula}</TableCell>
-                  <TableCell className="font-medium">{c.razon_social}</TableCell>
-                  <TableCell>{c.segmento ?? "—"}</TableCell>
-                  <TableCell>{c.sector ?? "—"}</TableCell>
-                  <TableCell>{c.ciudad ?? "—"}</TableCell>
-                  <TableCell>
-                    <Badge variant={estadoBadge(c.estado)}>{c.estado}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setDialog({ kind: "edit", cliente: c })}
-                      aria-label={`Editar ${c.razon_social}`}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    {c.estado !== "archivado" && (
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow><TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">Cargando…</TableCell></TableRow>
+              ) : error ? (
+                <TableRow><TableCell colSpan={7} className="py-8 text-center text-sm text-rose-400">{error}</TableCell></TableRow>
+              ) : data.length === 0 ? (
+                <TableRow><TableCell colSpan={7} className="py-10 text-center">
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <Users className="h-5 w-5" />
+                    <span className="text-sm">No hay clientes que coincidan</span>
+                  </div>
+                </TableCell></TableRow>
+              ) : (
+                data.map((c) => (
+                  <TableRow key={c.id} className="border-glass group hover:bg-glass">
+                    <TableCell className="font-mono text-xs text-foreground/85">{c.ruc_cedula}</TableCell>
+                    <TableCell className="font-medium">{c.razon_social}</TableCell>
+                    <TableCell className="text-sm capitalize text-foreground/75">{c.segmento ?? "—"}</TableCell>
+                    <TableCell className="text-sm capitalize text-foreground/75">{c.sector ?? "—"}</TableCell>
+                    <TableCell className="text-sm text-foreground/75">{c.ciudad ?? "—"}</TableCell>
+                    <TableCell>
+                      <Badge variant={estadoBadge(c.estado)}>{c.estado}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleArchive(c)}
-                        aria-label={`Archivar ${c.razon_social}`}
+                        onClick={() => setDialog({ kind: "edit", cliente: c })}
+                        aria-label={`Editar ${c.razon_social}`}
+                        className="text-muted-foreground hover:bg-glass-elev hover:text-copper"
                       >
-                        <Archive className="h-4 w-4" />
+                        <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                      {c.estado !== "archivado" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleArchive(c)}
+                          aria-label={`Archivar ${c.razon_social}`}
+                          className="text-muted-foreground hover:bg-glass-elev hover:text-amber-400"
+                        >
+                          <Archive className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+
+          {/* Paginación */}
+          <div className="flex items-center justify-between border-t border-glass px-5 py-3 text-sm">
+            <p className="font-mono text-[11px] text-muted-foreground">
+              {total === 0 ? "Sin resultados" : `${total} cliente${total === 1 ? "" : "s"} · página ${page}/${totalPages}`}
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="border-glass-mid bg-glass">Anterior</Button>
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="border-glass-mid bg-glass">Siguiente</Button>
+            </div>
+          </div>
+        </Panel>
       </div>
 
-      <div className="flex items-center justify-between text-sm">
-        <p className="text-muted-foreground">
-          {total === 0 ? "Sin resultados" : `${total} cliente${total === 1 ? "" : "s"} - pagina ${page}/${totalPages}`}
-        </p>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
-            Anterior
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
-            Siguiente
-          </Button>
-        </div>
-      </div>
-
-      <Dialog
-        open={dialog.kind !== "closed"}
-        onOpenChange={(open) => !open && setDialog({ kind: "closed" })}
-      >
+      <Dialog open={dialog.kind !== "closed"} onOpenChange={(open) => !open && setDialog({ kind: "closed" })}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {dialog.kind === "edit" ? "Editar cliente" : "Nuevo cliente"}
-            </DialogTitle>
+            <DialogTitle>{dialog.kind === "edit" ? "Editar cliente" : "Nuevo cliente"}</DialogTitle>
             <DialogDescription>
               {dialog.kind === "edit"
-                ? "Actualiza los datos del cliente y guarda."
-                : "Completa los datos del cliente. Los campos marcados con * son obligatorios."}
+                ? "Actualizá los datos del cliente y guardá."
+                : "Completá los datos del cliente. Los campos marcados con * son obligatorios."}
             </DialogDescription>
           </DialogHeader>
           {dialog.kind !== "closed" && (
@@ -326,20 +294,16 @@ export default function ClientesPage() {
         </DialogContent>
       </Dialog>
 
-      <Toaster richColors position="top-right" />
+      <Toaster richColors position="top-right" theme="dark" />
     </div>
   );
 }
 
 function estadoBadge(estado: EstadoCliente): "success" | "muted" | "destructive" | "warning" {
   switch (estado) {
-    case "activo":
-      return "success";
-    case "inactivo":
-      return "muted";
-    case "bloqueado":
-      return "destructive";
-    case "archivado":
-      return "warning";
+    case "activo":    return "success";
+    case "inactivo":  return "muted";
+    case "bloqueado": return "destructive";
+    case "archivado": return "warning";
   }
 }

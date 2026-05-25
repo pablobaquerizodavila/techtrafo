@@ -22,6 +22,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Toaster } from "sonner";
+import { PageHeader, HeaderActionPrimary } from "@/components/page-header";
+import { Panel, StatCard } from "@/components/panel";
 import {
   Expediente,
   EstadoExpediente,
@@ -71,9 +73,7 @@ export default function ExpedientesPage() {
     }
   }, [page, q, estado, soloEstancados]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
     getResumenExpedientes()
@@ -81,7 +81,6 @@ export default function ExpedientesPage() {
       .catch(() => setResumen(null));
   }, []);
 
-  // Debounce busqueda
   useEffect(() => {
     const t = setTimeout(() => {
       setPage(1);
@@ -93,236 +92,205 @@ export default function ExpedientesPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT));
 
   return (
-    <div className="space-y-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold">Expedientes</h2>
-          <p className="text-muted-foreground">Pedidos de cliente: hoja de ruta y monitoreo</p>
-        </div>
-        <Button asChild>
-          <Link href="/expedientes/nuevo">
-            <Plus className="mr-2 h-4 w-4" /> Nuevo expediente
-          </Link>
-        </Button>
-      </header>
+    <div>
+      <PageHeader
+        breadcrumb={[{ href: "/dashboard", label: "Panel" }, { label: "Expedientes" }]}
+        title="Expedientes"
+        titleAccent="de cliente"
+        meta={resumen ? <span>{resumen.total_activos} activos · {resumen.total_estancados} estancados · {resumen.por_estado["ganado"] ?? 0} ganados</span> : undefined}
+        liveIndicator={resumen ? { label: "live", tone: resumen.total_estancados > 0 ? "copper" : "green" } : undefined}
+        actions={
+          <HeaderActionPrimary href="/expedientes/nuevo" icon={<Plus className="h-3.5 w-3.5" />}>
+            Nuevo expediente
+          </HeaderActionPrimary>
+        }
+      />
 
-      {/* KPIs */}
-      {resumen && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-md border p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-md bg-primary/10 p-2">
-                <FolderOpen className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Activos</p>
-                <p className="text-2xl font-bold">{resumen.total_activos}</p>
-              </div>
-            </div>
-          </div>
-          <button
-            type="button"
-            className={`rounded-md border p-4 text-left transition hover:bg-accent ${soloEstancados ? "border-destructive bg-destructive/5" : ""}`}
-            onClick={() => {
-              setPage(1);
-              setSoloEstancados((v) => !v);
-            }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="rounded-md bg-destructive/10 p-2">
-                <AlertTriangle className="h-5 w-5 text-destructive" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  Estancados {soloEstancados && "(filtrado)"}
-                </p>
-                <p className="text-2xl font-bold text-destructive">{resumen.total_estancados}</p>
-              </div>
-            </div>
-          </button>
-          <div className="rounded-md border p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-md bg-green-100 p-2">
-                <TrendingUp className="h-5 w-5 text-green-700" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Ganados</p>
-                <p className="text-2xl font-bold">{resumen.por_estado["ganado"] ?? 0}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Filtros */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative w-72">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={qInput}
-            onChange={(e) => setQInput(e.target.value)}
-            placeholder="Buscar por codigo, RUC o cliente"
-            className="pl-9"
-            disabled={soloEstancados}
-          />
-        </div>
-        <Select
-          value={estado || "_"}
-          onValueChange={(v) => {
-            setPage(1);
-            setEstado(v === "_" ? "" : (v as EstadoExpediente));
-          }}
-          disabled={soloEstancados}
-        >
-          <SelectTrigger className="w-44"><SelectValue placeholder="Estado" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_">Todos los estados</SelectItem>
-            <SelectItem value="activo">Activo</SelectItem>
-            <SelectItem value="ganado">Ganado</SelectItem>
-            <SelectItem value="perdido">Perdido</SelectItem>
-            <SelectItem value="cancelado">Cancelado</SelectItem>
-          </SelectContent>
-        </Select>
-        {soloEstancados && (
-          <Button variant="outline" size="sm" onClick={() => setSoloEstancados(false)}>
-            Quitar filtro de estancados
-          </Button>
+      <div className="space-y-6 pt-6">
+        {/* KPIs */}
+        {resumen && (
+          <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <StatCard
+              icon={<FolderOpen className="h-3.5 w-3.5" />}
+              label="Activos"
+              value={resumen.total_activos}
+              sub="En gestión / activos"
+              tone="copper"
+            />
+            <StatCard
+              icon={<AlertTriangle className="h-3.5 w-3.5" />}
+              label={`Estancados${soloEstancados ? " · filtrado" : ""}`}
+              value={resumen.total_estancados}
+              sub={resumen.total_estancados > 0 ? "Hitos sobre SLA · clic para filtrar" : "Ningún hito vencido"}
+              tone={resumen.total_estancados > 0 ? "rose" : "default"}
+              onClick={() => { setPage(1); setSoloEstancados((v) => !v); }}
+              active={soloEstancados}
+            />
+            <StatCard
+              icon={<TrendingUp className="h-3.5 w-3.5" />}
+              label="Ganados"
+              value={resumen.por_estado["ganado"] ?? 0}
+              sub="Convertidos a contrato"
+              tone="green"
+            />
+          </section>
         )}
-      </div>
 
-      {/* Tabla */}
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Codigo</TableHead>
-              <TableHead>Cliente</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Canal</TableHead>
-              <TableHead>Apertura</TableHead>
-              <TableHead>Ejecutivo</TableHead>
-              {soloEstancados && <TableHead>Hito estancado</TableHead>}
-              <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={soloEstancados ? 9 : 8} className="text-center text-muted-foreground">
-                  Cargando...
-                </TableCell>
+        <Panel padded={false}>
+          {/* Filtros */}
+          <div className="flex flex-wrap items-center gap-2 border-b border-glass px-5 py-3">
+            <div className="relative flex-1 min-w-[18rem] max-w-sm">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={qInput}
+                onChange={(e) => setQInput(e.target.value)}
+                placeholder="Buscar por código, RUC o cliente…"
+                className="h-8 border-glass bg-glass pl-8 text-sm"
+                disabled={soloEstancados}
+              />
+            </div>
+            <Select
+              value={estado || "_"}
+              onValueChange={(v) => { setPage(1); setEstado(v === "_" ? "" : (v as EstadoExpediente)); }}
+              disabled={soloEstancados}
+            >
+              <SelectTrigger className="h-8 w-44 border-glass bg-glass text-xs"><SelectValue placeholder="Estado" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_">Todos los estados</SelectItem>
+                <SelectItem value="activo">Activo</SelectItem>
+                <SelectItem value="ganado">Ganado</SelectItem>
+                <SelectItem value="perdido">Perdido</SelectItem>
+                <SelectItem value="cancelado">Cancelado</SelectItem>
+              </SelectContent>
+            </Select>
+            {soloEstancados && (
+              <Button variant="outline" size="sm" onClick={() => setSoloEstancados(false)} className="border-rose-500/30 bg-rose-500/[0.06] text-rose-300 hover:bg-rose-500/10">
+                Quitar filtro de estancados
+              </Button>
+            )}
+          </div>
+
+          {/* Tabla */}
+          <Table>
+            <TableHeader>
+              <TableRow className="border-glass bg-glass hover:bg-glass">
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Código</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Cliente</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Tipo</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Canal</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Apertura</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Ejecutivo</TableHead>
+                {soloEstancados && <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Hito estancado</TableHead>}
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Estado</TableHead>
+                <TableHead className="text-right"></TableHead>
               </TableRow>
-            ) : error ? (
-              <TableRow>
-                <TableCell colSpan={soloEstancados ? 9 : 8} className="text-center text-destructive">
-                  {error}
-                </TableCell>
-              </TableRow>
-            ) : data.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={soloEstancados ? 9 : 8} className="text-center text-muted-foreground">
-                  {soloEstancados ? "Sin expedientes estancados" : "Sin expedientes que coincidan"}
-                </TableCell>
-              </TableRow>
-            ) : soloEstancados ? (
-              // Modo estancados: filas de la vista (estructura distinta)
-              data.map((row) => {
-                const r = row as unknown as {
-                  expediente_id: number;
-                  expediente_codigo: string;
-                  cliente_nombre: string;
-                  hito_codigo: string;
-                  hito_nombre: string;
-                  horas_transcurridas: number;
-                  sla_horas: number;
-                  expediente_estado: string;
-                };
-                return (
-                  <TableRow key={`${r.expediente_id}-${r.hito_codigo}`} className="bg-destructive/5">
-                    <TableCell className="font-mono text-sm">{r.expediente_codigo}</TableCell>
-                    <TableCell className="font-medium">{r.cliente_nombre}</TableCell>
-                    <TableCell colSpan={3} className="text-sm">
-                      <Badge variant="destructive" className="mr-2">
-                        <AlertTriangle className="mr-1 h-3 w-3" /> {r.hito_nombre}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {Number(r.horas_transcurridas).toFixed(1)}h / SLA {r.sla_horas}h
-                      </span>
-                    </TableCell>
-                    <TableCell colSpan={2}></TableCell>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow><TableCell colSpan={soloEstancados ? 9 : 8} className="py-8 text-center text-sm text-muted-foreground">Cargando…</TableCell></TableRow>
+              ) : error ? (
+                <TableRow><TableCell colSpan={soloEstancados ? 9 : 8} className="py-8 text-center text-sm text-rose-400">{error}</TableCell></TableRow>
+              ) : data.length === 0 ? (
+                <TableRow><TableCell colSpan={soloEstancados ? 9 : 8} className="py-10 text-center">
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <FolderOpen className="h-5 w-5" />
+                    <span className="text-sm">{soloEstancados ? "Sin expedientes estancados" : "Sin expedientes que coincidan"}</span>
+                  </div>
+                </TableCell></TableRow>
+              ) : soloEstancados ? (
+                // Modo estancados: filas de la vista (estructura distinta)
+                data.map((row) => {
+                  const r = row as unknown as {
+                    expediente_id: number;
+                    expediente_codigo: string;
+                    cliente_nombre: string;
+                    hito_codigo: string;
+                    hito_nombre: string;
+                    horas_transcurridas: number;
+                    sla_horas: number;
+                    expediente_estado: string;
+                  };
+                  return (
+                    <TableRow key={`${r.expediente_id}-${r.hito_codigo}`} className="border-glass bg-rose-500/[0.04] hover:bg-rose-500/[0.08]">
+                      <TableCell className="font-mono text-xs text-foreground/90">{r.expediente_codigo}</TableCell>
+                      <TableCell className="font-medium">{r.cliente_nombre}</TableCell>
+                      <TableCell colSpan={3} className="text-sm">
+                        <Badge variant="destructive" className="mr-2">
+                          <AlertTriangle className="mr-1 h-3 w-3" /> {r.hito_nombre}
+                        </Badge>
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {Number(r.horas_transcurridas).toFixed(1)}h / SLA {r.sla_horas}h
+                        </span>
+                      </TableCell>
+                      <TableCell colSpan={2}></TableCell>
+                      <TableCell>
+                        <Badge variant={estadoExpedienteVariant(r.expediente_estado as EstadoExpediente)}>
+                          {r.expediente_estado}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" asChild className="text-muted-foreground hover:bg-glass-elev hover:text-copper">
+                          <Link href={`/expedientes/${r.expediente_id}`}>
+                            <Eye className="h-3.5 w-3.5" />
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              ) : (
+                data.map((e) => (
+                  <TableRow key={e.id} className="border-glass group hover:bg-glass">
+                    <TableCell className="font-mono text-xs text-foreground/90">{e.codigo}</TableCell>
                     <TableCell>
-                      <Badge variant={estadoExpedienteVariant(r.expediente_estado as EstadoExpediente)}>
-                        {r.expediente_estado}
-                      </Badge>
+                      <p className="font-medium">{e.clientes?.razon_social ?? "—"}</p>
+                      <p className="font-mono text-xs text-muted-foreground">{e.clientes?.ruc_cedula}</p>
+                    </TableCell>
+                    <TableCell className="text-sm capitalize text-foreground/80">
+                      {e.tipo_servicio_confirmado ?? e.tipo_servicio_estimado ?? "—"}
+                      {!e.tipo_servicio_confirmado && (
+                        <span className="ml-1 font-mono text-[10px] text-muted-foreground">(est.)</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-foreground/80">{canalOrigenLabel(e.canal_origen)}</TableCell>
+                    <TableCell className="font-mono text-xs text-foreground/80">{e.fecha_apertura.split("T")[0]}</TableCell>
+                    <TableCell className="text-sm text-foreground/80">
+                      {e.usuarios_expedientes_ejecutivo_idTousuarios
+                        ? `${e.usuarios_expedientes_ejecutivo_idTousuarios.nombres} ${e.usuarios_expedientes_ejecutivo_idTousuarios.apellidos}`
+                        : "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={estadoExpedienteVariant(e.estado)}>{e.estado}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/expedientes/${r.expediente_id}`}>
-                          <Eye className="h-4 w-4" />
+                      <Button variant="ghost" size="icon" asChild className="text-muted-foreground hover:bg-glass-elev hover:text-copper">
+                        <Link href={`/expedientes/${e.id}`} aria-label={`Ver ${e.codigo}`}>
+                          <Eye className="h-3.5 w-3.5" />
                         </Link>
                       </Button>
                     </TableCell>
                   </TableRow>
-                );
-              })
-            ) : (
-              data.map((e) => (
-                <TableRow key={e.id}>
-                  <TableCell className="font-mono text-sm">{e.codigo}</TableCell>
-                  <TableCell className="font-medium">
-                    {e.clientes?.razon_social ?? "—"}
-                    <div className="text-xs text-muted-foreground font-mono">{e.clientes?.ruc_cedula}</div>
-                  </TableCell>
-                  <TableCell className="capitalize text-sm">
-                    {e.tipo_servicio_confirmado ?? e.tipo_servicio_estimado ?? "—"}
-                    {!e.tipo_servicio_confirmado && (
-                      <span className="ml-1 text-xs text-muted-foreground">(est.)</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm">{canalOrigenLabel(e.canal_origen)}</TableCell>
-                  <TableCell className="text-sm">{e.fecha_apertura.split("T")[0]}</TableCell>
-                  <TableCell className="text-sm">
-                    {e.usuarios_expedientes_ejecutivo_idTousuarios
-                      ? `${e.usuarios_expedientes_ejecutivo_idTousuarios.nombres} ${e.usuarios_expedientes_ejecutivo_idTousuarios.apellidos}`
-                      : "—"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={estadoExpedienteVariant(e.estado)}>{e.estado}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" asChild>
-                      <Link href={`/expedientes/${e.id}`} aria-label={`Ver ${e.codigo}`}>
-                        <Eye className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                ))
+              )}
+            </TableBody>
+          </Table>
+
+          {/* Paginación */}
+          {!soloEstancados && (
+            <div className="flex items-center justify-between border-t border-glass px-5 py-3 text-sm">
+              <p className="font-mono text-[11px] text-muted-foreground">
+                {total === 0 ? "Sin resultados" : `${total} expediente${total === 1 ? "" : "s"} · página ${page}/${totalPages}`}
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="border-glass-mid bg-glass">Anterior</Button>
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="border-glass-mid bg-glass">Siguiente</Button>
+              </div>
+            </div>
+          )}
+        </Panel>
       </div>
 
-      {!soloEstancados && (
-        <div className="flex items-center justify-between text-sm">
-          <p className="text-muted-foreground">
-            {total === 0
-              ? "Sin resultados"
-              : `${total} expediente${total === 1 ? "" : "s"} - pagina ${page}/${totalPages}`}
-          </p>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
-              Anterior
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
-              Siguiente
-            </Button>
-          </div>
-        </div>
-      )}
-
-      <Toaster richColors position="top-right" />
+      <Toaster richColors position="top-right" theme="dark" />
     </div>
   );
 }

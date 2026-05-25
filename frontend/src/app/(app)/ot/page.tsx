@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Eye, AlertTriangle, Factory, Zap, Clock } from "lucide-react";
+import { Plus, Search, Eye, AlertTriangle, Factory, Zap, Clock, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Toaster } from "sonner";
+import { PageHeader, HeaderActionPrimary } from "@/components/page-header";
+import { Panel, StatCard } from "@/components/panel";
 import {
   OT, EstadoOT, TipoRuta, PrioridadOT,
   estadoOTVariant, prioridadVariant, tipoRutaLabel,
@@ -74,184 +76,190 @@ export default function OTPage() {
   }, [qInput]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT));
+  const totalKpi = resumen
+    ? (resumen.por_estado["en_curso"] ?? 0) +
+      (resumen.por_estado["planeada"] ?? 0) +
+      (resumen.por_estado["pausada"] ?? 0)
+    : 0;
 
   return (
-    <div className="space-y-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold">Órdenes de Trabajo</h2>
-          <p className="text-muted-foreground">Planificación y ejecución en planta</p>
-        </div>
-        <Button asChild>
-          <Link href="/ot/nueva">
-            <Plus className="mr-2 h-4 w-4" /> Nueva OT
-          </Link>
-        </Button>
-      </header>
+    <div>
+      <PageHeader
+        breadcrumb={[{ href: "/dashboard", label: "Panel" }, { label: "Órdenes de trabajo" }]}
+        title="Órdenes"
+        titleAccent="de trabajo"
+        meta={resumen ? <span>{totalKpi} OT activas · {resumen.atrasadas} atrasadas · {resumen.urgentes_abiertas} urgentes</span> : undefined}
+        liveIndicator={resumen ? { label: "live", tone: resumen.atrasadas > 0 ? "copper" : "green" } : undefined}
+        actions={
+          <HeaderActionPrimary href="/ot/nueva" icon={<Plus className="h-3.5 w-3.5" />}>
+            Nueva OT
+          </HeaderActionPrimary>
+        }
+      />
 
-      {resumen && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-          <KpiCard
-            icon={<Factory className="h-5 w-5 text-primary" />}
-            label="En curso"
-            value={resumen.por_estado["en_curso"] ?? 0}
-            tone="primary"
-          />
-          <KpiCard
-            icon={<Clock className="h-5 w-5 text-yellow-700" />}
-            label="Planeadas"
-            value={resumen.por_estado["planeada"] ?? 0}
-            tone="muted"
-          />
-          <KpiCard
-            icon={<Zap className="h-5 w-5 text-destructive" />}
-            label="Urgentes abiertas"
-            value={resumen.urgentes_abiertas}
-            tone="destructive"
-          />
-          <KpiCard
-            icon={<AlertTriangle className="h-5 w-5 text-destructive" />}
-            label="Atrasadas"
-            value={resumen.atrasadas}
-            tone="destructive"
-          />
-        </div>
-      )}
+      <div className="space-y-6 pt-6">
+        {/* KPIs */}
+        {resumen && (
+          <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <StatCard
+              icon={<Activity className="h-3.5 w-3.5" />}
+              label="En curso"
+              value={resumen.por_estado["en_curso"] ?? 0}
+              sub={`${resumen.por_estado["planeada"] ?? 0} planeadas`}
+              tone="copper"
+            />
+            <StatCard
+              icon={<Clock className="h-3.5 w-3.5" />}
+              label="Planeadas"
+              value={resumen.por_estado["planeada"] ?? 0}
+              sub="Aún no inician"
+            />
+            <StatCard
+              icon={<Zap className="h-3.5 w-3.5" />}
+              label="Urgentes abiertas"
+              value={resumen.urgentes_abiertas}
+              sub={resumen.urgentes_abiertas > 0 ? "Prioridad URG" : "Sin urgentes"}
+              tone={resumen.urgentes_abiertas > 0 ? "rose" : "default"}
+            />
+            <StatCard
+              icon={<AlertTriangle className="h-3.5 w-3.5" />}
+              label="Atrasadas"
+              value={resumen.atrasadas}
+              sub={resumen.atrasadas > 0 ? "Fin planeado vencido" : "Sin atrasos"}
+              tone={resumen.atrasadas > 0 ? "rose" : "default"}
+            />
+          </section>
+        )}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative w-72">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={qInput}
-            onChange={(e) => setQInput(e.target.value)}
-            placeholder="Buscar por código, contrato, cliente"
-            className="pl-9"
-          />
-        </div>
-        <Select value={estado || "_"} onValueChange={(v) => { setPage(1); setEstado(v === "_" ? "" : (v as EstadoOT)); }}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Estado" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_">Todos los estados</SelectItem>
-            <SelectItem value="planeada">Planeada</SelectItem>
-            <SelectItem value="en_curso">En curso</SelectItem>
-            <SelectItem value="pausada">Pausada</SelectItem>
-            <SelectItem value="completada">Completada</SelectItem>
-            <SelectItem value="cancelada">Cancelada</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={tipoRuta || "_"} onValueChange={(v) => { setPage(1); setTipoRuta(v === "_" ? "" : (v as TipoRuta)); }}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Tipo ruta" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_">Todas las rutas</SelectItem>
-            <SelectItem value="reparacion">Reparación</SelectItem>
-            <SelectItem value="fabricacion">Fabricación</SelectItem>
-            <SelectItem value="mantenimiento">Mantenimiento</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={prioridad || "_"} onValueChange={(v) => { setPage(1); setPrioridad(v === "_" ? "" : (v as PrioridadOT)); }}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="Prioridad" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_">Todas</SelectItem>
-            <SelectItem value="urgente">Urgente</SelectItem>
-            <SelectItem value="alta">Alta</SelectItem>
-            <SelectItem value="normal">Normal</SelectItem>
-            <SelectItem value="baja">Baja</SelectItem>
-          </SelectContent>
-        </Select>
+        <Panel padded={false}>
+          {/* Filtros */}
+          <div className="flex flex-wrap items-center gap-2 border-b border-glass px-5 py-3">
+            <div className="relative flex-1 min-w-[18rem] max-w-sm">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={qInput}
+                onChange={(e) => setQInput(e.target.value)}
+                placeholder="Buscar por código, contrato, cliente…"
+                className="h-8 border-glass bg-glass pl-8 text-sm"
+              />
+            </div>
+            <Select value={estado || "_"} onValueChange={(v) => { setPage(1); setEstado(v === "_" ? "" : (v as EstadoOT)); }}>
+              <SelectTrigger className="h-8 w-40 border-glass bg-glass text-xs"><SelectValue placeholder="Estado" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_">Todos los estados</SelectItem>
+                <SelectItem value="planeada">Planeada</SelectItem>
+                <SelectItem value="en_curso">En curso</SelectItem>
+                <SelectItem value="pausada">Pausada</SelectItem>
+                <SelectItem value="completada">Completada</SelectItem>
+                <SelectItem value="cancelada">Cancelada</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={tipoRuta || "_"} onValueChange={(v) => { setPage(1); setTipoRuta(v === "_" ? "" : (v as TipoRuta)); }}>
+              <SelectTrigger className="h-8 w-40 border-glass bg-glass text-xs"><SelectValue placeholder="Tipo ruta" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_">Todas las rutas</SelectItem>
+                <SelectItem value="reparacion">Reparación</SelectItem>
+                <SelectItem value="fabricacion">Fabricación</SelectItem>
+                <SelectItem value="mantenimiento">Mantenimiento</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={prioridad || "_"} onValueChange={(v) => { setPage(1); setPrioridad(v === "_" ? "" : (v as PrioridadOT)); }}>
+              <SelectTrigger className="h-8 w-36 border-glass bg-glass text-xs"><SelectValue placeholder="Prioridad" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_">Todas</SelectItem>
+                <SelectItem value="urgente">Urgente</SelectItem>
+                <SelectItem value="alta">Alta</SelectItem>
+                <SelectItem value="normal">Normal</SelectItem>
+                <SelectItem value="baja">Baja</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Tabla */}
+          <Table>
+            <TableHeader>
+              <TableRow className="border-glass bg-glass hover:bg-glass">
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Código</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Cliente / Contrato</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Tipo</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Prioridad</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Responsable</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Fin planeado</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Pasos</TableHead>
+                <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Estado</TableHead>
+                <TableHead className="text-right"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow><TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">Cargando…</TableCell></TableRow>
+              ) : error ? (
+                <TableRow><TableCell colSpan={9} className="py-8 text-center text-sm text-rose-400">{error}</TableCell></TableRow>
+              ) : data.length === 0 ? (
+                <TableRow><TableCell colSpan={9} className="py-10 text-center">
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <Factory className="h-5 w-5" />
+                    <span className="text-sm">Sin OT que coincidan</span>
+                  </div>
+                </TableCell></TableRow>
+              ) : (
+                data.map((ot) => {
+                  const atrasada = ot.fecha_fin_planeada && new Date(ot.fecha_fin_planeada) < new Date()
+                    && ["planeada", "en_curso", "pausada"].includes(ot.estado);
+                  return (
+                    <TableRow key={ot.id} className={`border-glass group ${atrasada ? "bg-rose-500/[0.04] hover:bg-rose-500/[0.08]" : "hover:bg-glass"}`}>
+                      <TableCell className="font-mono text-xs text-foreground/90">{ot.codigo ?? "—"}</TableCell>
+                      <TableCell>
+                        <p className="font-medium">{ot.contratos?.clientes?.razon_social ?? "—"}</p>
+                        <p className="font-mono text-xs text-muted-foreground">{ot.contratos?.codigo}</p>
+                      </TableCell>
+                      <TableCell className="text-sm text-foreground/80">{tipoRutaLabel(ot.tipo_ruta)}</TableCell>
+                      <TableCell>
+                        <Badge variant={prioridadVariant(ot.prioridad)}>{ot.prioridad}</Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-foreground/80">
+                        {ot.usuarios_ot_responsable_idTousuarios
+                          ? `${ot.usuarios_ot_responsable_idTousuarios.nombres} ${ot.usuarios_ot_responsable_idTousuarios.apellidos}`
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        <span className={atrasada ? "text-rose-300" : "text-foreground/80"}>
+                          {ot.fecha_fin_planeada?.split("T")[0] ?? "—"}
+                        </span>
+                        {atrasada && <AlertTriangle className="ml-1 inline h-3 w-3 text-rose-400" />}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {ot._count?.ot_pasos ?? 0}
+                      </TableCell>
+                      <TableCell><Badge variant={estadoOTVariant(ot.estado)}>{ot.estado.replaceAll("_", " ")}</Badge></TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" asChild className="text-muted-foreground hover:bg-glass-elev hover:text-copper">
+                          <Link href={`/ot/${ot.id}`} aria-label={`Ver ${ot.codigo}`}>
+                            <Eye className="h-3.5 w-3.5" />
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+
+          {/* Paginación */}
+          <div className="flex items-center justify-between border-t border-glass px-5 py-3 text-sm">
+            <p className="font-mono text-[11px] text-muted-foreground">
+              {total === 0 ? "Sin resultados" : `${total} OT · página ${page}/${totalPages}`}
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="border-glass-mid bg-glass">Anterior</Button>
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="border-glass-mid bg-glass">Siguiente</Button>
+            </div>
+          </div>
+        </Panel>
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Código</TableHead>
-              <TableHead>Cliente / Contrato</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Prioridad</TableHead>
-              <TableHead>Responsable</TableHead>
-              <TableHead>Fin planeado</TableHead>
-              <TableHead>Pasos</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Cargando...</TableCell></TableRow>
-            ) : error ? (
-              <TableRow><TableCell colSpan={9} className="text-center text-destructive">{error}</TableCell></TableRow>
-            ) : data.length === 0 ? (
-              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Sin OT que coincidan</TableCell></TableRow>
-            ) : (
-              data.map((ot) => {
-                const atrasada = ot.fecha_fin_planeada && new Date(ot.fecha_fin_planeada) < new Date()
-                  && ["planeada", "en_curso", "pausada"].includes(ot.estado);
-                return (
-                  <TableRow key={ot.id} className={atrasada ? "bg-destructive/5" : ""}>
-                    <TableCell className="font-mono text-sm">{ot.codigo ?? "—"}</TableCell>
-                    <TableCell>
-                      <p className="font-medium">{ot.contratos?.clientes?.razon_social ?? "—"}</p>
-                      <p className="text-xs text-muted-foreground font-mono">{ot.contratos?.codigo}</p>
-                    </TableCell>
-                    <TableCell className="text-sm">{tipoRutaLabel(ot.tipo_ruta)}</TableCell>
-                    <TableCell>
-                      <Badge variant={prioridadVariant(ot.prioridad)}>{ot.prioridad}</Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {ot.usuarios_ot_responsable_idTousuarios
-                        ? `${ot.usuarios_ot_responsable_idTousuarios.nombres} ${ot.usuarios_ot_responsable_idTousuarios.apellidos}`
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {ot.fecha_fin_planeada?.split("T")[0] ?? "—"}
-                      {atrasada && <AlertTriangle className="ml-1 inline h-3.5 w-3.5 text-destructive" />}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {ot._count?.ot_pasos ?? 0} pasos
-                    </TableCell>
-                    <TableCell><Badge variant={estadoOTVariant(ot.estado)}>{ot.estado}</Badge></TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/ot/${ot.id}`} aria-label={`Ver ${ot.codigo}`}>
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      <div className="flex items-center justify-between text-sm">
-        <p className="text-muted-foreground">
-          {total === 0 ? "Sin resultados" : `${total} OT - página ${page}/${totalPages}`}
-        </p>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>Anterior</Button>
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>Siguiente</Button>
-        </div>
-      </div>
-
-      <Toaster richColors position="top-right" />
-    </div>
-  );
-}
-
-function KpiCard({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: number; tone: "primary" | "muted" | "destructive" }) {
-  const bg = tone === "destructive" ? "bg-destructive/10" : tone === "primary" ? "bg-primary/10" : "bg-muted";
-  const text = tone === "destructive" ? "text-destructive" : "";
-  return (
-    <div className="rounded-md border p-4">
-      <div className="flex items-center gap-3">
-        <div className={`rounded-md p-2 ${bg}`}>{icon}</div>
-        <div>
-          <p className="text-xs text-muted-foreground">{label}</p>
-          <p className={`text-2xl font-bold ${text}`}>{value}</p>
-        </div>
-      </div>
+      <Toaster richColors position="top-right" theme="dark" />
     </div>
   );
 }

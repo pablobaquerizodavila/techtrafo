@@ -97,7 +97,11 @@ export default function ProduccionDashboardPage() {
   const otActivas = (data.kpis.ot_por_estado["en_curso"] ?? 0) + (data.kpis.ot_por_estado["planeada"] ?? 0) + (data.kpis.ot_por_estado["pausada"] ?? 0);
   const otCompletadas = data.kpis.ot_por_estado["completada"] ?? 0;
   const totalRiesgo = data.kpis.ot_urgentes_abiertas + data.kpis.ot_atrasadas + data.kpis.expedientes_estancados;
-  const horaGen = new Date(data.generado_en).toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit" });
+  const horaGen = new Date(data.generado_en).toLocaleTimeString("es-EC", {
+    timeZone: "America/Guayaquil",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
   return (
     <div className="-m-8">

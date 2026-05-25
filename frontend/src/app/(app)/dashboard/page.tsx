@@ -8,6 +8,7 @@ import {
   Truck, Users, Zap,
 } from "lucide-react";
 import { SessionExpiredButton } from "../session-expired-button";
+import { LiveTime, LiveDate } from "@/components/live-datetime";
 
 interface AuthMeResponse {
   user: {
@@ -104,8 +105,7 @@ export default async function DashboardPage() {
   const notif48h = notif?.data.recientes_48h ?? 0;
 
   const necesitaAtencion = otAtrasadas + otUrgentes + expEstancados + garVencidas + reclamosAbiertos;
-  const horaActual = new Date().toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit" });
-  const fechaActual = new Date().toLocaleDateString("es-EC", { weekday: "long", day: "numeric", month: "long" });
+  // Hora y fecha se renderizan client-side (zona horaria del usuario) — ver <LiveTime/> y <LiveDate/>.
 
   const modulos: ModuloCard[] = [
     { href: "/produccion", titulo: "Dashboard de planta",
@@ -193,10 +193,10 @@ export default async function DashboardPage() {
             <div className="mt-3 flex flex-wrap items-center gap-3 font-mono text-[11px] text-muted-foreground">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-green-500/25 bg-green-500/[0.08] px-2.5 py-1 text-green-400">
                 <span className="led-green" />
-                Live · {horaActual}
+                Live · <LiveTime />
               </span>
               <span className="text-muted-foreground/40">·</span>
-              <span className="capitalize">{fechaActual}</span>
+              <LiveDate />
               <span className="text-muted-foreground/40">·</span>
               <span>
                 {user.rol_nombre ?? "sin rol"}
