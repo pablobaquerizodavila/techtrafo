@@ -7,9 +7,10 @@ import {
   ChevronLeft, Send, CheckCircle2, XCircle, Ban, FileText, Clock,
   ShieldCheck, AlertCircle, ArrowUpToLine, History,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Toaster, toast } from "sonner";
+import { PageHeader, HeaderActionGhost } from "@/components/page-header";
+import { Panel } from "@/components/panel";
 import {
   Cotizacion,
   RevisionHistorialItem,
@@ -32,20 +33,26 @@ import { ApiError } from "@/lib/api";
 import { CotizacionForm } from "../cotizacion-form";
 import { PdfButton } from "../../pdf-button";
 
-interface PageProps {
-  params: Promise<{ id: string }>;
-}
+interface PageProps { params: Promise<{ id: string }> }
 
 const ROLES_OVERRIDE = ["presidencia", "gerencia_general", "gerencia_comercial"];
 
-const accionConfig: Record<TransicionAccion, { label: string; icon: typeof Send; variant: "default" | "outline" | "destructive" }> = {
-  enviar: { label: "Enviar al cliente", icon: Send, variant: "default" },
-  aprobar: { label: "Marcar como aprobada", icon: CheckCircle2, variant: "default" },
-  rechazar: { label: "Marcar como rechazada", icon: XCircle, variant: "destructive" },
-  cancelar: { label: "Cancelar", icon: Ban, variant: "destructive" },
-  vencer: { label: "Marcar como vencida", icon: Clock, variant: "outline" },
-  convertir: { label: "Convertir a contrato", icon: FileText, variant: "default" },
+const accionConfig: Record<TransicionAccion, { label: string; icon: typeof Send; tone: "primary" | "ghost" | "destructive" }> = {
+  enviar:    { label: "Enviar al cliente",     icon: Send,         tone: "primary" },
+  aprobar:   { label: "Marcar como aprobada",  icon: CheckCircle2, tone: "primary" },
+  rechazar:  { label: "Marcar como rechazada", icon: XCircle,      tone: "destructive" },
+  cancelar:  { label: "Cancelar",              icon: Ban,          tone: "destructive" },
+  vencer:    { label: "Marcar como vencida",   icon: Clock,        tone: "ghost" },
+  convertir: { label: "Convertir a contrato",  icon: FileText,     tone: "primary" },
 };
+
+function actionClass(tone: "primary" | "ghost" | "destructive") {
+  return tone === "primary"
+    ? "inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-b from-copper to-copper-deep px-3 py-1.5 text-xs font-medium text-white shadow-sm glow-copper-sm inset-highlight-md transition hover:glow-copper disabled:opacity-50 disabled:pointer-events-none"
+    : tone === "destructive"
+    ? "inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-300 transition hover:bg-rose-500/15 disabled:opacity-50 disabled:pointer-events-none"
+    : "inline-flex items-center gap-1.5 rounded-lg border border-glass-mid bg-glass px-3 py-1.5 text-xs font-medium text-foreground/90 transition hover:border-glass-strong hover:bg-glass-elev disabled:opacity-50 disabled:pointer-events-none";
+}
 
 export default function CotizacionDetallePage({ params }: PageProps) {
   const router = useRouter();
@@ -58,13 +65,8 @@ export default function CotizacionDetallePage({ params }: PageProps) {
   const [mostrarHistorial, setMostrarHistorial] = useState(false);
   const [working, setWorking] = useState(false);
 
-  useEffect(() => {
-    params.then(({ id }) => setId(Number(id)));
-  }, [params]);
-
-  useEffect(() => {
-    getCurrentUser().then(setCurrentUser).catch(() => setCurrentUser(null));
-  }, []);
+  useEffect(() => { params.then(({ id }) => setId(Number(id))); }, [params]);
+  useEffect(() => { getCurrentUser().then(setCurrentUser).catch(() => setCurrentUser(null)); }, []);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -76,32 +78,24 @@ export default function CotizacionDetallePage({ params }: PageProps) {
       const h = await getRevisionHistorial(id);
       setHistorial(h.data);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 404) {
-        setError("Cotizacion no encontrada");
-      } else {
-        setError(err instanceof Error ? err.message : "Error cargando");
-      }
+      if (err instanceof ApiError && err.status === 404) setError("Cotización no encontrada");
+      else setError(err instanceof Error ? err.message : "Error cargando");
     } finally {
       setLoading(false);
     }
   }, [id]);
 
-  useEffect(() => {
-    if (id) load();
-  }, [id, load]);
+  useEffect(() => { if (id) load(); }, [id, load]);
 
   async function handleTransicion(accion: TransicionAccion) {
     if (!cotizacion) return;
-    if (accion === "convertir") {
-      router.push(`/contratos/nuevo?cotizacion=${cotizacion.id}`);
-      return;
-    }
+    if (accion === "convertir") { router.push(`/contratos/nuevo?cotizacion=${cotizacion.id}`); return; }
     if (["rechazar", "cancelar", "vencer"].includes(accion)) {
       const motivo = window.prompt(`Motivo de ${accion}:`);
       if (motivo === null) return;
       try {
         await transicionCotizacion(cotizacion.id, accion, motivo);
-        toast.success(`Cotizacion ${accion === "cancelar" ? "cancelada" : accion + "da"}`);
+        toast.success(`Cotización ${accion === "cancelar" ? "cancelada" : accion + "da"}`);
         load();
       } catch (err) {
         toast.error(err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error");
@@ -120,71 +114,59 @@ export default function CotizacionDetallePage({ params }: PageProps) {
 
   async function handleSolicitar() {
     if (!cotizacion) return;
-    if (!window.confirm("Solicitar revisión interna de esta cotización? Se enviará al rol de Gerencia Comercial para aprobación.")) return;
+    if (!window.confirm("¿Solicitar revisión interna? Se enviará al rol de Gerencia Comercial para aprobación.")) return;
     setWorking(true);
-    try {
-      await solicitarRevisionInterna(cotizacion.id);
-      toast.success("Revisión interna solicitada");
-      load();
-    } catch (err) {
-      toast.error(err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error");
-    } finally { setWorking(false); }
+    try { await solicitarRevisionInterna(cotizacion.id); toast.success("Revisión interna solicitada"); load(); }
+    catch (err) { toast.error(err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error"); }
+    finally { setWorking(false); }
   }
   async function handleAprobarRev() {
     if (!cotizacion) return;
     const notas = window.prompt("Notas opcionales para la aprobación:") ?? undefined;
     setWorking(true);
-    try {
-      await aprobarRevisionInterna(cotizacion.id, notas || undefined);
-      toast.success("Aprobación interna registrada — la cotización ya puede enviarse al cliente");
-      load();
-    } catch (err) {
-      toast.error(err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error");
-    } finally { setWorking(false); }
+    try { await aprobarRevisionInterna(cotizacion.id, notas || undefined); toast.success("Aprobación interna registrada"); load(); }
+    catch (err) { toast.error(err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error"); }
+    finally { setWorking(false); }
   }
   async function handleRechazarRev() {
     if (!cotizacion) return;
     const motivo = window.prompt("Motivo del rechazo interno (obligatorio):");
     if (!motivo || motivo.trim() === "") return;
     setWorking(true);
-    try {
-      await rechazarRevisionInterna(cotizacion.id, motivo.trim());
-      toast.success("Cotización rechazada internamente — el creador puede corregir y re-solicitar");
-      load();
-    } catch (err) {
-      toast.error(err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error");
-    } finally { setWorking(false); }
+    try { await rechazarRevisionInterna(cotizacion.id, motivo.trim()); toast.success("Cotización rechazada internamente"); load(); }
+    catch (err) { toast.error(err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error"); }
+    finally { setWorking(false); }
   }
   async function handleEscalarRev() {
     if (!cotizacion) return;
     const nivelActual = cotizacion.revision_interna_nivel ?? 1;
-    if (nivelActual >= 3) {
-      toast.error("Ya está en el nivel máximo (presidencia)");
-      return;
-    }
+    if (nivelActual >= 3) { toast.error("Ya está en el nivel máximo (presidencia)"); return; }
     const siguiente = rolDeNivelRevision(nivelActual + 1);
     const mensaje = window.prompt(`Mensaje para ${siguiente} (obligatorio):`);
     if (!mensaje || mensaje.trim() === "") return;
     setWorking(true);
-    try {
-      const res = await escalarRevisionInterna(cotizacion.id, mensaje.trim());
-      toast.success(`Escalada a ${res.rol_destino}`);
-      load();
-    } catch (err) {
-      toast.error(err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error");
-    } finally { setWorking(false); }
+    try { const res = await escalarRevisionInterna(cotizacion.id, mensaje.trim()); toast.success(`Escalada a ${res.rol_destino}`); load(); }
+    catch (err) { toast.error(err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error"); }
+    finally { setWorking(false); }
   }
 
   if (loading && !cotizacion) {
-    return <div className="text-muted-foreground">Cargando cotizacion...</div>;
+    return (
+      <div className="flex h-[60vh] items-center justify-center text-muted-foreground">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-copper border-t-transparent" />
+          <span className="text-sm">Cargando cotización…</span>
+        </div>
+      </div>
+    );
   }
   if (error) {
     return (
-      <div className="space-y-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/cotizaciones"><ChevronLeft className="mr-1 h-4 w-4" /> Volver</Link>
-        </Button>
-        <p className="text-destructive">{error}</p>
+      <div>
+        <PageHeader breadcrumb={[{ href: "/dashboard", label: "Panel" }, { href: "/cotizaciones", label: "Cotizaciones" }, { label: "Error" }]} title="Cotización" titleAccent="no encontrada" />
+        <div className="pt-6">
+          <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-6 text-rose-200 inset-highlight"><p className="text-sm">{error}</p></div>
+        </div>
       </div>
     );
   }
@@ -193,222 +175,215 @@ export default function CotizacionDetallePage({ params }: PageProps) {
   const editable = cotizacion.estado !== "convertida" && cotizacion.estado !== "cancelada" && cotizacion.estado !== "rechazada";
   const transiciones = transicionesPosibles(cotizacion.estado);
 
-  // -------- Gating de la revision interna --------
+  // -------- Gating revisión interna --------
   const rev = cotizacion.revision_interna_estado;
   const nivelActual = cotizacion.revision_interna_nivel ?? 1;
   const rolEsperado = rolDeNivelRevision(nivelActual);
   const userRol = currentUser?.rol_nombre ?? "";
   const esOverride = !!currentUser?.es_super_admin || ROLES_OVERRIDE.includes(userRol);
   const userEsResponsableNivel = userRol === rolEsperado || esOverride;
-  // Solo el creador (o override) puede solicitar revision
   const esCreadorOAdmin = currentUser?.id === cotizacion.vendedor_id || esOverride;
   const puedeSolicitar = (rev === "no_solicitada" || rev === "rechazada") && cotizacion.estado === "borrador" && esCreadorOAdmin;
   const puedeActuar = rev === "pendiente" && userEsResponsableNivel;
   const puedeEscalar = puedeActuar && nivelActual < 3;
-  // Bloquear el boton 'Enviar al cliente' si revision interna no esta aprobada
   const transicionesFiltradas = transiciones.filter((a) => !(a === "enviar" && rev !== "aprobada"));
 
+  // Tono del panel de revisión según estado
+  const revPanelTone =
+    rev === "aprobada"  ? "border-green-500/30 bg-green-500/[0.04]" :
+    rev === "pendiente" ? "border-ttteal/30 bg-ttteal/[0.04]" :
+    rev === "rechazada" ? "border-rose-500/30 bg-rose-500/[0.04]" :
+                          "border-glass bg-glass";
+
   return (
-    <div className="space-y-6">
-      <header>
-        <Button variant="ghost" size="sm" asChild className="mb-2">
-          <Link href="/cotizaciones">
-            <ChevronLeft className="mr-1 h-4 w-4" /> Volver a cotizaciones
-          </Link>
-        </Button>
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-3xl font-bold">{cotizacion.codigo}</h2>
-            <p className="text-muted-foreground">
-              {cotizacion.clientes?.razon_social} ({cotizacion.clientes?.ruc_cedula})
-              {" · "}revision {cotizacion.revision_actual}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant={estadoVariant(cotizacion.estado)} className="text-base">
-              {cotizacion.estado.toUpperCase()}
-            </Badge>
+    <div>
+      <PageHeader
+        breadcrumb={[{ href: "/dashboard", label: "Panel" }, { href: "/cotizaciones", label: "Cotizaciones" }, { label: cotizacion.codigo }]}
+        title={cotizacion.codigo}
+        titleAccent={cotizacion.clientes?.razon_social ?? ""}
+        meta={
+          <>
+            <Badge variant={estadoVariant(cotizacion.estado)}>{cotizacion.estado}</Badge>
+            <span className="text-muted-foreground/40">·</span>
+            <span>Revisión <span className="font-mono text-foreground">{cotizacion.revision_actual}</span></span>
+            <span className="text-muted-foreground/40">·</span>
+            <span>{cotizacion.clientes?.ruc_cedula}</span>
+          </>
+        }
+        actions={
+          <>
+            <HeaderActionGhost href="/cotizaciones" icon={<ChevronLeft className="h-3.5 w-3.5" />}>Volver</HeaderActionGhost>
             <PdfButton recurso="cotizacion" id={cotizacion.id} />
-          </div>
-        </div>
-      </header>
-
-      {/* Panel de revision interna */}
-      <section className={
-        rev === "aprobada" ? "rounded-md border border-green-300 bg-green-50 p-4"
-        : rev === "pendiente" ? "rounded-md border border-blue-300 bg-blue-50 p-4"
-        : rev === "rechazada" ? "rounded-md border border-destructive bg-destructive/5 p-4"
-        : "rounded-md border bg-muted/20 p-4"
-      }>
-        <div className="mb-2 flex items-center gap-2">
-          <ShieldCheck className="h-5 w-5" />
-          <h3 className="text-sm font-semibold">Revisión interna</h3>
-          <Badge variant={
-            rev === "aprobada" ? "success"
-            : rev === "pendiente" ? "default"
-            : rev === "rechazada" ? "destructive"
-            : "muted"
-          }>
-            {rev === "no_solicitada" ? "no solicitada" : rev}
-          </Badge>
-          {rev === "pendiente" && (
-            <span className="text-xs text-muted-foreground">
-              · Esperando aprobación de <strong>{nivelRevisionLabel(nivelActual)}</strong>
-            </span>
-          )}
-        </div>
-
-        {rev === "no_solicitada" && cotizacion.estado === "borrador" && (
-          <p className="text-sm text-muted-foreground">
-            Antes de poder enviar al cliente, esta cotización debe ser aprobada internamente: primero por Gerencia Comercial, con escalamientos a Gerencia General y Presidencia si es necesario.
-          </p>
-        )}
-        {rev === "rechazada" && (
-          <div className="text-sm">
-            <p className="font-medium text-destructive">Motivo:</p>
-            <p className="whitespace-pre-wrap">{cotizacion.revision_interna_motivo_rechazo ?? "—"}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Corrige las líneas o condiciones y vuelve a solicitar la revisión.
-            </p>
-          </div>
-        )}
-        {rev === "aprobada" && (
-          <p className="text-sm text-muted-foreground">
-            Aprobada internamente el {cotizacion.revision_interna_resuelta_at ? new Date(cotizacion.revision_interna_resuelta_at).toLocaleString("es-EC") : "—"}.
-            Ya puedes enviarla al cliente desde el bloque de acciones.
-          </p>
-        )}
-
-        {/* Botones de accion */}
-        <div className="mt-3 flex flex-wrap gap-2">
-          {puedeSolicitar && (
-            <Button size="sm" onClick={handleSolicitar} disabled={working}>
-              <Send className="mr-1 h-3.5 w-3.5" /> Solicitar revisión interna
-            </Button>
-          )}
-          {puedeActuar && (
-            <>
-              <Button size="sm" onClick={handleAprobarRev} disabled={working}>
-                <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Aprobar internamente
-              </Button>
-              <Button size="sm" variant="destructive" onClick={handleRechazarRev} disabled={working}>
-                <XCircle className="mr-1 h-3.5 w-3.5" /> Rechazar
-              </Button>
-              {puedeEscalar && (
-                <Button size="sm" variant="outline" onClick={handleEscalarRev} disabled={working}>
-                  <ArrowUpToLine className="mr-1 h-3.5 w-3.5" />
-                  Escalar a {nivelRevisionLabel(nivelActual + 1)}
-                </Button>
-              )}
-            </>
-          )}
-          {rev === "pendiente" && !puedeActuar && (
-            <p className="text-xs text-muted-foreground">
-              <AlertCircle className="mr-1 inline h-3 w-3" />
-              Solo {nivelRevisionLabel(nivelActual)} (o presidencia/gerencia general/gerencia comercial como override) puede aprobar/rechazar/escalar.
-            </p>
-          )}
-          {historial.length > 0 && (
-            <Button size="sm" variant="ghost" onClick={() => setMostrarHistorial((v) => !v)}>
-              <History className="mr-1 h-3.5 w-3.5" />
-              {mostrarHistorial ? "Ocultar historial" : `Ver historial (${historial.length})`}
-            </Button>
-          )}
-        </div>
-
-        {/* Historial */}
-        {mostrarHistorial && historial.length > 0 && (
-          <div className="mt-3 space-y-1 rounded border bg-background p-2 text-xs">
-            {historial.map((h) => (
-              <div key={h.id} className="flex items-start justify-between gap-2 border-b pb-1 last:border-0 last:pb-0">
-                <div>
-                  <span className="font-mono">{new Date(h.created_at).toLocaleString("es-EC")}</span>
-                  {" · "}
-                  <strong>{h.accion}</strong>
-                  {" · "}
-                  <span>{nivelRevisionLabel(h.nivel)}</span>
-                  {" · "}
-                  <span className="text-muted-foreground">
-                    {h.nombres ? `${h.nombres} ${h.apellidos ?? ""}` : "—"}
-                    {h.rol_actuante && ` (${h.rol_actuante})`}
-                  </span>
-                </div>
-                {h.notas && <span className="max-w-md text-muted-foreground italic">"{h.notas}"</span>}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Botones de transicion */}
-      {transicionesFiltradas.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 p-3">
-          <span className="text-sm font-medium">Acciones:</span>
-          {transicionesFiltradas.map((accion) => {
-            const cfg = accionConfig[accion];
-            const Icon = cfg.icon;
-            return (
-              <Button
-                key={accion}
-                variant={cfg.variant}
-                size="sm"
-                onClick={() => handleTransicion(accion)}
-              >
-                <Icon className="mr-2 h-4 w-4" /> {cfg.label}
-              </Button>
-            );
-          })}
-          {/* Hint si 'enviar' fue ocultado por falta de revision interna */}
-          {transiciones.includes("enviar") && rev !== "aprobada" && (
-            <span className="text-xs text-muted-foreground">
-              <AlertCircle className="mr-1 inline h-3 w-3" />
-              "Enviar al cliente" requiere aprobación interna primero.
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Revisiones (snapshots de cambios) */}
-      {cotizacion.cotizacion_revisiones && cotizacion.cotizacion_revisiones.length > 0 && (
-        <details className="rounded-md border p-3 text-sm">
-          <summary className="cursor-pointer font-medium">
-            {cotizacion.cotizacion_revisiones.length} revision{cotizacion.cotizacion_revisiones.length === 1 ? "" : "es"} previas
-          </summary>
-          <ul className="mt-2 space-y-1 text-muted-foreground">
-            {cotizacion.cotizacion_revisiones.map((r) => (
-              <li key={r.id}>
-                <span className="font-mono">rev {r.revision}</span>
-                {" · "}
-                {new Date(r.created_at).toLocaleString("es-EC")}
-                {r.motivo && ` · ${r.motivo}`}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-
-      <CotizacionForm
-        initial={cotizacion}
-        readOnly={!editable}
-        onCancel={() => router.push("/cotizaciones")}
-        onSubmit={async (payload) => {
-          try {
-            const res = await updateCotizacion(cotizacion.id, payload);
-            toast.success(`Cotizacion ${res.data.codigo} actualizada`);
-            setCotizacion(res.data);
-          } catch (err) {
-            const msg = err instanceof ApiError
-              ? typeof err.body === "object" && err.body !== null && "error" in err.body
-                ? String((err.body as { error: string }).error)
-                : `Error ${err.status}`
-              : "Error inesperado";
-            toast.error(msg);
-            throw err;
-          }
-        }}
+          </>
+        }
       />
 
-      <Toaster richColors position="top-right" />
+      <div className="space-y-6 pt-6">
+        {/* Revisión interna */}
+        <section className={`overflow-hidden rounded-xl border ${revPanelTone} inset-highlight`}>
+          <div className="flex items-center justify-between border-b border-glass px-5 py-3.5">
+            <div className="flex items-center gap-2.5">
+              <ShieldCheck className="h-4 w-4 text-copper" />
+              <h3 className="font-display text-sm font-semibold tracking-tight">Revisión interna</h3>
+              <Badge variant={
+                rev === "aprobada"  ? "success" :
+                rev === "pendiente" ? "teal" :
+                rev === "rechazada" ? "destructive" :
+                                      "muted"
+              }>
+                {rev === "no_solicitada" ? "no solicitada" : rev}
+              </Badge>
+              {rev === "pendiente" && (
+                <span className="font-mono text-[10.5px] uppercase tracking-wider text-muted-foreground">
+                  · esperando <span className="text-foreground">{nivelRevisionLabel(nivelActual)}</span>
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="p-5">
+            {rev === "no_solicitada" && cotizacion.estado === "borrador" && (
+              <p className="mb-3 text-sm text-muted-foreground">
+                Antes de enviar al cliente, esta cotización debe aprobarse internamente: primero Gerencia Comercial, con escalamientos a Gerencia General y Presidencia si es necesario.
+              </p>
+            )}
+            {rev === "rechazada" && (
+              <div className="mb-3 text-sm">
+                <p className="font-medium text-rose-300">Motivo del rechazo</p>
+                <p className="mt-0.5 whitespace-pre-wrap text-foreground/85">{cotizacion.revision_interna_motivo_rechazo ?? "—"}</p>
+                <p className="mt-2 text-xs text-muted-foreground">Corregí las líneas o condiciones y volvé a solicitar la revisión.</p>
+              </div>
+            )}
+            {rev === "aprobada" && (
+              <p className="mb-3 text-sm text-muted-foreground">
+                Aprobada internamente el {cotizacion.revision_interna_resuelta_at ? new Date(cotizacion.revision_interna_resuelta_at).toLocaleString("es-EC", { timeZone: "America/Guayaquil" }) : "—"}. Ya podés enviarla al cliente desde el bloque de acciones.
+              </p>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              {puedeSolicitar && (
+                <button type="button" onClick={handleSolicitar} disabled={working} className={actionClass("primary")}>
+                  <Send className="h-3.5 w-3.5" /> Solicitar revisión interna
+                </button>
+              )}
+              {puedeActuar && (
+                <>
+                  <button type="button" onClick={handleAprobarRev} disabled={working} className={actionClass("primary")}>
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Aprobar internamente
+                  </button>
+                  <button type="button" onClick={handleRechazarRev} disabled={working} className={actionClass("destructive")}>
+                    <XCircle className="h-3.5 w-3.5" /> Rechazar
+                  </button>
+                  {puedeEscalar && (
+                    <button type="button" onClick={handleEscalarRev} disabled={working} className={actionClass("ghost")}>
+                      <ArrowUpToLine className="h-3.5 w-3.5" /> Escalar a {nivelRevisionLabel(nivelActual + 1)}
+                    </button>
+                  )}
+                </>
+              )}
+              {rev === "pendiente" && !puedeActuar && (
+                <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <AlertCircle className="h-3 w-3" />
+                  Solo {nivelRevisionLabel(nivelActual)} (o override) puede aprobar/rechazar/escalar.
+                </p>
+              )}
+              {historial.length > 0 && (
+                <button type="button" onClick={() => setMostrarHistorial((v) => !v)} className={actionClass("ghost")}>
+                  <History className="h-3.5 w-3.5" />
+                  {mostrarHistorial ? "Ocultar historial" : `Ver historial (${historial.length})`}
+                </button>
+              )}
+            </div>
+
+            {mostrarHistorial && historial.length > 0 && (
+              <div className="mt-4 space-y-1.5 rounded-lg border border-glass bg-background/40 p-3 font-mono text-[11px]">
+                {historial.map((h) => (
+                  <div key={h.id} className="flex items-start justify-between gap-3 border-b border-glass pb-1.5 last:border-0 last:pb-0">
+                    <div className="min-w-0 flex-1">
+                      <span className="text-muted-foreground">{new Date(h.created_at).toLocaleString("es-EC", { timeZone: "America/Guayaquil" })}</span>
+                      <span className="mx-1.5 text-muted-foreground/40">·</span>
+                      <strong className="text-foreground/90">{h.accion}</strong>
+                      <span className="mx-1.5 text-muted-foreground/40">·</span>
+                      <span className="text-copper">{nivelRevisionLabel(h.nivel)}</span>
+                      <span className="mx-1.5 text-muted-foreground/40">·</span>
+                      <span className="text-muted-foreground">
+                        {h.nombres ? `${h.nombres} ${h.apellidos ?? ""}` : "—"}
+                        {h.rol_actuante && ` (${h.rol_actuante})`}
+                      </span>
+                    </div>
+                    {h.notas && <span className="max-w-md italic text-muted-foreground">&ldquo;{h.notas}&rdquo;</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Acciones de transición */}
+        {transicionesFiltradas.length > 0 && (
+          <Panel title="Acciones disponibles" subtitle="Transiciones de estado">
+            <div className="flex flex-wrap items-center gap-2">
+              {transicionesFiltradas.map((accion) => {
+                const cfg = accionConfig[accion];
+                const Icon = cfg.icon;
+                return (
+                  <button key={accion} type="button" onClick={() => handleTransicion(accion)} className={actionClass(cfg.tone)}>
+                    <Icon className="h-3.5 w-3.5" /> {cfg.label}
+                  </button>
+                );
+              })}
+              {transiciones.includes("enviar") && rev !== "aprobada" && (
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <AlertCircle className="h-3 w-3" />
+                  &ldquo;Enviar al cliente&rdquo; requiere aprobación interna primero.
+                </span>
+              )}
+            </div>
+          </Panel>
+        )}
+
+        {/* Revisiones previas (snapshots) */}
+        {cotizacion.cotizacion_revisiones && cotizacion.cotizacion_revisiones.length > 0 && (
+          <details className="rounded-xl border border-glass bg-glass p-4 text-sm inset-highlight">
+            <summary className="cursor-pointer font-display text-sm font-semibold tracking-tight">
+              {cotizacion.cotizacion_revisiones.length} revisión{cotizacion.cotizacion_revisiones.length === 1 ? "" : "es"} previas
+            </summary>
+            <ul className="mt-3 space-y-1 font-mono text-[11px] text-muted-foreground">
+              {cotizacion.cotizacion_revisiones.map((r) => (
+                <li key={r.id} className="border-b border-glass pb-1 last:border-0 last:pb-0">
+                  <span className="text-copper">rev {r.revision}</span>
+                  <span className="mx-1.5 text-muted-foreground/40">·</span>
+                  <span>{new Date(r.created_at).toLocaleString("es-EC", { timeZone: "America/Guayaquil" })}</span>
+                  {r.motivo && <span className="ml-1.5 text-foreground/70">· {r.motivo}</span>}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+
+        {/* Form (no rebrand profundo — Ola 2B) */}
+        <CotizacionForm
+          initial={cotizacion}
+          readOnly={!editable}
+          onCancel={() => router.push("/cotizaciones")}
+          onSubmit={async (payload) => {
+            try {
+              const res = await updateCotizacion(cotizacion.id, payload);
+              toast.success(`Cotización ${res.data.codigo} actualizada`);
+              setCotizacion(res.data);
+            } catch (err) {
+              const msg = err instanceof ApiError
+                ? typeof err.body === "object" && err.body !== null && "error" in err.body
+                  ? String((err.body as { error: string }).error)
+                  : `Error ${err.status}`
+                : "Error inesperado";
+              toast.error(msg);
+              throw err;
+            }
+          }}
+        />
+      </div>
+
+      <Toaster richColors position="top-right" theme="dark" />
     </div>
   );
 }

@@ -68,117 +68,111 @@ export function TiemposReprocesosPanel({ otId, pasos }: Props) {
   }
 
   return (
-    <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       {/* Tiempos de trabajo */}
-      <div className="rounded-md border p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="flex items-center gap-2 text-lg font-bold">
-            <Clock className="h-5 w-5" /> Tiempos de trabajo
+      <div className="overflow-hidden rounded-xl border border-glass bg-glass inset-highlight">
+        <div className="flex items-center justify-between border-b border-glass px-5 py-3.5">
+          <h3 className="flex items-center gap-2 font-display text-sm font-semibold tracking-tight">
+            <Clock className="h-4 w-4 text-copper" /> Tiempos de trabajo
           </h3>
-          <Badge variant="outline" className="text-xs">{horasTotal.toFixed(1)}h totales</Badge>
+          <Badge variant="muted">{horasTotal.toFixed(1)}h totales</Badge>
         </div>
+        <div className="p-5">
+          <Dialog open={openTiempo} onOpenChange={setOpenTiempo}>
+            <DialogTrigger asChild>
+              <button type="button" className="mb-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-glass-mid bg-glass px-3 py-2 text-xs font-medium text-foreground/90 transition hover:border-glass-strong hover:bg-glass-elev">
+                <Plus className="h-3.5 w-3.5" /> Registrar tiempo
+              </button>
+            </DialogTrigger>
+            <RegistrarTiempoForm otId={otId} pasos={pasos} areas={areas} onSaved={() => { setOpenTiempo(false); load(); }} />
+          </Dialog>
 
-        <Dialog open={openTiempo} onOpenChange={setOpenTiempo}>
-          <DialogTrigger asChild>
-            <Button size="sm" variant="outline" className="mb-3 w-full">
-              <Plus className="mr-1 h-3.5 w-3.5" /> Registrar tiempo
-            </Button>
-          </DialogTrigger>
-          <RegistrarTiempoForm
-            otId={otId}
-            pasos={pasos}
-            areas={areas}
-            onSaved={() => { setOpenTiempo(false); load(); }}
-          />
-        </Dialog>
-
-        {tiempos.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Sin registros todavía</p>
-        ) : (
-          <ul className="space-y-2 max-h-72 overflow-y-auto text-sm">
-            {tiempos.map((t) => (
-              <li key={t.id} className="flex items-start gap-2 rounded border p-2 text-xs">
-                <div className="flex-1">
+          {tiempos.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 rounded-md border border-dashed border-glass bg-glass py-6">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground">Sin registros todavía</p>
+            </div>
+          ) : (
+            <ul className="max-h-72 space-y-1.5 overflow-y-auto scroll-discreet pr-1 text-sm">
+              {tiempos.map((t) => (
+                <li key={t.id} className="rounded-lg border border-glass bg-glass p-2.5 text-xs">
                   <p className="font-medium">
-                    {Number(t.horas).toFixed(1)}h
+                    <span className="font-mono text-copper">{Number(t.horas).toFixed(1)}h</span>
                     {t.areas && (
-                      <span className="ml-2 inline-flex items-center gap-1">
+                      <span className="ml-2 inline-flex items-center gap-1.5">
                         <span className="inline-block h-2 w-2 rounded-full" style={{ background: t.areas.color_hex }} />
                         <span className="text-muted-foreground">{t.areas.nombre}</span>
                       </span>
                     )}
                   </p>
-                  <p className="text-muted-foreground">
+                  <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
                     {t.usuarios && `${t.usuarios.nombres} · `}
                     {t.fecha.split("T")[0]}
                     {t.ot_pasos && ` · paso ${t.ot_pasos.numero}`}
                   </p>
-                  {t.descripcion && <p className="mt-0.5 text-muted-foreground italic">{t.descripcion}</p>}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+                  {t.descripcion && <p className="mt-0.5 italic text-muted-foreground">{t.descripcion}</p>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
 
       {/* Reprocesos */}
-      <div className="rounded-md border p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="flex items-center gap-2 text-lg font-bold">
-            <AlertOctagon className="h-5 w-5 text-destructive" /> Reprocesos
+      <div className="overflow-hidden rounded-xl border border-glass bg-glass inset-highlight">
+        <div className="flex items-center justify-between border-b border-glass px-5 py-3.5">
+          <h3 className="flex items-center gap-2 font-display text-sm font-semibold tracking-tight">
+            <AlertOctagon className="h-4 w-4 text-rose-400" /> Reprocesos
           </h3>
-          <div className="flex gap-1">
-            <Badge variant="outline" className="text-xs">{diasReprocesoTotal.toFixed(1)}d perdidos</Badge>
-            {reprocesosAbiertos > 0 && (
-              <Badge variant="destructive" className="text-xs">{reprocesosAbiertos} abiertos</Badge>
-            )}
+          <div className="flex gap-1.5">
+            <Badge variant="muted">{diasReprocesoTotal.toFixed(1)}d perdidos</Badge>
+            {reprocesosAbiertos > 0 && <Badge variant="destructive">{reprocesosAbiertos} abiertos</Badge>}
           </div>
         </div>
+        <div className="p-5">
+          <Dialog open={openReproceso} onOpenChange={setOpenReproceso}>
+            <DialogTrigger asChild>
+              <button type="button" className="mb-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-glass-mid bg-glass px-3 py-2 text-xs font-medium text-foreground/90 transition hover:border-glass-strong hover:bg-glass-elev">
+                <Plus className="h-3.5 w-3.5" /> Reportar reproceso
+              </button>
+            </DialogTrigger>
+            <ReportarReprocesoForm otId={otId} pasos={pasos} causas={causas} onSaved={() => { setOpenReproceso(false); load(); }} />
+          </Dialog>
 
-        <Dialog open={openReproceso} onOpenChange={setOpenReproceso}>
-          <DialogTrigger asChild>
-            <Button size="sm" variant="outline" className="mb-3 w-full">
-              <Plus className="mr-1 h-3.5 w-3.5" /> Reportar reproceso
-            </Button>
-          </DialogTrigger>
-          <ReportarReprocesoForm
-            otId={otId}
-            pasos={pasos}
-            causas={causas}
-            onSaved={() => { setOpenReproceso(false); load(); }}
-          />
-        </Dialog>
-
-        {reprocesos.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Sin reprocesos reportados</p>
-        ) : (
-          <ul className="space-y-2 max-h-72 overflow-y-auto text-sm">
-            {reprocesos.map((r) => (
-              <li key={r.id} className={`rounded border p-2 text-xs ${r.resuelto ? "" : "border-destructive/40 bg-destructive/5"}`}>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <p className="font-medium">
-                      {r.causas_demora?.nombre ?? "—"}
-                      {r.ot_pasos && <span className="ml-1 text-muted-foreground">· paso {r.ot_pasos.numero}</span>}
-                    </p>
-                    <p className="mt-0.5 text-muted-foreground">{r.descripcion}</p>
-                    <p className="mt-0.5 text-muted-foreground">
-                      {Number(r.dias_perdidos).toFixed(1)}d perdidos · {new Date(r.created_at).toLocaleDateString("es-EC")}
-                    </p>
-                    {r.notas_resolucion && (
-                      <p className="mt-1 rounded bg-muted p-1 italic">Resuelto: {r.notas_resolucion}</p>
+          {reprocesos.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 rounded-md border border-dashed border-green-500/25 bg-green-500/[0.04] py-6">
+              <CheckCircle2 className="h-4 w-4 text-green-400" />
+              <p className="text-xs text-green-300">Sin reprocesos reportados</p>
+            </div>
+          ) : (
+            <ul className="max-h-72 space-y-1.5 overflow-y-auto scroll-discreet pr-1 text-sm">
+              {reprocesos.map((r) => (
+                <li key={r.id} className={`rounded-lg border p-2.5 text-xs ${r.resuelto ? "border-glass bg-glass" : "border-rose-500/30 bg-rose-500/[0.05]"}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium">
+                        {r.causas_demora?.nombre ?? "—"}
+                        {r.ot_pasos && <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">· paso {r.ot_pasos.numero}</span>}
+                      </p>
+                      <p className="mt-0.5 text-muted-foreground">{r.descripcion}</p>
+                      <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+                        <span className="text-rose-300">{Number(r.dias_perdidos).toFixed(1)}d perdidos</span> · {new Date(r.created_at).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil" })}
+                      </p>
+                      {r.notas_resolucion && (
+                        <p className="mt-1 rounded bg-glass-elev px-2 py-1 italic">Resuelto: {r.notas_resolucion}</p>
+                      )}
+                    </div>
+                    {!r.resuelto && (
+                      <button type="button" onClick={() => handleResolver(r)} className="rounded p-1.5 text-green-400 hover:bg-green-500/10" aria-label="Resolver">
+                        <CheckCircle2 className="h-4 w-4" />
+                      </button>
                     )}
                   </div>
-                  {!r.resuelto && (
-                    <Button size="sm" variant="ghost" onClick={() => handleResolver(r)}>
-                      <CheckCircle2 className="h-3.5 w-3.5 text-green-700" />
-                    </Button>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </section>
   );
@@ -220,7 +214,7 @@ function RegistrarTiempoForm({
   }
 
   return (
-    <DialogContent className="bg-white">
+    <DialogContent>
       <DialogHeader>
         <DialogTitle>Registrar tiempo de trabajo</DialogTitle>
         <DialogDescription>Horas-hombre dedicadas a esta OT. Por defecto el área se infiere del paso seleccionado.</DialogDescription>
@@ -311,7 +305,7 @@ function ReportarReprocesoForm({
   }
 
   return (
-    <DialogContent className="bg-white">
+    <DialogContent>
       <DialogHeader>
         <DialogTitle>Reportar reproceso / demora</DialogTitle>
         <DialogDescription>Tipifica la causa y los días perdidos. Sirve para alimentar el ranking del dashboard.</DialogDescription>

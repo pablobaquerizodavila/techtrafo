@@ -31,7 +31,13 @@ export function GanttOT({ otId }: Props) {
     return () => window.removeEventListener("resize", onResize);
   }, [otId]);
 
-  if (!data) return <p className="text-xs text-muted-foreground">Cargando Gantt...</p>;
+  if (!data) {
+    return (
+      <section className="overflow-hidden rounded-xl border border-glass bg-glass p-5 inset-highlight">
+        <p className="text-xs text-muted-foreground">Cargando Gantt…</p>
+      </section>
+    );
+  }
 
   const desde = new Date(data.rango.desde).getTime();
   const hasta = new Date(data.rango.hasta).getTime();
@@ -50,27 +56,28 @@ export function GanttOT({ otId }: Props) {
   }));
 
   return (
-    <div id={`gantt-${otId}`} className="rounded-md border bg-white p-4">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-        <CalendarRange className="h-4 w-4" /> Gantt — pasos planificados vs reales
+    <section id={`gantt-${otId}`} className="overflow-hidden rounded-xl border border-glass bg-glass p-5 inset-highlight">
+      <div className="mb-3 flex items-center gap-2 font-display text-sm font-semibold tracking-tight">
+        <CalendarRange className="h-4 w-4 text-copper" /> Gantt
+        <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">pasos planificados vs reales</span>
       </div>
       <svg width={w} height={totalH} className="block">
         {/* Cabecera con ticks de tiempo */}
-        <line x1={PAD_LEFT} y1={HEADER_H - 4} x2={w - PAD_RIGHT} y2={HEADER_H - 4} stroke="#cbd5e1" />
+        <line x1={PAD_LEFT} y1={HEADER_H - 4} x2={w - PAD_RIGHT} y2={HEADER_H - 4} stroke="rgba(255,255,255,0.12)" />
         {ticks.map((t, i) => (
           <g key={i}>
-            <line x1={x(t.t)} y1={HEADER_H - 8} x2={x(t.t)} y2={HEADER_H - 2} stroke="#94a3b8" />
-            <text x={x(t.t)} y={HEADER_H - 12} textAnchor={i === 0 ? "start" : i === ticks.length - 1 ? "end" : "middle"} fontSize="10" fill="#475569">
-              {new Date(t.t).toLocaleDateString("es-EC", { day: "2-digit", month: "short" })}
+            <line x1={x(t.t)} y1={HEADER_H - 8} x2={x(t.t)} y2={HEADER_H - 2} stroke="rgba(255,255,255,0.18)" />
+            <text x={x(t.t)} y={HEADER_H - 12} textAnchor={i === 0 ? "start" : i === ticks.length - 1 ? "end" : "middle"} fontSize="10" fill="rgba(245,245,244,0.55)" fontFamily="var(--font-mono)">
+              {new Date(t.t).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil", day: "2-digit", month: "short" })}
             </text>
           </g>
         ))}
 
-        {/* Linea de HOY */}
+        {/* Línea de HOY */}
         {todayInRange && (
           <g>
-            <line x1={x(today)} y1={HEADER_H - 4} x2={x(today)} y2={totalH - FOOTER_H} stroke="#ef4444" strokeWidth="1.5" strokeDasharray="4,4" />
-            <text x={x(today) + 4} y={HEADER_H + 10} fontSize="10" fill="#ef4444" fontWeight="600">HOY</text>
+            <line x1={x(today)} y1={HEADER_H - 4} x2={x(today)} y2={totalH - FOOTER_H} stroke="#ff6b35" strokeWidth="1.5" strokeDasharray="4,4" style={{ filter: "drop-shadow(0 0 4px rgba(255,107,53,0.5))" }} />
+            <text x={x(today) + 4} y={HEADER_H + 10} fontSize="10" fill="#ff6b35" fontWeight="600" fontFamily="var(--font-mono)">HOY</text>
           </g>
         )}
 
@@ -81,18 +88,18 @@ export function GanttOT({ otId }: Props) {
         })}
 
         {/* Leyenda al pie */}
-        <g transform={`translate(${PAD_LEFT}, ${totalH - 14})`}>
-          <rect x={0} y={-6} width={10} height={8} fill="#cbd5e1" />
-          <text x={14} y={2} fontSize="10" fill="#475569">Plan</text>
-          <rect x={50} y={-6} width={10} height={8} fill="#3b82f6" />
-          <text x={64} y={2} fontSize="10" fill="#475569">Real</text>
-          <rect x={100} y={-6} width={10} height={8} fill="#10b981" />
-          <text x={114} y={2} fontSize="10" fill="#475569">Completado</text>
-          <rect x={195} y={-6} width={10} height={8} fill="#ef4444" />
-          <text x={209} y={2} fontSize="10" fill="#475569">Rechazado</text>
+        <g transform={`translate(${PAD_LEFT}, ${totalH - 14})`} fontFamily="var(--font-mono)">
+          <rect x={0} y={-6} width={10} height={8} fill="rgba(255,255,255,0.18)" />
+          <text x={14} y={2} fontSize="10" fill="rgba(245,245,244,0.55)">Plan</text>
+          <rect x={50} y={-6} width={10} height={8} fill="#4fd1c5" />
+          <text x={64} y={2} fontSize="10" fill="rgba(245,245,244,0.55)">En curso</text>
+          <rect x={120} y={-6} width={10} height={8} fill="#22c55e" />
+          <text x={134} y={2} fontSize="10" fill="rgba(245,245,244,0.55)">Completado</text>
+          <rect x={215} y={-6} width={10} height={8} fill="#ef4444" />
+          <text x={229} y={2} fontSize="10" fill="rgba(245,245,244,0.55)">Rechazado</text>
         </g>
       </svg>
-    </div>
+    </section>
   );
 }
 
@@ -109,34 +116,40 @@ function PasoRow({ paso, y, x }: { paso: GanttPaso; y: number; x: (t: number) =>
   const realW = realX1 && realX2 ? Math.max(2, realX2 - realX1) : 0;
 
   const realColor =
-    paso.estado === "completado" ? "#10b981" :
+    paso.estado === "completado" ? "#22c55e" :
     paso.estado === "rechazado"  ? "#ef4444" :
-    paso.estado === "saltado"    ? "#94a3b8" :
-    paso.estado === "en_curso"   ? "#3b82f6" : "#cbd5e1";
+    paso.estado === "saltado"    ? "rgba(255,255,255,0.25)" :
+    paso.estado === "en_curso"   ? "#4fd1c5" : "rgba(255,255,255,0.2)";
 
   return (
     <g>
       {/* Label del paso */}
-      <text x={PAD_LEFT - 8} y={y + ROW_H / 2 + 4} textAnchor="end" fontSize="11" fill="#0f172a">
-        {paso.numero}. {paso.nombre.length > 22 ? paso.nombre.slice(0, 20) + "…" : paso.nombre}
-        {paso.es_gate && " ⚐"}
+      <text x={PAD_LEFT - 8} y={y + ROW_H / 2 + 4} textAnchor="end" fontSize="11" fill="rgba(245,245,244,0.9)">
+        <tspan fill="rgba(245,245,244,0.5)" fontFamily="var(--font-mono)">{paso.numero}.</tspan>{" "}
+        {paso.nombre.length > 22 ? paso.nombre.slice(0, 20) + "…" : paso.nombre}
+        {paso.es_gate && <tspan fill="#f59e0b"> ⚐</tspan>}
       </text>
 
-      {/* Barra plan (gris claro) */}
-      <rect x={planX1} y={y + 6} width={planW} height={ROW_H - 12} fill="#cbd5e1" rx="2" opacity={0.5}>
-        <title>{`Plan: ${new Date(paso.plan_inicio).toLocaleDateString()} → ${new Date(paso.plan_fin).toLocaleDateString()}`}</title>
+      {/* Barra plan (gris translúcido) */}
+      <rect x={planX1} y={y + 6} width={planW} height={ROW_H - 12} fill="rgba(255,255,255,0.12)" rx="2">
+        <title>{`Plan: ${new Date(paso.plan_inicio).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil" })} → ${new Date(paso.plan_fin).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil" })}`}</title>
       </rect>
 
       {/* Barra real (encima, color según estado) */}
       {realX1 != null && realW > 0 && (
-        <rect x={realX1} y={y + 2} width={realW} height={ROW_H - 4} fill={realColor} rx="3">
-          <title>{`Real: ${paso.real_inicio ? new Date(paso.real_inicio).toLocaleDateString() : "?"} → ${paso.real_fin ? new Date(paso.real_fin).toLocaleDateString() : "ahora"}`}</title>
+        <rect x={realX1} y={y + 2} width={realW} height={ROW_H - 4} fill={realColor} rx="3" style={{
+          filter: paso.estado === "completado" ? "drop-shadow(0 0 4px rgba(34,197,94,0.4))"
+                : paso.estado === "rechazado" ? "drop-shadow(0 0 6px rgba(239,68,68,0.5))"
+                : paso.estado === "en_curso" ? "drop-shadow(0 0 4px rgba(79,209,197,0.4))"
+                : "none"
+        }}>
+          <title>{`Real: ${paso.real_inicio ? new Date(paso.real_inicio).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil" }) : "?"} → ${paso.real_fin ? new Date(paso.real_fin).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil" }) : "ahora"}`}</title>
         </rect>
       )}
 
       {/* Borde de area si existe */}
       {paso.area && (
-        <rect x={planX1} y={y + 6} width={planW} height={ROW_H - 12} fill="none" stroke={paso.area.color} strokeWidth="1.5" rx="2" />
+        <rect x={planX1} y={y + 6} width={planW} height={ROW_H - 12} fill="none" stroke={paso.area.color} strokeWidth="1.5" rx="2" opacity={0.6} />
       )}
     </g>
   );

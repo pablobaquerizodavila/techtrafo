@@ -4,10 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ChevronLeft, ShieldCheck, Zap, MessageSquareWarning, Plus,
-  CheckCircle2, Wrench, Calendar,
+  CheckCircle2, Wrench, Calendar, ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader, HeaderActionGhost } from "@/components/page-header";
+import { Panel, StatCard } from "@/components/panel";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,131 +49,152 @@ export default function GarantiaDetallePage({ params }: PageProps) {
   }, [id]);
   useEffect(() => { if (id) load(); }, [id, load]);
 
-  if (loading && !g) return <div className="text-muted-foreground">Cargando garantía...</div>;
-  if (!g) return <p className="text-destructive">No encontrada</p>;
+  if (loading && !g) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center text-muted-foreground">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-copper border-t-transparent" />
+          <span className="text-sm">Cargando garantía…</span>
+        </div>
+      </div>
+    );
+  }
+  if (!g) {
+    return (
+      <div>
+        <PageHeader breadcrumb={[{ href: "/dashboard", label: "Panel" }, { href: "/garantias", label: "Garantías" }, { label: "Error" }]} title="Garantía" titleAccent="no encontrada" />
+        <div className="pt-6">
+          <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-6 text-rose-200 inset-highlight"><p className="text-sm">No encontrada</p></div>
+        </div>
+      </div>
+    );
+  }
 
   const dias = g.dias_restantes ?? 0;
   const reclamosAbiertos = g.reclamos?.filter((r) => r.estado !== "cerrado" && r.estado !== "rechazado").length ?? 0;
+  const diasTone = dias < 0 ? "rose" : dias <= 30 ? "amber" : "green";
 
   return (
-    <div className="space-y-6">
-      <header>
-        <Button variant="ghost" size="sm" asChild className="mb-2">
-          <Link href="/garantias"><ChevronLeft className="mr-1 h-4 w-4" /> Volver</Link>
-        </Button>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="flex items-center gap-2 text-3xl font-bold">
-              <ShieldCheck className="h-7 w-7" /> {g.codigo}
-            </h2>
-            <p className="text-muted-foreground">
-              {g.clientes?.razon_social} ({g.clientes?.ruc_cedula})
-            </p>
-          </div>
-          <Badge variant={estadoGarVariant(g.estado)} className="text-base">{g.estado.toUpperCase()}</Badge>
-        </div>
-      </header>
-
-      {/* Stats banner */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Duración" value={`${g.duracion_meses} meses`} />
-        <Stat label="Desde" value={g.fecha_inicio.split("T")[0]} />
-        <Stat label="Hasta" value={g.fecha_fin.split("T")[0]} highlight={dias < 0 ? "danger" : dias <= 30 ? "warning" : undefined} />
-        <Stat label="Días restantes" value={String(dias)} highlight={dias < 0 ? "danger" : dias <= 30 ? "warning" : "ok"} />
-      </div>
-
-      {/* Equipo + origen */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {g.transformadores && (
-          <Link href={`/transformadores/${g.transformadores.id}`} className="rounded-md border p-4 transition hover:border-primary hover:bg-accent">
-            <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold">
-              <Zap className="h-4 w-4 text-yellow-600" /> Equipo cubierto
-            </h3>
-            <p className="text-lg font-bold">{g.transformadores.codigo_interno}</p>
-            <p className="text-sm text-muted-foreground">
-              {g.transformadores.marca} {g.transformadores.modelo} ·{" "}
-              {g.transformadores.capacidad_kva >= 1000
-                ? `${(g.transformadores.capacidad_kva / 1000).toFixed(0)} MVA`
-                : `${g.transformadores.capacidad_kva} kVA`}
-            </p>
-            {g.transformadores.numero_serie && (
-              <p className="mt-1 font-mono text-xs text-muted-foreground">Serie {g.transformadores.numero_serie}</p>
-            )}
-          </Link>
-        )}
-        {g.ot && (
-          <Link href={`/ot/${g.ot.id}`} className="rounded-md border p-4 transition hover:border-primary hover:bg-accent">
-            <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold">
-              <Wrench className="h-4 w-4" /> Origen
-            </h3>
-            <p className="text-lg font-bold font-mono">{g.ot.codigo}</p>
-            <p className="text-sm text-muted-foreground capitalize">{g.ot.tipo_ruta}</p>
-            {g.ot.fecha_fin_real && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Completada {new Date(g.ot.fecha_fin_real).toLocaleDateString("es-EC")}
-              </p>
-            )}
-          </Link>
-        )}
-      </div>
-
-      {g.alcance && (
-        <section className="rounded-md border bg-muted/20 p-4 text-sm">
-          <h3 className="mb-1 font-semibold">Alcance</h3>
-          <p className="whitespace-pre-wrap text-muted-foreground">{g.alcance}</p>
-        </section>
-      )}
-      {g.condiciones && (
-        <section className="rounded-md border bg-muted/20 p-4 text-sm">
-          <h3 className="mb-1 font-semibold">Condiciones</h3>
-          <p className="whitespace-pre-wrap text-muted-foreground">{g.condiciones}</p>
-        </section>
-      )}
-
-      {/* Reclamos */}
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="flex items-center gap-2 text-xl font-bold">
-            <MessageSquareWarning className="h-5 w-5" /> Reclamos
+    <div>
+      <PageHeader
+        breadcrumb={[{ href: "/dashboard", label: "Panel" }, { href: "/garantias", label: "Garantías" }, { label: g.codigo }]}
+        title={g.codigo}
+        titleAccent={g.clientes?.razon_social ?? ""}
+        meta={
+          <>
+            <Badge variant={estadoGarVariant(g.estado)}>{g.estado}</Badge>
+            <span className="text-muted-foreground/40">·</span>
+            <span>{g.clientes?.ruc_cedula}</span>
             {reclamosAbiertos > 0 && (
-              <Badge variant="destructive" className="text-xs">{reclamosAbiertos} abiertos</Badge>
+              <>
+                <span className="text-muted-foreground/40">·</span>
+                <Badge variant="destructive">{reclamosAbiertos} reclamo{reclamosAbiertos === 1 ? "" : "s"} abierto{reclamosAbiertos === 1 ? "" : "s"}</Badge>
+              </>
             )}
-          </h3>
-          {g.estado === "vigente" && (
-            <Dialog open={openNuevoReclamo} onOpenChange={setOpenNuevoReclamo}>
-              <DialogTrigger asChild>
-                <Button size="sm"><Plus className="mr-1 h-4 w-4" /> Reportar reclamo</Button>
-              </DialogTrigger>
-              <NuevoReclamoForm garId={g.id} onSaved={() => { setOpenNuevoReclamo(false); load(); }} />
-            </Dialog>
+          </>
+        }
+        actions={
+          <HeaderActionGhost href="/garantias" icon={<ChevronLeft className="h-3.5 w-3.5" />}>Volver</HeaderActionGhost>
+        }
+      />
+
+      <div className="space-y-6 pt-6">
+        {/* Stats banner */}
+        <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <StatCard label="Duración" value={`${g.duracion_meses}`} sub="meses cubiertos" icon={<ShieldCheck className="h-3.5 w-3.5" />} />
+          <StatCard label="Desde" value={g.fecha_inicio.split("T")[0]} sub="Inicio de cobertura" />
+          <StatCard label="Hasta" value={g.fecha_fin.split("T")[0]} sub={dias < 0 ? "Vencida" : dias <= 30 ? "Próxima a vencer" : "Vigente"} tone={diasTone} />
+          <StatCard label="Días restantes" value={String(dias)} sub={dias < 0 ? "Días en mora" : dias <= 30 ? "Programar renovación" : "Margen amplio"} tone={diasTone} icon={<Calendar className="h-3.5 w-3.5" />} />
+        </section>
+
+        {/* Equipo + origen */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {g.transformadores && (
+            <Link
+              href={`/transformadores/${g.transformadores.id}`}
+              className="group block overflow-hidden rounded-xl border border-glass bg-glass p-4 inset-highlight transition hover:border-glass-mid hover:bg-glass-elev"
+              style={{ backgroundImage: "radial-gradient(ellipse 50% 80% at 0% 50%, rgba(255,107,53,0.06), transparent 60%)" }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-copper to-copper-deep text-white shadow-md glow-copper-sm inset-highlight-md">
+                  <Zap className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Equipo cubierto</p>
+                  <p className="font-display text-sm font-semibold tracking-tight">{g.transformadores.codigo_interno}</p>
+                  <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                    {g.transformadores.marca} {g.transformadores.modelo}
+                    <span className="mx-1.5 text-muted-foreground/40">·</span>
+                    <span className="text-ttteal">{g.transformadores.capacidad_kva >= 1000 ? `${(g.transformadores.capacidad_kva / 1000).toFixed(0)} MVA` : `${g.transformadores.capacidad_kva} kVA`}</span>
+                    {g.transformadores.numero_serie && (<><span className="mx-1.5 text-muted-foreground/40">·</span>serie {g.transformadores.numero_serie}</>)}
+                  </p>
+                </div>
+                <ExternalLink className="h-4 w-4 text-muted-foreground/50 transition group-hover:text-copper" />
+              </div>
+            </Link>
+          )}
+          {g.ot && (
+            <Link
+              href={`/ot/${g.ot.id}`}
+              className="group block overflow-hidden rounded-xl border border-glass bg-glass p-4 inset-highlight transition hover:border-glass-mid hover:bg-glass-elev"
+            >
+              <div className="flex items-center gap-3">
+                <div className="grid h-11 w-11 place-items-center rounded-xl border border-ttteal/30 bg-ttteal/10 text-ttteal">
+                  <Wrench className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Origen</p>
+                  <p className="font-mono text-sm font-semibold text-foreground/90">{g.ot.codigo}</p>
+                  <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                    <span className="capitalize">{g.ot.tipo_ruta}</span>
+                    {g.ot.fecha_fin_real && (<><span className="mx-1.5 text-muted-foreground/40">·</span>completada {new Date(g.ot.fecha_fin_real).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil" })}</>)}
+                  </p>
+                </div>
+                <ExternalLink className="h-4 w-4 text-muted-foreground/50 transition group-hover:text-copper" />
+              </div>
+            </Link>
           )}
         </div>
 
-        {!g.reclamos?.length ? (
-          <p className="rounded-md border bg-muted/20 p-6 text-center text-sm text-muted-foreground">
-            Sin reclamos registrados {g.estado === "vigente" ? "(¡bien!)" : ""}
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {g.reclamos.map((r) => <ReclamoCard key={r.id} reclamo={r} garId={g.id} onChange={load} />)}
-          </div>
+        {g.alcance && (
+          <Panel title="Alcance"><p className="whitespace-pre-wrap text-sm text-foreground/85">{g.alcance}</p></Panel>
         )}
-      </section>
+        {g.condiciones && (
+          <Panel title="Condiciones"><p className="whitespace-pre-wrap text-sm text-foreground/85">{g.condiciones}</p></Panel>
+        )}
 
-      <Toaster richColors position="top-right" />
-    </div>
-  );
-}
+        {/* Reclamos */}
+        <Panel
+          title="Reclamos"
+          subtitle={reclamosAbiertos > 0 ? `${reclamosAbiertos} abiertos` : "Sin reclamos abiertos"}
+          icon={<MessageSquareWarning className="h-3.5 w-3.5" />}
+          action={
+            g.estado === "vigente" ? (
+              <Dialog open={openNuevoReclamo} onOpenChange={setOpenNuevoReclamo}>
+                <DialogTrigger asChild>
+                  <button type="button" className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-b from-copper to-copper-deep px-3 py-1.5 text-xs font-medium text-white shadow-sm glow-copper-sm inset-highlight-md transition hover:glow-copper">
+                    <Plus className="h-3.5 w-3.5" /> Reportar reclamo
+                  </button>
+                </DialogTrigger>
+                <NuevoReclamoForm garId={g.id} onSaved={() => { setOpenNuevoReclamo(false); load(); }} />
+              </Dialog>
+            ) : undefined
+          }
+        >
+          {!g.reclamos?.length ? (
+            <div className="flex flex-col items-center gap-2 rounded-md border border-dashed border-green-500/25 bg-green-500/[0.04] py-6">
+              <CheckCircle2 className="h-5 w-5 text-green-400" />
+              <p className="text-xs text-green-300">Sin reclamos registrados{g.estado === "vigente" ? " — todo bien" : ""}</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {g.reclamos.map((r) => <ReclamoCard key={r.id} reclamo={r} garId={g.id} onChange={load} />)}
+            </div>
+          )}
+        </Panel>
+      </div>
 
-function Stat({ label, value, highlight }: { label: string; value: string; highlight?: "ok" | "warning" | "danger" }) {
-  const cls = highlight === "danger" ? "text-destructive"
-    : highlight === "warning" ? "text-yellow-700"
-    : highlight === "ok" ? "text-green-700"
-    : "";
-  return (
-    <div className="rounded-md border p-3 text-sm">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`text-xl font-bold ${cls}`}>{value}</p>
+      <Toaster richColors position="top-right" theme="dark" />
     </div>
   );
 }
@@ -202,7 +225,7 @@ function NuevoReclamoForm({ garId, onSaved }: { garId: number; onSaved: () => vo
   }
 
   return (
-    <DialogContent className="bg-white">
+    <DialogContent>
       <DialogHeader>
         <DialogTitle>Nuevo reclamo</DialogTitle>
         <DialogDescription>El reclamo queda en estado &quot;recibido&quot; y se puede asignar intervenciones después.</DialogDescription>
@@ -258,39 +281,44 @@ function ReclamoCard({ reclamo, garId, onChange }: { reclamo: Reclamo; garId: nu
   const [openCerrar, setOpenCerrar] = useState(false);
 
   return (
-    <div className={`rounded-md border p-4 ${reclamo.estado === "cerrado" ? "" : "border-l-4 border-l-yellow-500"}`}>
+    <div className={`overflow-hidden rounded-xl border p-4 inset-highlight ${reclamo.estado === "cerrado" ? "border-glass bg-glass" : "border-l-4 border-l-amber-500 border-glass bg-amber-500/[0.04]"}`}>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-sm">{reclamo.codigo}</span>
-            <Badge variant={severidadVariant(reclamo.severidad)} className="text-xs uppercase">{reclamo.severidad}</Badge>
-            <Badge variant={estadoReclamoVariant(reclamo.estado)} className="text-xs">{reclamo.estado.replace("_", " ")}</Badge>
-            {reclamo.canal && <span className="text-xs text-muted-foreground">vía {reclamo.canal}</span>}
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-sm text-foreground/90">{reclamo.codigo}</span>
+            <Badge variant={severidadVariant(reclamo.severidad)}>{reclamo.severidad}</Badge>
+            <Badge variant={estadoReclamoVariant(reclamo.estado)}>{reclamo.estado.replace("_", " ")}</Badge>
+            {reclamo.canal && <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">vía {reclamo.canal}</span>}
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            <Calendar className="mr-1 inline h-3 w-3" />
-            {new Date(reclamo.fecha_reclamo).toLocaleString("es-EC")}
+          <p className="mt-1.5 inline-flex items-center gap-1 font-mono text-[10.5px] text-muted-foreground">
+            <Calendar className="h-3 w-3" />
+            {new Date(reclamo.fecha_reclamo).toLocaleString("es-EC", { timeZone: "America/Guayaquil" })}
             {reclamo.reportado_por_nombre && ` · ${reclamo.reportado_por_nombre}`}
           </p>
-          <p className="mt-2 text-sm whitespace-pre-wrap">{reclamo.descripcion}</p>
+          <p className="mt-2 whitespace-pre-wrap text-sm text-foreground/85">{reclamo.descripcion}</p>
           {reclamo.resolucion && (
-            <p className="mt-2 rounded bg-green-50 p-2 text-xs">
-              <strong>Resolución:</strong> {reclamo.resolucion}
-            </p>
+            <div className="mt-2 rounded-lg border border-green-500/25 bg-green-500/[0.05] p-2.5 text-xs">
+              <p className="mb-0.5 font-mono text-[9.5px] uppercase tracking-wider text-green-300">Resolución</p>
+              <p className="text-foreground/85">{reclamo.resolucion}</p>
+            </div>
           )}
         </div>
-        <div className="flex flex-col gap-1">
+        <div className="flex shrink-0 flex-col gap-1.5">
           {reclamo.estado !== "cerrado" && reclamo.estado !== "rechazado" && (
             <>
               <Dialog open={openInter} onOpenChange={setOpenInter}>
                 <DialogTrigger asChild>
-                  <Button size="sm" variant="outline">+ Intervención</Button>
+                  <button type="button" className="inline-flex items-center gap-1 rounded-md border border-glass-mid bg-glass px-2.5 py-1 text-[11px] font-medium text-foreground/90 hover:bg-glass-elev">
+                    <Plus className="h-3 w-3" /> Intervención
+                  </button>
                 </DialogTrigger>
                 <NuevaIntervencionForm garId={garId} rId={reclamo.id} onSaved={() => { setOpenInter(false); onChange(); }} />
               </Dialog>
               <Dialog open={openCerrar} onOpenChange={setOpenCerrar}>
                 <DialogTrigger asChild>
-                  <Button size="sm" variant="default"><CheckCircle2 className="mr-1 h-3 w-3" /> Cerrar</Button>
+                  <button type="button" className="inline-flex items-center gap-1 rounded-md bg-gradient-to-b from-copper to-copper-deep px-2.5 py-1 text-[11px] font-medium text-white glow-copper-sm">
+                    <CheckCircle2 className="h-3 w-3" /> Cerrar
+                  </button>
                 </DialogTrigger>
                 <CerrarReclamoForm garId={garId} rId={reclamo.id} onSaved={() => { setOpenCerrar(false); onChange(); }} />
               </Dialog>
@@ -300,28 +328,28 @@ function ReclamoCard({ reclamo, garId, onChange }: { reclamo: Reclamo; garId: nu
       </div>
 
       {reclamo.intervenciones && reclamo.intervenciones.length > 0 && (
-        <div className="mt-3 border-t pt-3">
-          <p className="mb-2 text-xs font-semibold text-muted-foreground">
+        <div className="mt-3 border-t border-glass pt-3">
+          <p className="mb-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
             Intervenciones ({reclamo.intervenciones.length})
           </p>
           <ul className="space-y-2">
             {reclamo.intervenciones.map((i) => (
-              <li key={i.id} className="rounded border p-2 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">#{i.numero}</span>
-                  <span className="capitalize">{i.tipo.replace(/_/g, " ")}</span>
+              <li key={i.id} className="rounded-lg border border-glass bg-glass p-2.5 text-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-copper">#{i.numero}</span>
+                  <span className="capitalize text-foreground/85">{i.tipo.replace(/_/g, " ")}</span>
                   {i.resultado && (
-                    <Badge variant={i.resultado === "exitoso" ? "success" : i.resultado === "parcial" ? "warning" : "destructive"} className="text-[10px]">
+                    <Badge variant={i.resultado === "exitoso" ? "success" : i.resultado === "parcial" ? "warning" : "destructive"}>
                       {i.resultado}
                     </Badge>
                   )}
                 </div>
-                <p className="mt-1 text-muted-foreground">
-                  {i.fecha_real && <>Realizada {new Date(i.fecha_real).toLocaleDateString("es-EC")}</>}
-                  {!i.fecha_real && i.fecha_programada && <>Programada {new Date(i.fecha_programada).toLocaleDateString("es-EC")}</>}
+                <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                  {i.fecha_real && <>Realizada {new Date(i.fecha_real).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil" })}</>}
+                  {!i.fecha_real && i.fecha_programada && <>Programada {new Date(i.fecha_programada).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil" })}</>}
                   {i.usuarios_intervenciones_tecnico_idTousuarios && ` · ${i.usuarios_intervenciones_tecnico_idTousuarios.nombres} ${i.usuarios_intervenciones_tecnico_idTousuarios.apellidos}`}
                 </p>
-                {i.acciones_tomadas && <p className="mt-1">{i.acciones_tomadas}</p>}
+                {i.acciones_tomadas && <p className="mt-1 text-foreground/85">{i.acciones_tomadas}</p>}
               </li>
             ))}
           </ul>
@@ -358,7 +386,7 @@ function NuevaIntervencionForm({ garId, rId, onSaved }: { garId: number; rId: nu
   }
 
   return (
-    <DialogContent className="bg-white">
+    <DialogContent>
       <DialogHeader>
         <DialogTitle>Nueva intervención</DialogTitle>
         <DialogDescription>Visita, reparación, reemplazo o asesoría sobre este reclamo.</DialogDescription>
@@ -431,7 +459,7 @@ function CerrarReclamoForm({ garId, rId, onSaved }: { garId: number; rId: number
   }
 
   return (
-    <DialogContent className="bg-white">
+    <DialogContent>
       <DialogHeader>
         <DialogTitle>Cerrar reclamo</DialogTitle>
         <DialogDescription>La resolución es obligatoria y queda como dictamen final.</DialogDescription>

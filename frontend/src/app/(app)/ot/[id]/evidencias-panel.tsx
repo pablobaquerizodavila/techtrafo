@@ -49,19 +49,20 @@ export function EvidenciasPanel({ otId, pasos }: Props) {
   const otros = evs.filter((e) => e.tipo !== "foto");
 
   return (
-    <section className="rounded-md border p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="flex items-center gap-2 text-lg font-bold">
-          <Camera className="h-5 w-5" /> Evidencias
+    <section className="overflow-hidden rounded-xl border border-glass bg-glass inset-highlight">
+      <div className="flex items-center justify-between border-b border-glass px-5 py-3.5">
+        <h3 className="flex items-center gap-2 font-display text-sm font-semibold tracking-tight">
+          <Camera className="h-4 w-4 text-copper" /> Evidencias
         </h3>
-        <Badge variant="outline" className="text-xs">{evs.length} archivo(s)</Badge>
+        <Badge variant="outline">{evs.length} archivo{evs.length === 1 ? "" : "s"}</Badge>
       </div>
+      <div className="p-5">
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button size="sm" variant="outline" className="mb-4">
-            <Upload className="mr-1 h-3.5 w-3.5" /> Subir archivo
-          </Button>
+          <button type="button" className="mb-4 inline-flex items-center gap-1.5 rounded-lg border border-glass-mid bg-glass px-3 py-1.5 text-xs font-medium text-foreground/90 transition hover:border-glass-strong hover:bg-glass-elev">
+            <Upload className="h-3.5 w-3.5" /> Subir archivo
+          </button>
         </DialogTrigger>
         <SubirForm otId={otId} pasos={pasos} onSaved={() => { setOpen(false); load(); }} />
       </Dialog>
@@ -69,21 +70,21 @@ export function EvidenciasPanel({ otId, pasos }: Props) {
       {/* Galería de fotos */}
       {fotos.length > 0 && (
         <div className="mb-4">
-          <p className="mb-2 text-xs font-semibold text-muted-foreground">Fotos ({fotos.length})</p>
+          <p className="mb-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Fotos ({fotos.length})</p>
           <div className="grid grid-cols-3 gap-2 md:grid-cols-4 lg:grid-cols-6">
             {fotos.map((f) => (
               <button
                 key={f.id}
                 type="button"
                 onClick={() => setPreviewing(f)}
-                className="group relative overflow-hidden rounded border bg-muted"
+                className="group relative overflow-hidden rounded-lg border border-glass bg-glass-elev"
               >
                 <img
                   src={urlEvidencia(otId, f.id)}
                   alt={f.titulo ?? "evidencia"}
                   className="aspect-square w-full object-cover transition group-hover:opacity-80"
                 />
-                <div className="absolute inset-x-0 bottom-0 truncate bg-black/60 px-1 py-0.5 text-[10px] text-white">
+                <div className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/80 via-black/40 to-transparent px-1.5 py-1 text-[10px] text-white">
                   {f.titulo}
                 </div>
               </button>
@@ -95,24 +96,24 @@ export function EvidenciasPanel({ otId, pasos }: Props) {
       {/* Otros (PDF / video / etc) */}
       {otros.length > 0 && (
         <div>
-          <p className="mb-2 text-xs font-semibold text-muted-foreground">Otros archivos ({otros.length})</p>
+          <p className="mb-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Otros archivos ({otros.length})</p>
           <ul className="space-y-2">
             {otros.map((e) => (
-              <li key={e.id} className="flex items-center gap-3 rounded border p-2 text-sm">
-                {e.tipo === "pdf" ? <FileText className="h-5 w-5 text-red-600" /> : <FileIcon className="h-5 w-5 text-muted-foreground" />}
-                <div className="flex-1">
-                  <p className="font-medium">{e.titulo}</p>
-                  <p className="text-xs text-muted-foreground">
+              <li key={e.id} className="flex items-center gap-3 rounded-lg border border-glass bg-glass-elev p-2.5 text-sm">
+                {e.tipo === "pdf" ? <FileText className="h-5 w-5 text-rose-400" /> : <FileIcon className="h-5 w-5 text-muted-foreground" />}
+                <div className="flex-1 min-w-0">
+                  <p className="truncate font-medium">{e.titulo}</p>
+                  <p className="font-mono text-[10px] text-muted-foreground">
                     {e.tipo} · {e.tamanio_bytes ? `${(Number(e.tamanio_bytes) / 1024).toFixed(1)} KB` : "—"}
                     {e.ot_pasos && ` · paso ${e.ot_pasos.numero}`}
-                    {" · "}{new Date(e.created_at).toLocaleDateString("es-EC")}
+                    {" · "}{new Date(e.created_at).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil" })}
                   </p>
                 </div>
-                <a href={urlEvidencia(otId, e.id)} target="_blank" rel="noopener noreferrer" className="rounded p-1 hover:bg-accent">
+                <a href={urlEvidencia(otId, e.id)} target="_blank" rel="noopener noreferrer" className="rounded p-1 text-muted-foreground hover:bg-glass hover:text-copper">
                   <Eye className="h-4 w-4" />
                 </a>
-                <button onClick={() => handleEliminar(e)} className="rounded p-1 hover:bg-destructive/10">
-                  <Trash2 className="h-4 w-4 text-destructive" />
+                <button onClick={() => handleEliminar(e)} className="rounded p-1 text-rose-400 hover:bg-rose-500/10">
+                  <Trash2 className="h-4 w-4" />
                 </button>
               </li>
             ))}
@@ -121,8 +122,12 @@ export function EvidenciasPanel({ otId, pasos }: Props) {
       )}
 
       {evs.length === 0 && (
-        <p className="text-sm text-muted-foreground">Aún no hay evidencias cargadas.</p>
+        <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed border-glass bg-glass py-6">
+          <Camera className="h-5 w-5 text-muted-foreground" />
+          <p className="text-xs text-muted-foreground">Aún no hay evidencias cargadas</p>
+        </div>
       )}
+      </div>
 
       {/* Preview de foto (lightbox simple) */}
       {previewing && (
@@ -194,7 +199,7 @@ function SubirForm({ otId, pasos, onSaved }: { otId: number; pasos: OTPaso[]; on
   }
 
   return (
-    <DialogContent className="bg-white">
+    <DialogContent>
       <DialogHeader>
         <DialogTitle>Subir evidencia</DialogTitle>
         <DialogDescription>

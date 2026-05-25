@@ -6,6 +6,118 @@ El formato sigue Keep a Changelog y este proyecto adhiere a Semantic Versioning.
 
 ---
 
+## [0.15.0] — 2026-05-25 — Voltage OS: identidad visual del panel
+
+Rediseno visual integral del panel de gestion (panel.techtrafo.com) con
+una nueva identidad llamada "Voltage OS": dark refinado con acentos
+copper + teal, paneles glass con inset-highlight, LEDs operacionales
+tomados de la propuesta "Alta Tension", y tipografia display Bricolage
+Grotesque + Geist Mono para data.
+
+### Foundation (commits 569097a, 8cefa7f, b4a75b1)
+
+- Tokens CSS de Voltage OS en `globals.css`: paleta dark con primary
+  copper (#ff6b35), ring copper, destructive rose; utilities custom
+  `bg-glass / border-glass / inset-highlight / glow-copper /
+  text-glow-rose / led-green / led-copper` con keyframes propios.
+- Mesh sutil de fondo (radial copper sup-izq + teal inf-der).
+- Scroll discreto en paneles.
+- `tailwind.config.ts`: colores `copper` y `ttteal` con variantes
+  soft/deep, fontFamily mapeada a CSS vars, keyframes pulse/ping.
+- Fonts Bricolage Grotesque (display) + Geist Mono (data) cargadas
+  via `next/font/google` y expuestas como CSS vars.
+- Sidebar refactor: brand mark con gradiente copper + glow, search
+  bar visual con atajo K, grupos con labels font-mono, LED verde
+  pulsante para "Sistema operativo".
+- Dashboard ejecutivo (/dashboard): header sticky con gradient title
+  (foreground -> copper italic), 6 KPIs con tono dinamico, hero card
+  copper, atencion requerida con border-left tonal, modulos tiles.
+- Dashboard de planta (/produccion): donut SVG con drop-shadow glow
+  por segmento, KPI hero 4 cards, proximas entregas como timeline,
+  matriz con badges OT/EXP copper/teal, capacidad/causas/productividad.
+
+### Ola 1 (commit 126bf91)
+
+Componentes shared nuevos en `src/components/`:
+
+- `page-header.tsx`: PageHeader sticky con breadcrumb pill, gradient
+  title, meta info opcional, slot de acciones. HeaderActionPrimary
+  (copper con glow), HeaderActionGhost (glass) y LiveBadge.
+- `panel.tsx`: Panel glass reutilizable + EmptyState + StatCard con
+  tonos copper/teal/rose/amber/green y soporte de active/onClick
+  para KPIs interactivos (filtros tipo expedientes estancados).
+- `live-datetime.tsx`: LiveTime y LiveDate client components que
+  resuelven el bug de SSR + UTC. Renderizan en zona horaria
+  America/Guayaquil y refrescan cada 30s.
+
+Componentes shadcn actualizados:
+
+- `badge.tsx`: variants Voltage OS, agrega `copper` y `teal`;
+  destructive, success y warning como tintes glass (sin green-100
+  ni yellow-100 hardcoded); outline con border-glass.
+- `select.tsx`: trigger con border-glass + focus border-glass-strong,
+  content con backdrop-blur, sin mas `bg-white`/`dark:bg-slate-900`
+  hardcoded — todo via tokens semanticos (bg-popover).
+
+6 listas migradas: /clientes, /ot, /expedientes, /cotizaciones,
+/contratos, /garantias. Cada una con header sticky Voltage OS,
+StatCards tonalizados (copper para activos, rose para alertas,
+green para OK, amber para warnings), Panel glass con filtros
+compactos h-8, badges Voltage OS, hover sutil, paginacion tonal.
+
+### Ola 2A (este commit)
+
+5 paginas de detalle [id] refactorizadas:
+
+- `/contratos/[id]`: PageHeader, StatCard financiero (monto/pagado/
+  saldo/plan), plan de pagos en Panel padded=false con monto pagado
+  en green, dialog de cobro mantiene logica.
+- `/cotizaciones/[id]`: PageHeader, panel de revision interna con
+  tono dinamico por estado (green/teal/rose/glass), historial mono
+  colapsable, transiciones con botones tone-based.
+- `/ot/[id]`: PageHeader con badges multiples (estado/prioridad/
+  atrasada), 3 info cards (responsable con avatar gradient,
+  fechas planeadas, fechas reales), transformador como hero card
+  con glow copper, pasos con tinte por estado (rechazado=rose,
+  en_curso=copper, completado=green/saltado=glass), gate amber
+  border-l, action buttons tone-based.
+- `/ot/[id]/gantt.tsx`: SVG con colores Voltage OS, drop-shadow
+  glow en barras por estado, linea HOY copper.
+- `/ot/[id]/evidencias-panel.tsx`: Panel glass, galeria con
+  gradient overlay, lightbox sin cambios.
+- `/ot/[id]/tiempos-reprocesos-panel.tsx`: 2 panels paralelos
+  glass, empty state celebrativo verde para sin reprocesos.
+- `/ot/[id]/auditoria-panel.tsx`: Panel colapsable glass, JSON
+  diff antes/despues con tintes rose/green.
+- `/garantias/[id]`: PageHeader, 4 StatCards de cobertura con
+  tono por dias restantes, equipo y origen como hero cards
+  clickables.
+- `/expedientes/[id]`: PageHeader, info cards (cliente con icons,
+  ejecutivo con avatar, fechas con KVLine), DocCard glass.
+  Logica interna de hitos preservada sin tocar para no
+  introducir bugs (la migrare en una ola posterior con cuidado).
+
+Todas las fechas/horas con `timeZone: "America/Guayaquil"`.
+
+### Pendiente (Ola 2B y Ola 3)
+
+- **Ola 2B**: 5 formularios `nueva/o` (OT, cotizaciones, contratos,
+  expedientes, transformadores).
+- **Ola 3**: /admin/*, /compras/*, /inventario/*, /transformadores/*,
+  /portal/*, /notificaciones, /perfil, /login, /register, mas
+  refactor cuidadoso de la seccion de hitos en /expedientes/[id].
+
+### Workflow de backups
+
+A partir de esta version, los backups, snapshots de codigo y READMEs
+locales se centralizan en `\\NAS1821\Carpeta Hellius\Documentos
+Helius\compañias\Desarrollos\Techtrafo\tech-trafo-commit-backup` con
+estructura: `_archive/` (migracion de los backups anteriores), `code/`
+(snapshots por commit con timestamp + version), `db-dumps/` (todos los
+`.sql.gz` historicos), `README.md` y `CHANGELOG.md` actualizados.
+
+---
+
 ## [0.14.0] — 2026-05-24 — Modulo de Compras (Fase 1 + 2)
 
 Cubre el documento de especificacion de Pablo: proveedores, solicitudes internas, ordenes de compra con aprobacion escalonada, recepciones que afectan bodega y costo de items.

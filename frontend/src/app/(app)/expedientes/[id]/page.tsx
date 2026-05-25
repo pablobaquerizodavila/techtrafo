@@ -25,6 +25,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageHeader, HeaderActionGhost } from "@/components/page-header";
+import { Panel } from "@/components/panel";
 import { Cronometro, TiempoTotal } from "@/components/cronometro";
 import { VisitaTecnicaForm } from "@/components/visita-tecnica-form";
 import { InformeTecnicoDialog } from "@/components/informe-tecnico-dialog";
@@ -319,13 +321,11 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
 
   if (error) {
     return (
-      <div className="space-y-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/expedientes">
-            <ChevronLeft className="mr-1 h-4 w-4" /> Volver
-          </Link>
-        </Button>
-        <p className="text-destructive">{error}</p>
+      <div>
+        <PageHeader breadcrumb={[{ href: "/dashboard", label: "Panel" }, { href: "/expedientes", label: "Expedientes" }, { label: "Error" }]} title="Expediente" titleAccent="no encontrado" />
+        <div className="pt-6">
+          <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-6 text-rose-200 inset-highlight"><p className="text-sm">{error}</p></div>
+        </div>
       </div>
     );
   }
@@ -338,98 +338,92 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
   const algunoEstancado = hitos.some((h) => h.estancado);
 
   return (
-    <div className="space-y-6">
-      <header>
-        <Button variant="ghost" size="sm" asChild className="mb-2">
-          <Link href="/expedientes">
-            <ChevronLeft className="mr-1 h-4 w-4" /> Volver a expedientes
-          </Link>
-        </Button>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-3xl font-bold">{expediente.codigo}</h2>
-            <p className="text-muted-foreground">
-              {expediente.clientes?.razon_social} ({expediente.clientes?.ruc_cedula}) ·{" "}
-              {canalOrigenLabel(expediente.canal_origen)} ·{" "}
-              <span className="capitalize">
-                {expediente.tipo_servicio_confirmado ?? expediente.tipo_servicio_estimado}
-              </span>
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {algunoEstancado && (
-              <Badge variant="destructive" className="text-sm">
-                <AlertTriangle className="mr-1 h-4 w-4" /> Hito estancado
-              </Badge>
-            )}
-            <Badge variant={estadoExpedienteVariant(expediente.estado)} className="text-base">
-              {expediente.estado.toUpperCase()}
-            </Badge>
+    <div>
+      <PageHeader
+        breadcrumb={[{ href: "/dashboard", label: "Panel" }, { href: "/expedientes", label: "Expedientes" }, { label: expediente.codigo }]}
+        title={expediente.codigo}
+        titleAccent={expediente.clientes?.razon_social ?? ""}
+        meta={
+          <>
+            <Badge variant={estadoExpedienteVariant(expediente.estado)}>{expediente.estado}</Badge>
+            {algunoEstancado && <Badge variant="destructive"><AlertTriangle className="mr-1 h-3 w-3" /> hito estancado</Badge>}
+            <span className="text-muted-foreground/40">·</span>
+            <span>{canalOrigenLabel(expediente.canal_origen)}</span>
+            <span className="text-muted-foreground/40">·</span>
+            <span className="capitalize">{expediente.tipo_servicio_confirmado ?? expediente.tipo_servicio_estimado}</span>
+          </>
+        }
+        actions={
+          <>
+            <HeaderActionGhost href="/expedientes" icon={<ChevronLeft className="h-3.5 w-3.5" />}>Volver</HeaderActionGhost>
             {["cancelado", "ganado", "perdido"].includes(expediente.estado)
               && hasPermission(currentUser, "expedientes", "reactivar") && (
-              <Button size="sm" variant="outline" onClick={handleReactivarExpediente} disabled={reactivando}>
-                <RotateCcw className="mr-1 h-3.5 w-3.5" />
-                {reactivando ? "Reactivando..." : "Reactivar"}
-              </Button>
+              <button type="button" onClick={handleReactivarExpediente} disabled={reactivando} className="inline-flex items-center gap-1.5 rounded-lg border border-glass-mid bg-glass px-3 py-2 text-xs font-medium text-foreground/90 backdrop-blur transition hover:border-glass-strong hover:bg-glass-elev disabled:opacity-40">
+                <RotateCcw className="h-3.5 w-3.5" />
+                {reactivando ? "Reactivando…" : "Reactivar"}
+              </button>
             )}
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
-      {/* Info cliente + ejecutivo */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded-md border p-4 text-sm">
-          <h3 className="mb-2 font-semibold">Cliente</h3>
-          <div className="space-y-1 text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <User className="h-3.5 w-3.5" />
-              <span>{expediente.clientes?.razon_social}</span>
-            </div>
-            {expediente.clientes?.email && (
+      <div className="space-y-6 pt-6">
+        {/* Info cliente + ejecutivo */}
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <Panel title="Cliente">
+            <div className="space-y-1.5 text-sm text-foreground/85">
               <div className="flex items-center gap-2">
-                <Mail className="h-3.5 w-3.5" />
-                <span>{expediente.clientes.email}</span>
+                <User className="h-3.5 w-3.5 text-muted-foreground" />
+                <span>{expediente.clientes?.razon_social}</span>
               </div>
-            )}
-            {expediente.clientes?.telefono && (
-              <div className="flex items-center gap-2">
-                <Phone className="h-3.5 w-3.5" />
-                <span>{expediente.clientes.telefono}</span>
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="rounded-md border p-4 text-sm">
-          <h3 className="mb-2 font-semibold">Ejecutivo asignado</h3>
-          {expediente.usuarios_expedientes_ejecutivo_idTousuarios ? (
-            <div className="text-muted-foreground">
-              <p>
-                {expediente.usuarios_expedientes_ejecutivo_idTousuarios.nombres}{" "}
-                {expediente.usuarios_expedientes_ejecutivo_idTousuarios.apellidos}
-              </p>
-              {expediente.usuarios_expedientes_ejecutivo_idTousuarios.email && (
-                <p className="text-xs">{expediente.usuarios_expedientes_ejecutivo_idTousuarios.email}</p>
+              {expediente.clientes?.email && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Mail className="h-3.5 w-3.5" />
+                  <span>{expediente.clientes.email}</span>
+                </div>
               )}
+              {expediente.clientes?.telefono && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Phone className="h-3.5 w-3.5" />
+                  <span>{expediente.clientes.telefono}</span>
+                </div>
+              )}
+              <p className="pt-1 font-mono text-[10.5px] text-muted-foreground">{expediente.clientes?.ruc_cedula}</p>
             </div>
-          ) : (
-            <p className="text-muted-foreground">Sin asignar</p>
-          )}
-        </div>
-        <div className="rounded-md border p-4 text-sm">
-          <h3 className="mb-2 font-semibold">Fechas</h3>
-          <div className="space-y-1 text-muted-foreground">
-            <p>Apertura: {expediente.fecha_apertura.split("T")[0]}</p>
-            {expediente.fecha_cierre && <p>Cierre: {expediente.fecha_cierre.split("T")[0]}</p>}
-          </div>
-        </div>
-      </div>
+          </Panel>
+          <Panel title="Ejecutivo asignado">
+            {expediente.usuarios_expedientes_ejecutivo_idTousuarios ? (
+              <div className="flex items-center gap-3">
+                <div className="grid h-9 w-9 place-items-center rounded-lg border border-glass-mid bg-gradient-to-br from-copper/15 to-ttteal/15 font-display text-[11px] font-bold inset-highlight">
+                  {((expediente.usuarios_expedientes_ejecutivo_idTousuarios.nombres?.[0] ?? "") + (expediente.usuarios_expedientes_ejecutivo_idTousuarios.apellidos?.[0] ?? "")).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-sm font-medium">
+                    {expediente.usuarios_expedientes_ejecutivo_idTousuarios.nombres}{" "}
+                    {expediente.usuarios_expedientes_ejecutivo_idTousuarios.apellidos}
+                  </p>
+                  {expediente.usuarios_expedientes_ejecutivo_idTousuarios.email && (
+                    <p className="font-mono text-[10.5px] text-muted-foreground">{expediente.usuarios_expedientes_ejecutivo_idTousuarios.email}</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Sin asignar</p>
+            )}
+          </Panel>
+          <Panel title="Fechas">
+            <dl className="space-y-1.5 font-mono text-xs">
+              <KVLine label="Apertura" value={expediente.fecha_apertura.split("T")[0]} />
+              {expediente.fecha_cierre && <KVLine label="Cierre" value={expediente.fecha_cierre.split("T")[0]} />}
+            </dl>
+          </Panel>
+        </section>
 
-      {expediente.descripcion_problema && (
-        <div className="rounded-md border bg-muted/20 p-4 text-sm">
-          <h3 className="mb-1 font-semibold">Descripcion del problema</h3>
-          <p className="whitespace-pre-wrap text-muted-foreground">{expediente.descripcion_problema}</p>
-        </div>
-      )}
+        {expediente.descripcion_problema && (
+          <Panel title="Descripción del problema">
+            <p className="whitespace-pre-wrap text-sm text-foreground/85">{expediente.descripcion_problema}</p>
+          </Panel>
+        )}
 
       {/* Documentos relacionados */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -884,7 +878,7 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
             <Label htmlFor="hito_ant">Hito anterior a reabrir</Label>
             <select
               id="hito_ant"
-              className="w-full rounded border bg-background px-2 py-1.5 text-sm"
+              className="w-full rounded-md border border-glass bg-glass px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-glass-strong focus:outline-none"
               value={rechazoDialog.kind === "reabrir-anterior" && rechazoDialog.hitoAnteriorId !== null ? String(rechazoDialog.hitoAnteriorId) : ""}
               onChange={(e) => {
                 if (rechazoDialog.kind !== "reabrir-anterior") return;
@@ -929,7 +923,7 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
             <Label htmlFor="esc_rol">Escalar a *</Label>
             <select
               id="esc_rol"
-              className="w-full rounded border bg-background px-2 py-1.5 text-sm"
+              className="w-full rounded-md border border-glass bg-glass px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-glass-strong focus:outline-none"
               value={rechazoDialog.kind === "escalar" && rechazoDialog.rolDestinoId !== null ? String(rechazoDialog.rolDestinoId) : ""}
               onChange={(e) => {
                 if (rechazoDialog.kind !== "escalar") return;
@@ -950,7 +944,7 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
             <textarea
               id="esc_msg"
               rows={4}
-              className="w-full rounded border bg-background px-2 py-1.5 text-sm"
+              className="w-full rounded-md border border-glass bg-glass px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-glass-strong focus:outline-none"
               placeholder="Ej: Cliente no permitió acceso al equipo. Requiere intervención comercial para coordinar visita."
               value={rechazoDialog.kind === "escalar" ? rechazoDialog.mensaje : ""}
               onChange={(e) => {
@@ -987,7 +981,7 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
             <textarea
               id="cancel_motivo"
               rows={3}
-              className="w-full rounded border bg-background px-2 py-1.5 text-sm"
+              className="w-full rounded-md border border-glass bg-glass px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-glass-strong focus:outline-none"
               placeholder="Ej: Equipo no viable según diagnóstico"
               value={rechazoDialog.kind === "cancelar" ? rechazoDialog.motivo : ""}
               onChange={(e) => {
@@ -1005,7 +999,18 @@ export default function ExpedienteDetallePage({ params }: PageProps) {
         </DialogContent>
       </Dialog>
 
-      <Toaster richColors position="top-right" />
+      </div>{/* /space-y-6 pt-6 */}
+
+      <Toaster richColors position="top-right" theme="dark" />
+    </div>
+  );
+}
+
+function KVLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="tabular-nums text-foreground/90">{value}</dd>
     </div>
   );
 }
@@ -1023,21 +1028,21 @@ function DocCard({
 }) {
   if (!codigo) {
     return (
-      <div className="rounded-md border bg-muted/10 p-3 text-sm">
-        <p className="text-xs font-semibold text-muted-foreground">{label}</p>
-        <p className="text-muted-foreground">— sin generar —</p>
+      <div className="rounded-xl border border-glass bg-glass p-3 text-sm inset-highlight">
+        <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+        <p className="text-sm text-muted-foreground/60">— sin generar —</p>
       </div>
     );
   }
   const inner = (
-    <div className="rounded-md border p-3 text-sm transition hover:border-primary">
-      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
-      <p className="flex items-center gap-1 font-mono">
+    <div className="group rounded-xl border border-glass bg-glass p-3 text-sm inset-highlight transition hover:border-glass-mid hover:bg-glass-elev">
+      <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="flex items-center gap-1 font-mono text-copper">
         {codigo}
-        {href && <ExternalLink className="h-3 w-3" />}
+        {href && <ExternalLink className="h-3 w-3 transition group-hover:translate-x-0.5" />}
       </p>
       {estado && (
-        <p className="mt-1 text-xs text-muted-foreground capitalize">{estado}</p>
+        <p className="mt-1 font-mono text-[10px] capitalize text-muted-foreground">{estado}</p>
       )}
     </div>
   );
