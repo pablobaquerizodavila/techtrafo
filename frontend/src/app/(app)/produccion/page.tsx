@@ -7,7 +7,6 @@ import {
   CheckCircle2, ChevronRight, Clock, Eye, Factory, Flag, Gauge,
   LayoutDashboard, RefreshCw, Search, Truck, Users, Zap,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,11 +19,11 @@ import { Toaster } from "sonner";
 import { DashboardData, MatrizFila, getDashboardProduccion } from "@/lib/produccion";
 
 const SEMAFORO_CFG = {
-  verde:    { label: "En tiempo",   dot: "bg-emerald-500", bar: "bg-emerald-500", text: "text-emerald-700", soft: "bg-emerald-50",  ring: "ring-emerald-200",  hex: "#10b981" },
-  amarillo: { label: "En riesgo",   dot: "bg-amber-500",   bar: "bg-amber-500",   text: "text-amber-700",   soft: "bg-amber-50",    ring: "ring-amber-200",    hex: "#f59e0b" },
-  rojo:     { label: "Atrasado",    dot: "bg-rose-500",    bar: "bg-rose-500",    text: "text-rose-700",    soft: "bg-rose-50",     ring: "ring-rose-200",     hex: "#f43f5e" },
-  azul:     { label: "Terminado",   dot: "bg-sky-500",     bar: "bg-sky-500",     text: "text-sky-700",     soft: "bg-sky-50",      ring: "ring-sky-200",      hex: "#0ea5e9" },
-  gris:     { label: "No iniciado", dot: "bg-slate-400",   bar: "bg-slate-400",   text: "text-slate-600",   soft: "bg-slate-50",    ring: "ring-slate-200",    hex: "#94a3b8" },
+  verde:    { label: "En tiempo",   dot: "bg-green-500 glow-green",   text: "text-green-300",  hex: "#22c55e", glow: "drop-shadow(0 0 6px rgba(34,197,94,0.6))"  },
+  amarillo: { label: "En riesgo",   dot: "bg-amber-500",              text: "text-amber-300",  hex: "#f59e0b", glow: "none" },
+  rojo:     { label: "Atrasado",    dot: "bg-rose-500 glow-rose",     text: "text-rose-300",   hex: "#ef4444", glow: "drop-shadow(0 0 8px rgba(239,68,68,0.7))"   },
+  azul:     { label: "Terminado",   dot: "bg-ttteal glow-teal-sm",    text: "text-ttteal-soft",hex: "#4fd1c5", glow: "drop-shadow(0 0 6px rgba(79,209,197,0.4))" },
+  gris:     { label: "No iniciado", dot: "bg-muted-foreground/60",    text: "text-muted-foreground", hex: "rgba(255,255,255,0.18)", glow: "none" },
 } as const;
 
 type SemaforoKey = keyof typeof SEMAFORO_CFG;
@@ -74,9 +73,9 @@ export default function ProduccionDashboardPage() {
 
   if (loading && !data) {
     return (
-      <div className="flex h-[60vh] items-center justify-center">
+      <div className="-m-8 flex h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3 text-muted-foreground">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-copper border-t-transparent" />
           <p className="text-sm">Cargando dashboard de producción…</p>
         </div>
       </div>
@@ -84,9 +83,11 @@ export default function ProduccionDashboardPage() {
   }
   if (error) {
     return (
-      <div className="rounded-lg border border-rose-200 bg-rose-50 p-6 text-rose-700">
-        <p className="font-semibold">Error al cargar el dashboard</p>
-        <p className="mt-1 text-sm">{error}</p>
+      <div className="-m-8 p-8">
+        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-6 text-rose-200 inset-highlight">
+          <p className="font-display text-base font-semibold">Error al cargar el dashboard</p>
+          <p className="mt-1 text-sm text-rose-200/80">{error}</p>
+        </div>
       </div>
     );
   }
@@ -99,34 +100,37 @@ export default function ProduccionDashboardPage() {
   const horaGen = new Date(data.generado_en).toLocaleTimeString("es-EC", { hour: "2-digit", minute: "2-digit" });
 
   return (
-    <div className="-m-8 min-h-screen bg-slate-50/50">
+    <div className="-m-8">
       {/* ───── Header sticky ───── */}
-      <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/80 px-8 py-5 backdrop-blur-md">
+      <header className="sticky top-0 z-20 border-b border-glass bg-background/70 px-8 py-5 backdrop-blur-xl">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <div className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-slate-500">
-              <Link href="/dashboard" className="hover:text-slate-700">Panel</Link>
-              <ChevronRight className="h-3 w-3" />
-              <span>Producción</span>
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-glass bg-glass px-3 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              <Link href="/dashboard" className="text-muted-foreground hover:text-foreground">Panel</Link>
+              <ChevronRight className="h-3 w-3 text-muted-foreground/50" />
+              <span className="text-foreground">Producción</span>
             </div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
-                Dashboard de planta
-              </h1>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-                </span>
-                Live · {horaGen}
+            <h1 className="font-display text-4xl font-semibold tracking-tight">
+              <span className="bg-gradient-to-b from-foreground to-foreground/60 bg-clip-text text-transparent">Dashboard </span>
+              <span className="bg-gradient-to-br from-copper to-copper-soft bg-clip-text italic text-transparent">de planta</span>
+            </h1>
+            <div className="mt-3 flex flex-wrap items-center gap-3 font-mono text-[11px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-green-500/25 bg-green-500/[0.08] px-2.5 py-1 text-green-400">
+                <span className="led-green" />
+                Telemetría · 60s · {horaGen}
               </span>
+              <span className="text-muted-foreground/40">·</span>
+              <span>{otActivas} OT activas · {totalRiesgo} en riesgo · {data.alertas.length} alertas</span>
             </div>
-            <p className="mt-1 text-sm text-slate-500">
-              Vista ejecutiva en tiempo real · refresco automático cada 60s
-            </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={load} disabled={loading} className="bg-white">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={load}
+              disabled={loading}
+              className="border-glass-mid bg-glass backdrop-blur hover:bg-glass-elev"
+            >
               <RefreshCw className={`mr-2 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
               Refrescar
             </Button>
@@ -136,13 +140,13 @@ export default function ProduccionDashboardPage() {
 
       <div className="space-y-6 p-8">
         {/* ───── KPI hero ───── */}
-        <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <HeroKpi
             label="OT activas"
             value={otActivas}
             sub={`${data.kpis.ot_por_estado["en_curso"] ?? 0} en curso · ${data.kpis.ot_por_estado["planeada"] ?? 0} planeadas`}
             icon={<Factory className="h-4 w-4" />}
-            accent="indigo"
+            accent="copper"
             href="/ot"
           />
           <HeroKpi
@@ -150,14 +154,14 @@ export default function ProduccionDashboardPage() {
             value={otCompletadas}
             sub={`${data.kpis.expedientes_por_estado["ganado"] ?? 0} expedientes ganados`}
             icon={<CheckCircle2 className="h-4 w-4" />}
-            accent="emerald"
+            accent="green"
           />
           <HeroKpi
             label="OT en riesgo"
             value={totalRiesgo}
             sub={`${data.kpis.ot_urgentes_abiertas} urgentes · ${data.kpis.ot_atrasadas} atrasadas · ${data.kpis.expedientes_estancados} estancados`}
             icon={<AlertOctagon className="h-4 w-4" />}
-            accent={totalRiesgo > 0 ? "rose" : "slate"}
+            accent={totalRiesgo > 0 ? "rose" : "muted"}
           />
           <HeroKpi
             label="Expedientes activos"
@@ -169,20 +173,20 @@ export default function ProduccionDashboardPage() {
           />
         </section>
 
-        {/* ───── Row: Semáforo donut + Próximas entregas + Alertas ───── */}
+        {/* ───── Donut + Próximas entregas + Alertas ───── */}
         <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          {/* Donut semáforo */}
+          {/* Donut */}
           <Panel
             title="Estado del pipeline"
-            subtitle={`${totalSemaforo} fases activas en planta`}
-            icon={<Gauge className="h-4 w-4" />}
+            subtitle={`${totalSemaforo} fases activas`}
+            icon={<Gauge className="h-3.5 w-3.5" />}
           >
             <div className="flex items-center gap-6">
               <Donut
                 size={148}
                 stroke={18}
                 slices={(["verde", "amarillo", "rojo", "azul", "gris"] as const)
-                  .map((k) => ({ value: data.semaforo[k], color: SEMAFORO_CFG[k].hex }))
+                  .map((k) => ({ value: data.semaforo[k], color: SEMAFORO_CFG[k].hex, glow: SEMAFORO_CFG[k].glow }))
                   .filter((s) => s.value > 0)}
                 centerValue={otActivas}
                 centerLabel="OT activas"
@@ -193,11 +197,11 @@ export default function ProduccionDashboardPage() {
                   const n = data.semaforo[c];
                   const pct = totalSemaforo > 0 ? Math.round((n / totalSemaforo) * 100) : 0;
                   return (
-                    <li key={c} className="flex items-center gap-2.5">
-                      <span className={`h-2.5 w-2.5 rounded-full ${cfg.dot}`} />
-                      <span className="flex-1 text-xs text-slate-600">{cfg.label}</span>
-                      <span className="text-xs font-mono font-semibold tabular-nums text-slate-900">{n}</span>
-                      <span className="w-9 text-right text-[10px] text-slate-400 tabular-nums">{pct}%</span>
+                    <li key={c} className="flex items-center gap-2.5 border-b border-glass pb-2 last:border-b-0 last:pb-0">
+                      <span className={`h-2 w-2 rounded-full ${cfg.dot}`} />
+                      <span className="flex-1 text-xs text-muted-foreground">{cfg.label}</span>
+                      <span className="font-mono text-xs font-semibold tabular-nums">{n}</span>
+                      <span className="w-9 text-right font-mono text-[10px] text-muted-foreground/70 tabular-nums">{pct}%</span>
                     </li>
                   );
                 })}
@@ -208,14 +212,18 @@ export default function ProduccionDashboardPage() {
           {/* Próximas entregas */}
           <Panel
             title="Próximas entregas"
-            subtitle="Compromisos a 7 días"
-            icon={<Truck className="h-4 w-4" />}
-            action={data.proximas_entregas.length > 0 && <span className="text-xs text-slate-400">{data.proximas_entregas.length} OT</span>}
+            subtitle="7 días"
+            icon={<Truck className="h-3.5 w-3.5" />}
+            action={data.proximas_entregas.length > 0 && (
+              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                {data.proximas_entregas.length} OT
+              </span>
+            )}
           >
             {data.proximas_entregas.length === 0 ? (
               <EmptyState message="Sin entregas planeadas en los próximos 7 días" />
             ) : (
-              <ul className="space-y-1">
+              <ul className="space-y-2">
                 {data.proximas_entregas.slice(0, 6).map((e) => {
                   const dias = e.dias_para;
                   const urg = dias !== null && dias <= 2;
@@ -223,21 +231,21 @@ export default function ProduccionDashboardPage() {
                     <li key={e.id}>
                       <Link
                         href={`/ot/${e.id}`}
-                        className="group flex items-center gap-3 rounded-md px-2 py-2 hover:bg-slate-50"
+                        className="group flex items-center gap-3 rounded-lg border border-glass bg-glass px-2.5 py-2 transition hover:border-glass-mid hover:bg-glass-elev"
                       >
-                        <div className={`flex h-9 w-12 flex-col items-center justify-center rounded-md text-center ${urg ? "bg-rose-50 text-rose-700 ring-1 ring-rose-200" : "bg-slate-100 text-slate-600"}`}>
-                          <span className="text-[10px] font-medium uppercase leading-none">
+                        <div className={`flex h-9 w-12 flex-col items-center justify-center rounded-md border text-center ${urg ? "border-rose-500/40 bg-rose-500/10" : "border-glass-mid bg-glass-elev"}`}>
+                          <span className={`font-mono text-[9px] font-medium uppercase leading-none ${urg ? "text-rose-300" : "text-muted-foreground"}`}>
                             {dias === 0 ? "Hoy" : dias === 1 ? "Mañ." : "d"}
                           </span>
-                          <span className="text-sm font-bold leading-tight tabular-nums">
+                          <span className={`font-display text-sm font-bold leading-tight tabular-nums ${urg ? "text-rose-400" : "text-foreground"}`}>
                             {dias === 0 || dias === 1 ? "" : dias}
                           </span>
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-slate-900">{e.cliente ?? "Sin cliente"}</p>
-                          <p className="truncate font-mono text-xs text-slate-500">{e.codigo}</p>
+                          <p className="truncate text-sm font-medium">{e.cliente ?? "Sin cliente"}</p>
+                          <p className="truncate font-mono text-xs text-muted-foreground">{e.codigo}</p>
                         </div>
-                        <ArrowUpRight className="h-3.5 w-3.5 text-slate-300 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-slate-700" />
+                        <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground/40 transition group-hover:text-copper" />
                       </Link>
                     </li>
                   );
@@ -250,25 +258,27 @@ export default function ProduccionDashboardPage() {
           <Panel
             title="Alertas activas"
             subtitle={data.alertas.length === 0 ? "Todo bajo control" : `${data.alertas.length} requieren atención`}
-            icon={<BellRing className="h-4 w-4" />}
+            icon={<BellRing className="h-3.5 w-3.5" />}
             action={data.alertas.length > 0 && (
-              <Badge variant="destructive" className="font-mono text-[10px]">{data.alertas.length}</Badge>
+              <span className="inline-flex items-center rounded-full border border-rose-500/30 bg-rose-500/15 px-2 py-0.5 font-mono text-[10px] font-semibold text-rose-300 num">
+                {data.alertas.length}
+              </span>
             )}
           >
             {data.alertas.length === 0 ? (
               <EmptyState message="Sin alertas activas — sistema saludable" tone="positive" />
             ) : (
-              <ul className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+              <ul className="space-y-1.5 max-h-72 overflow-y-auto pr-1 scroll-discreet">
                 {data.alertas.map((a) => {
                   const sevCfg =
-                    a.severidad === "alta"  ? { dot: "bg-rose-500",  text: "text-rose-700",  border: "border-l-rose-500"  } :
-                    a.severidad === "media" ? { dot: "bg-amber-500", text: "text-amber-700", border: "border-l-amber-500" } :
-                                              { dot: "bg-sky-500",   text: "text-sky-700",   border: "border-l-sky-500"   };
+                    a.severidad === "alta"  ? { dot: "bg-rose-500 glow-rose",  text: "text-rose-300",  border: "border-l-rose-500"  } :
+                    a.severidad === "media" ? { dot: "bg-amber-500",           text: "text-amber-300", border: "border-l-amber-500" } :
+                                              { dot: "bg-ttteal glow-teal-sm", text: "text-ttteal-soft", border: "border-l-ttteal" };
                   return (
-                    <li key={a.id} className={`flex items-start gap-2 rounded-md border-l-2 ${sevCfg.border} bg-slate-50/70 px-3 py-2`}>
+                    <li key={a.id} className={`flex items-start gap-2 rounded-md border-l-2 ${sevCfg.border} bg-glass px-3 py-2`}>
                       <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${sevCfg.dot}`} />
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs leading-snug text-slate-700">{a.mensaje}</p>
+                        <p className="text-xs leading-snug text-foreground/90">{a.mensaje}</p>
                         {a.ref && (
                           <Link
                             href={a.ref.tipo === "ot" ? `/ot/${a.ref.id}` : `/expedientes/${a.ref.id}`}
@@ -286,25 +296,25 @@ export default function ProduccionDashboardPage() {
           </Panel>
         </section>
 
-        {/* ───── Matriz comparativa ───── */}
+        {/* ───── Matriz ───── */}
         <Panel
           title="Matriz de seguimiento"
           subtitle={`${matrizFiltrada.length} de ${data.matriz.length} órdenes y expedientes`}
-          icon={<LayoutDashboard className="h-4 w-4" />}
+          icon={<LayoutDashboard className="h-3.5 w-3.5" />}
           padded={false}
         >
-          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-5 py-3">
+          <div className="flex flex-wrap items-center gap-2 border-b border-glass px-5 py-3">
             <div className="relative flex-1 min-w-[14rem]">
-              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
-                className="h-8 border-slate-200 pl-8 text-sm"
+                className="h-8 border-glass bg-glass pl-8 text-sm focus:border-glass-strong"
                 placeholder="Buscar código, cliente, responsable…"
                 value={filtroBusq}
                 onChange={(e) => setFiltroBusq(e.target.value)}
               />
             </div>
             <Select value={filtroOrigen || "_"} onValueChange={(v) => setFiltroOrigen(v === "_" ? "" : v)}>
-              <SelectTrigger className="h-8 w-32 text-xs"><SelectValue placeholder="Origen" /></SelectTrigger>
+              <SelectTrigger className="h-8 w-32 border-glass bg-glass text-xs"><SelectValue placeholder="Origen" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="_">OT + Exp</SelectItem>
                 <SelectItem value="ot">Solo OT</SelectItem>
@@ -312,7 +322,7 @@ export default function ProduccionDashboardPage() {
               </SelectContent>
             </Select>
             <Select value={filtroTipo || "_"} onValueChange={(v) => setFiltroTipo(v === "_" ? "" : v)}>
-              <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="Tipo" /></SelectTrigger>
+              <SelectTrigger className="h-8 w-36 border-glass bg-glass text-xs"><SelectValue placeholder="Tipo" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="_">Todos los tipos</SelectItem>
                 <SelectItem value="reparacion">Reparación</SelectItem>
@@ -322,7 +332,7 @@ export default function ProduccionDashboardPage() {
               </SelectContent>
             </Select>
             <Select value={filtroSemaforo || "_"} onValueChange={(v) => setFiltroSemaforo(v === "_" ? "" : v)}>
-              <SelectTrigger className="h-8 w-32 text-xs"><SelectValue placeholder="Semáforo" /></SelectTrigger>
+              <SelectTrigger className="h-8 w-32 border-glass bg-glass text-xs"><SelectValue placeholder="Semáforo" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="_">Todos</SelectItem>
                 <SelectItem value="verde">En tiempo</SelectItem>
@@ -337,24 +347,24 @@ export default function ProduccionDashboardPage() {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="border-slate-100 bg-slate-50/50 hover:bg-slate-50/50">
+                <TableRow className="border-glass bg-glass hover:bg-glass">
                   <TableHead className="w-2"></TableHead>
-                  <TableHead className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Origen</TableHead>
-                  <TableHead className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Código</TableHead>
-                  <TableHead className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Cliente</TableHead>
-                  <TableHead className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Tipo · Capacidad</TableHead>
-                  <TableHead className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Fase actual</TableHead>
-                  <TableHead className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Avance</TableHead>
-                  <TableHead className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Compromiso</TableHead>
-                  <TableHead className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Responsable</TableHead>
-                  <TableHead className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Estado</TableHead>
+                  <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Origen</TableHead>
+                  <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Código</TableHead>
+                  <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Cliente</TableHead>
+                  <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Tipo · Capacidad</TableHead>
+                  <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Fase actual</TableHead>
+                  <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Avance</TableHead>
+                  <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Compromiso</TableHead>
+                  <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Responsable</TableHead>
+                  <TableHead className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">Estado</TableHead>
                   <TableHead className="text-right"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {matrizFiltrada.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="py-10 text-center text-sm text-slate-400">
+                    <TableCell colSpan={11} className="py-10 text-center text-sm text-muted-foreground">
                       Sin órdenes activas con esos filtros
                     </TableCell>
                   </TableRow>
@@ -364,53 +374,53 @@ export default function ProduccionDashboardPage() {
                     ? m.capacidad_kva >= 1000 ? `${(m.capacidad_kva / 1000).toFixed(1)} MVA` : `${m.capacidad_kva} kVA`
                     : null;
                   return (
-                    <TableRow key={`${m.origen}-${m.id}`} className="border-slate-100 group hover:bg-slate-50/60">
+                    <TableRow key={`${m.origen}-${m.id}`} className="border-glass group hover:bg-glass">
                       <TableCell><span className={`block h-2 w-2 rounded-full ${cfg.dot}`} title={cfg.label} /></TableCell>
                       <TableCell>
-                        <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold ${m.origen === "ot" ? "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200" : "bg-purple-50 text-purple-700 ring-1 ring-purple-200"}`}>
+                        <span className={`inline-flex items-center rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold ${m.origen === "ot" ? "border border-copper/30 bg-copper/10 text-copper" : "border border-ttteal/30 bg-ttteal/10 text-ttteal"}`}>
                           {m.origen === "ot" ? "OT" : "EXP"}
                         </span>
                       </TableCell>
-                      <TableCell className="font-mono text-xs font-medium text-slate-700">{m.codigo ?? "—"}</TableCell>
-                      <TableCell className="max-w-[200px] truncate text-sm text-slate-700" title={m.cliente ?? undefined}>{m.cliente ?? "—"}</TableCell>
+                      <TableCell className="font-mono text-xs font-medium text-foreground/90">{m.codigo ?? "—"}</TableCell>
+                      <TableCell className="max-w-[200px] truncate text-sm text-foreground/85" title={m.cliente ?? undefined}>{m.cliente ?? "—"}</TableCell>
                       <TableCell className="text-xs">
-                        <span className="capitalize text-slate-600">{m.tipo}</span>
-                        {capacidadFmt && <span className="ml-1.5 font-mono text-slate-400">· {capacidadFmt}</span>}
+                        <span className="capitalize text-foreground/75">{m.tipo}</span>
+                        {capacidadFmt && <span className="ml-1.5 font-mono text-ttteal">· {capacidadFmt}</span>}
                       </TableCell>
-                      <TableCell className="max-w-[140px] truncate text-xs text-slate-600">{m.fase_actual ?? "—"}</TableCell>
+                      <TableCell className="max-w-[140px] truncate text-xs text-muted-foreground">{m.fase_actual ?? "—"}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-100">
+                          <div className="h-1.5 w-20 overflow-hidden rounded-full bg-glass-elev">
                             <div
-                              className={`h-full rounded-full transition-all ${m.avance_pct >= 80 ? "bg-emerald-500" : m.avance_pct >= 40 ? "bg-sky-500" : "bg-slate-400"}`}
+                              className={`h-full rounded-full transition-all ${m.avance_pct >= 80 ? "bg-green-500" : m.avance_pct >= 40 ? "bg-gradient-to-r from-ttteal to-copper" : "bg-muted-foreground/50"}`}
                               style={{ width: `${m.avance_pct}%` }}
                             />
                           </div>
-                          <span className="font-mono text-[11px] tabular-nums text-slate-600">{m.avance_pct}%</span>
+                          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{m.avance_pct}%</span>
                         </div>
                       </TableCell>
                       <TableCell className="font-mono text-xs">
                         {m.fecha_compromiso ? (
                           <div className="flex items-center gap-1.5">
-                            <span className="text-slate-600">{m.fecha_compromiso.split("T")[0]}</span>
+                            <span className="text-muted-foreground">{m.fecha_compromiso.split("T")[0]}</span>
                             {m.dias_diff !== null && (
-                              <span className={`rounded px-1 py-0.5 text-[10px] tabular-nums ${m.dias_diff < 0 ? "bg-rose-50 text-rose-700" : m.dias_diff <= 3 ? "bg-amber-50 text-amber-700" : "text-slate-400"}`}>
+                              <span className={`rounded px-1 py-0.5 text-[10px] tabular-nums ${m.dias_diff < 0 ? "bg-rose-500/15 text-rose-300" : m.dias_diff <= 3 ? "bg-amber-500/15 text-amber-300" : "text-muted-foreground/50"}`}>
                                 {m.dias_diff >= 0 ? "+" : ""}{m.dias_diff}d
                               </span>
                             )}
                           </div>
-                        ) : <span className="text-slate-400">—</span>}
+                        ) : <span className="text-muted-foreground/50">—</span>}
                       </TableCell>
-                      <TableCell className="max-w-[140px] truncate text-xs text-slate-600">{m.responsable ?? "—"}</TableCell>
+                      <TableCell className="max-w-[140px] truncate text-xs text-muted-foreground">{m.responsable ?? "—"}</TableCell>
                       <TableCell>
-                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium capitalize text-slate-700">
+                        <span className="inline-flex items-center rounded-full border border-glass bg-glass-elev px-2 py-0.5 font-mono text-[10px] font-medium capitalize text-muted-foreground">
                           {m.estado.replaceAll("_", " ")}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
                         <Link
                           href={m.origen === "ot" ? `/ot/${m.id}` : `/expedientes/${m.id}`}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-glass-elev hover:text-copper"
                         >
                           <Eye className="h-3.5 w-3.5" />
                         </Link>
@@ -423,29 +433,29 @@ export default function ProduccionDashboardPage() {
           </div>
         </Panel>
 
-        {/* ───── Row: Capacidad / Causas / Productividad ───── */}
+        {/* ───── Capacidad / Causas / Productividad ───── */}
         <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          {/* Capacidad de planta */}
+          {/* Capacidad */}
           <Panel
             title="Capacidad de planta"
             subtitle="Carga actual por área productiva"
-            icon={<Gauge className="h-4 w-4" />}
+            icon={<Gauge className="h-3.5 w-3.5" />}
           >
             {data.capacidad_planta.por_area.length === 0 ? (
               <EmptyState message="Sin áreas registradas" />
             ) : (
               <ul className="space-y-3">
                 {data.capacidad_planta.por_area.map((a) => {
-                  const tone = a.carga_pct >= 85 ? "rose" : a.carga_pct >= 65 ? "amber" : "emerald";
+                  const tone = a.carga_pct >= 85 ? "rose" : a.carga_pct >= 65 ? "amber" : "green";
                   const toneCfg = {
-                    rose:    { bar: "bg-rose-500",    text: "text-rose-700",    bg: "bg-rose-50"    },
-                    amber:   { bar: "bg-amber-500",   text: "text-amber-700",   bg: "bg-amber-50"   },
-                    emerald: { bar: "bg-emerald-500", text: "text-emerald-700", bg: "bg-emerald-50" },
+                    rose:  { bar: "bg-gradient-to-r from-amber-500 to-rose-500", text: "text-rose-300",  bg: "bg-rose-500/15"  },
+                    amber: { bar: "bg-amber-500",                                text: "text-amber-300", bg: "bg-amber-500/15" },
+                    green: { bar: "bg-green-500",                                text: "text-green-300", bg: "bg-green-500/15" },
                   }[tone];
                   return (
                     <li key={a.codigo}>
                       <div className="mb-1.5 flex items-center justify-between text-xs">
-                        <span className="flex items-center gap-2 font-medium text-slate-700">
+                        <span className="flex items-center gap-2 font-medium text-foreground/90">
                           <span className="h-2 w-2 rounded-full" style={{ background: a.color_hex }} />
                           {a.area}
                         </span>
@@ -453,10 +463,10 @@ export default function ProduccionDashboardPage() {
                           {a.carga_pct}%
                         </span>
                       </div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                      <div className="h-1.5 overflow-hidden rounded-full bg-glass-elev">
                         <div className={`h-full rounded-full ${toneCfg.bar}`} style={{ width: `${a.carga_pct}%` }} />
                       </div>
-                      <p className="mt-1 text-[10px] text-slate-400">
+                      <p className="mt-1 font-mono text-[10px] text-muted-foreground">
                         {a.ot_activas} activas · {a.completados_mes} completadas este mes
                       </p>
                     </li>
@@ -464,16 +474,16 @@ export default function ProduccionDashboardPage() {
                 })}
               </ul>
             )}
-            <p className="mt-4 border-t border-slate-100 pt-3 text-[10px] italic text-slate-400">
+            <p className="mt-4 border-t border-glass pt-3 font-mono text-[10px] italic text-muted-foreground/70">
               Capacidad nominal: 5 pasos simultáneos por área
             </p>
           </Panel>
 
-          {/* Causas de demora */}
+          {/* Causas */}
           <Panel
             title="Causas de demora"
             subtitle="Ranking por impacto en días perdidos"
-            icon={<AlertTriangle className="h-4 w-4" />}
+            icon={<AlertTriangle className="h-3.5 w-3.5" />}
           >
             {data.causas_demora.causas.length === 0 ? (
               <EmptyState message="Aún no se reportaron reprocesos" tone="positive" />
@@ -485,21 +495,21 @@ export default function ProduccionDashboardPage() {
                   return (
                     <li key={c.codigo} className="space-y-1">
                       <div className="flex items-center justify-between gap-2 text-xs">
-                        <span className="flex min-w-0 items-center gap-2 text-slate-700">
-                          <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-slate-100 text-[10px] font-bold text-slate-500">
+                        <span className="flex min-w-0 items-center gap-2 text-foreground/90">
+                          <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-glass-elev font-mono text-[10px] font-bold text-muted-foreground">
                             {i + 1}
                           </span>
                           <span className="truncate font-medium">{c.causa}</span>
                         </span>
-                        <span className="shrink-0 font-mono text-[10px] text-slate-500 tabular-nums">
+                        <span className="shrink-0 font-mono text-[10px] text-muted-foreground tabular-nums">
                           {c.dias_perdidos}d · {c.incidencias}×
                         </span>
                       </div>
-                      <div className="h-1 overflow-hidden rounded-full bg-slate-100">
-                        <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-rose-500" style={{ width: `${widthPct}%` }} />
+                      <div className="h-1 overflow-hidden rounded-full bg-glass-elev">
+                        <div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-copper" style={{ width: `${widthPct}%` }} />
                       </div>
                       {c.abiertas > 0 && (
-                        <p className="text-[10px] text-rose-600">
+                        <p className="font-mono text-[10px] text-rose-300">
                           ⚠ {c.abiertas} incidencia{c.abiertas === 1 ? "" : "s"} sin resolver
                         </p>
                       )}
@@ -510,11 +520,11 @@ export default function ProduccionDashboardPage() {
             )}
           </Panel>
 
-          {/* Productividad por responsable */}
+          {/* Productividad */}
           <Panel
-            title="Productividad (30d)"
+            title="Productividad 30d"
             subtitle="Horas registradas y OT intervenidas"
-            icon={<Users className="h-4 w-4" />}
+            icon={<Users className="h-3.5 w-3.5" />}
           >
             {data.productividad.por_responsable.length === 0 ? (
               <EmptyState message="Aún no se registran tiempos" />
@@ -526,20 +536,20 @@ export default function ProduccionDashboardPage() {
                   const iniciales = r.nombre.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
                   return (
                     <li key={r.usuario_id} className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-slate-100 to-slate-200 text-[10px] font-bold text-slate-600 ring-1 ring-slate-200">
+                      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-glass-mid bg-gradient-to-br from-copper/15 to-ttteal/15 font-display text-[11px] font-bold text-foreground inset-highlight">
                         {iniciales}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="mb-0.5 flex items-baseline justify-between gap-2">
-                          <span className="truncate text-xs font-medium text-slate-700">{r.nombre}</span>
-                          <span className="shrink-0 font-mono text-[11px] tabular-nums text-slate-900">
-                            {r.horas_mes.toFixed(0)}h
+                          <span className="truncate text-xs font-medium">{r.nombre}</span>
+                          <span className="shrink-0 font-display text-base font-semibold tabular-nums text-copper text-glow-copper">
+                            {r.horas_mes.toFixed(0)}<span className="text-[10px] text-muted-foreground font-normal">h</span>
                           </span>
                         </div>
-                        <div className="h-1 overflow-hidden rounded-full bg-slate-100">
-                          <div className="h-full rounded-full bg-indigo-500" style={{ width: `${widthPct}%` }} />
+                        <div className="h-1 overflow-hidden rounded-full bg-glass-elev">
+                          <div className="h-full rounded-full bg-copper" style={{ width: `${widthPct}%` }} />
                         </div>
-                        <p className="mt-0.5 text-[10px] text-slate-400">
+                        <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
                           {r.ot_intervenidas_mes} OT · {r.pasos_completados_mes} pasos
                         </p>
                       </div>
@@ -555,26 +565,26 @@ export default function ProduccionDashboardPage() {
         <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Panel
             title="Fases con más demora"
-            subtitle="Top 5 cuellos de botella detectados"
-            icon={<Clock className="h-4 w-4 text-rose-500" />}
+            subtitle="Top 5 cuellos de botella"
+            icon={<Clock className="h-3.5 w-3.5" />}
           >
             {data.ranking_fases_demora.length === 0 ? (
               <EmptyState message="Sin fases estancadas detectadas" tone="positive" />
             ) : (
               <ul className="space-y-2">
                 {data.ranking_fases_demora.map((r, i) => (
-                  <li key={r.codigo} className="flex items-center justify-between rounded-md border border-rose-100 bg-rose-50/50 px-3 py-2.5">
+                  <li key={r.codigo} className="flex items-center justify-between rounded-lg border border-rose-500/20 bg-rose-500/[0.05] px-3 py-2.5">
                     <div className="flex items-center gap-3">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-xs font-bold text-rose-600 ring-1 ring-rose-200">
+                      <span className="grid h-6 w-6 place-items-center rounded-full border border-rose-500/30 bg-rose-500/10 font-mono text-xs font-bold text-rose-300">
                         {i + 1}
                       </span>
-                      <span className="text-sm font-medium text-slate-800">{r.nombre}</span>
+                      <span className="text-sm font-medium text-foreground/90">{r.nombre}</span>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs font-semibold text-rose-700">
-                        +{r.promedio_exceso_horas}h <span className="font-normal text-rose-500">sobre SLA</span>
+                      <p className="font-mono text-xs font-semibold text-rose-300">
+                        +{r.promedio_exceso_horas}h <span className="font-normal text-rose-300/70">sobre SLA</span>
                       </p>
-                      <p className="text-[10px] text-slate-500">
+                      <p className="font-mono text-[10px] text-muted-foreground">
                         {r.cant_estancados} caso{r.cant_estancados === 1 ? "" : "s"}
                       </p>
                     </div>
@@ -587,25 +597,25 @@ export default function ProduccionDashboardPage() {
           <Panel
             title="Cumplimiento por cliente"
             subtitle="OT entregadas a tiempo vs total"
-            icon={<Activity className="h-4 w-4" />}
+            icon={<Activity className="h-3.5 w-3.5" />}
           >
             {data.cumplimiento_cliente.length === 0 ? (
               <EmptyState message="Aún sin OT completadas para medir" />
             ) : (
               <ul className="space-y-3">
                 {data.cumplimiento_cliente.map((r) => {
-                  const tone = r.cumplimiento_pct >= 80 ? "emerald" : r.cumplimiento_pct >= 50 ? "amber" : "rose";
-                  const toneBar = { emerald: "bg-emerald-500", amber: "bg-amber-500", rose: "bg-rose-500" }[tone];
-                  const toneText = { emerald: "text-emerald-700", amber: "text-amber-700", rose: "text-rose-700" }[tone];
+                  const tone = r.cumplimiento_pct >= 80 ? "green" : r.cumplimiento_pct >= 50 ? "amber" : "rose";
+                  const toneBar = { green: "bg-green-500", amber: "bg-amber-500", rose: "bg-rose-500" }[tone];
+                  const toneText = { green: "text-green-300", amber: "text-amber-300", rose: "text-rose-300" }[tone];
                   return (
                     <li key={r.cliente}>
                       <div className="mb-1 flex items-center justify-between text-xs">
-                        <span className="truncate font-medium text-slate-700">{r.cliente}</span>
+                        <span className="truncate font-medium text-foreground/90">{r.cliente}</span>
                         <span className={`shrink-0 font-mono tabular-nums ${toneText}`}>
-                          {r.cumplimiento_pct}% <span className="text-slate-400">({r.a_tiempo}/{r.total})</span>
+                          {r.cumplimiento_pct}% <span className="text-muted-foreground/60">({r.a_tiempo}/{r.total})</span>
                         </span>
                       </div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                      <div className="h-1.5 overflow-hidden rounded-full bg-glass-elev">
                         <div className={`h-full rounded-full ${toneBar}`} style={{ width: `${r.cumplimiento_pct}%` }} />
                       </div>
                     </li>
@@ -617,13 +627,13 @@ export default function ProduccionDashboardPage() {
         </section>
       </div>
 
-      <Toaster richColors position="top-right" />
+      <Toaster richColors position="top-right" theme="dark" />
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Componentes auxiliares
+// Componentes
 // ═══════════════════════════════════════════════════════════════
 
 function Panel({
@@ -637,14 +647,14 @@ function Panel({
   padded?: boolean;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-3.5">
+    <section className="overflow-hidden rounded-xl border border-glass bg-glass inset-highlight">
+      <div className="flex items-start justify-between gap-3 border-b border-glass px-5 py-3.5">
         <div>
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-            {icon && <span className="text-slate-400">{icon}</span>}
+          <h3 className="flex items-center gap-2 font-display text-sm font-semibold tracking-tight">
+            {icon && <span className="text-copper">{icon}</span>}
             {title}
           </h3>
-          {subtitle && <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>}
+          {subtitle && <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{subtitle}</p>}
         </div>
         {action && <div className="shrink-0">{action}</div>}
       </div>
@@ -660,30 +670,30 @@ function HeroKpi({
   value: number;
   sub: string;
   icon: React.ReactNode;
-  accent: "indigo" | "emerald" | "rose" | "amber" | "slate";
+  accent: "copper" | "green" | "rose" | "amber" | "muted";
   href?: string;
 }) {
   const cfg = {
-    indigo:  { iconBg: "bg-indigo-50 text-indigo-600 ring-indigo-100",   accentBar: "bg-indigo-500"  },
-    emerald: { iconBg: "bg-emerald-50 text-emerald-600 ring-emerald-100", accentBar: "bg-emerald-500" },
-    rose:    { iconBg: "bg-rose-50 text-rose-600 ring-rose-100",         accentBar: "bg-rose-500"    },
-    amber:   { iconBg: "bg-amber-50 text-amber-600 ring-amber-100",      accentBar: "bg-amber-500"   },
-    slate:   { iconBg: "bg-slate-100 text-slate-500 ring-slate-200",     accentBar: "bg-slate-300"   },
+    copper: { iconBg: "bg-copper/10 text-copper border-copper/25",       accent: "bg-gradient-to-r from-copper to-copper-soft", val: "text-foreground" },
+    green:  { iconBg: "bg-green-500/10 text-green-400 border-green-500/25", accent: "bg-green-500", val: "text-foreground" },
+    rose:   { iconBg: "bg-rose-500/10 text-rose-400 border-rose-500/25", accent: "bg-rose-500 glow-rose", val: "text-rose-400 text-glow-rose" },
+    amber:  { iconBg: "bg-amber-500/10 text-amber-400 border-amber-500/22", accent: "bg-amber-500", val: "text-foreground" },
+    muted:  { iconBg: "bg-glass text-muted-foreground border-glass",     accent: "bg-muted-foreground/30", val: "text-foreground" },
   }[accent];
 
   const inner = (
-    <div className="group relative overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-slate-300 hover:shadow-md">
-      <div className={`absolute inset-x-0 top-0 h-0.5 ${cfg.accentBar}`} />
+    <div className="group relative overflow-hidden rounded-xl border border-glass bg-glass p-4 inset-highlight transition-all hover:-translate-y-px hover:border-glass-mid hover:bg-glass-elev">
+      <div className={`absolute inset-x-0 top-0 h-0.5 ${cfg.accent}`} />
       <div className="mb-3 flex items-start justify-between">
-        <span className="text-xs font-medium uppercase tracking-wider text-slate-500">{label}</span>
-        <div className={`flex h-7 w-7 items-center justify-center rounded-md ring-1 ${cfg.iconBg}`}>
+        <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">{label}</span>
+        <div className={`grid h-7 w-7 place-items-center rounded-md border ${cfg.iconBg}`}>
           {icon}
         </div>
       </div>
-      <p className="text-3xl font-semibold tabular-nums tracking-tight text-slate-900">{value}</p>
-      <p className="mt-1 text-[11px] leading-tight text-slate-500">{sub}</p>
+      <p className={`font-display text-3xl font-semibold tabular-nums tracking-tight ${cfg.val}`}>{value}</p>
+      <p className="mt-1 font-mono text-[10.5px] leading-tight text-muted-foreground">{sub}</p>
       {href && (
-        <ArrowUpRight className="absolute bottom-3 right-3 h-3.5 w-3.5 text-slate-300 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-slate-600" />
+        <ArrowUpRight className="absolute bottom-3 right-3 h-3.5 w-3.5 text-muted-foreground/30 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-copper" />
       )}
     </div>
   );
@@ -696,7 +706,7 @@ function Donut({
 }: {
   size: number;
   stroke: number;
-  slices: { value: number; color: string }[];
+  slices: { value: number; color: string; glow: string }[];
   centerValue: number;
   centerLabel: string;
 }) {
@@ -706,11 +716,11 @@ function Donut({
   let offset = 0;
 
   return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
+    <div className="relative shrink-0" style={{ width: size, height: size, filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.4))" }}>
       <svg width={size} height={size} className="-rotate-90">
         <circle
           cx={size / 2} cy={size / 2} r={radius}
-          fill="none" stroke="#f1f5f9" strokeWidth={stroke}
+          fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={stroke}
         />
         {total > 0 && slices.map((s, i) => {
           const len = (s.value / total) * circ;
@@ -722,6 +732,7 @@ function Donut({
               fill="none" stroke={s.color} strokeWidth={stroke}
               strokeDasharray={dash} strokeDashoffset={-offset}
               strokeLinecap="butt"
+              style={{ filter: s.glow }}
             />
           );
           offset += len;
@@ -729,8 +740,8 @@ function Donut({
         })}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-semibold tabular-nums tracking-tight text-slate-900">{centerValue}</span>
-        <span className="text-[10px] uppercase tracking-wider text-slate-500">{centerLabel}</span>
+        <span className="font-display text-3xl font-semibold tabular-nums tracking-tight bg-gradient-to-b from-foreground to-foreground/60 bg-clip-text text-transparent">{centerValue}</span>
+        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{centerLabel}</span>
       </div>
     </div>
   );
@@ -738,8 +749,8 @@ function Donut({
 
 function EmptyState({ message, tone = "neutral" }: { message: string; tone?: "neutral" | "positive" }) {
   return (
-    <div className={`flex flex-col items-center justify-center rounded-md border border-dashed py-6 ${tone === "positive" ? "border-emerald-200 bg-emerald-50/30" : "border-slate-200 bg-slate-50/40"}`}>
-      <p className={`text-xs ${tone === "positive" ? "text-emerald-600" : "text-slate-400"}`}>
+    <div className={`flex flex-col items-center justify-center rounded-md border border-dashed py-6 ${tone === "positive" ? "border-green-500/25 bg-green-500/[0.04]" : "border-glass bg-glass"}`}>
+      <p className={`text-xs ${tone === "positive" ? "text-green-300" : "text-muted-foreground"}`}>
         {tone === "positive" && "✓ "}{message}
       </p>
     </div>

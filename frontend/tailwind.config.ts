@@ -45,11 +45,39 @@ const config: Config = {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
         },
+        // Voltage OS brand tokens (paleta de art direction "C")
+        copper: {
+          DEFAULT: "#ff6b35",
+          soft:    "#ffb88c",
+          deep:    "#c44a1c",
+        },
+        ttteal: {
+          DEFAULT: "#4fd1c5",
+          soft:    "#9ee7df",
+          deep:    "#2a9d96",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      fontFamily: {
+        sans: ["var(--font-display)", "system-ui", "-apple-system", "sans-serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "SFMono-Regular", "monospace"],
+      },
+      keyframes: {
+        "pulse-soft": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.5" },
+        },
+        "ping-soft": {
+          "75%, 100%": { transform: "scale(1.8)", opacity: "0" },
+        },
+      },
+      animation: {
+        "pulse-soft": "pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "ping-soft":  "ping-soft 2s cubic-bezier(0, 0, 0.2, 1) infinite",
       },
     },
   },

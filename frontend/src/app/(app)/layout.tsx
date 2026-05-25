@@ -1,5 +1,10 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
+import {
+  Bell, Boxes, ClipboardList, FileSignature, FileText, Factory, FolderOpen,
+  Gauge, KeySquare, LayoutDashboard, PackageCheck, Search, Shield, ShoppingCart,
+  Truck, Users, UsersRound, Zap,
+} from "lucide-react";
 import { LogoutButton } from "./logout-button";
 import { NotifLink } from "./notif-link";
 import { SessionExpiredButton } from "./session-expired-button";
@@ -42,6 +47,12 @@ function hasPerm(user: MeResponse["user"] | null, mod: string, accion: string): 
   return p[`${mod}.${accion}`] === true || p[mod] === true || p.all === true;
 }
 
+function iniciales(nombres: string, apellidos: string): string {
+  const n = (nombres || "").trim().split(/\s+/)[0]?.[0] ?? "";
+  const a = (apellidos || "").trim().split(/\s+/)[0]?.[0] ?? "";
+  return (n + a).toUpperCase() || "·";
+}
+
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await fetchMe();
   const puedeAdminUsuarios = hasPerm(user, "admin", "usuarios");
@@ -50,138 +61,193 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const puedeVerOT = hasPerm(user, "ot", "read");
   const puedeVerCompras = hasPerm(user, "compras", "read");
   const puedeVerProveedores = hasPerm(user, "proveedores", "read") || puedeVerCompras;
-  // Cliente externo: vista simplificada (rol cliente con cliente_id asociado)
   const esCliente = user?.rol_nombre === "cliente" && user.cliente_id !== null;
 
   return (
     <div className="flex min-h-screen">
-      <aside className="w-64 border-r bg-muted/20 p-4">
-        <div className="mb-6">
-          <h1 className="text-xl font-bold">TECHTRAFO</h1>
-          <p className="text-xs text-muted-foreground">
-            {esCliente ? "Portal de seguimiento" : "Panel de gestion"}
-          </p>
+      {/* ═════════════ Sidebar — Voltage OS ═════════════ */}
+      <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-glass bg-glass px-3 py-5 backdrop-blur-xl">
+        {/* Brand */}
+        <div className="mb-4 flex items-center gap-3 border-b border-glass px-2 pb-4">
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-copper to-copper-deep text-white shadow-lg glow-copper inset-highlight-md">
+            <Zap className="h-5 w-5" strokeWidth={2.4} />
+          </div>
+          <div className="leading-tight">
+            <h1 className="font-display text-lg font-semibold tracking-tight">Techtrafo</h1>
+            <p className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-muted-foreground">
+              {esCliente ? "Portal · 0.6" : "Voltage OS · 0.6"}
+            </p>
+          </div>
         </div>
-        <nav className="space-y-1 text-sm">
+
+        {/* Quick search (visual stub — ⌘K hook futuro) */}
+        <div className="relative mb-4">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder={esCliente ? "Buscar..." : "Buscar OT, cliente..."}
+            className="w-full rounded-lg border border-glass bg-glass px-3 py-2 pl-8 pr-10 font-sans text-xs text-foreground placeholder:text-muted-foreground/60 focus:border-glass-strong focus:bg-glass-elev focus:outline-none"
+          />
+          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-glass bg-glass px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">
+            ⌘K
+          </span>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 space-y-4 overflow-y-auto pr-1 scroll-discreet">
           {esCliente ? (
-            <>
-              {/* Vista simplificada para cliente externo */}
-              <Link href="/portal" className="block rounded px-3 py-2 font-medium hover:bg-accent hover:text-accent-foreground">
-                🏠 Mi cuenta
-              </Link>
+            <NavGroup label="Portal">
+              <NavLink href="/portal" icon={<LayoutDashboard className="h-4 w-4" />}>Mi cuenta</NavLink>
               {user && <NotifLink />}
-            </>
+            </NavGroup>
           ) : (
             <>
-              <Link href="/dashboard" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-                Dashboard
-              </Link>
-              <Link href="/clientes" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-                Clientes
-              </Link>
-              {puedeVerExpedientes && (
-                <Link href="/expedientes" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-                  Expedientes
-                </Link>
-              )}
-              {user && <NotifLink />}
-              <Link href="/cotizaciones" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-                Cotizaciones
-              </Link>
-              <Link href="/contratos" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-                Contratos
-              </Link>
-              {puedeVerOT && (
-                <>
-                  <Link href="/ot" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-                    Órdenes de trabajo
-                  </Link>
-                  <Link href="/transformadores" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-                    ⚡ Transformadores
-                  </Link>
-                  <Link href="/garantias" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-                    🛡️ Garantías
-                  </Link>
-                  <Link href="/produccion" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground font-medium">
-                    📊 Dashboard producción
-                  </Link>
-                </>
-              )}
-              <Link href="/inventario" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-                Bodega
-              </Link>
+              <NavGroup label="Operación">
+                <NavLink href="/dashboard" icon={<LayoutDashboard className="h-4 w-4" />}>Inicio</NavLink>
+                {puedeVerOT && (
+                  <NavLink href="/produccion" icon={<Gauge className="h-4 w-4" />}>Dashboard planta</NavLink>
+                )}
+                {puedeVerOT && (
+                  <NavLink href="/ot" icon={<Factory className="h-4 w-4" />}>Órdenes de trabajo</NavLink>
+                )}
+                {puedeVerExpedientes && (
+                  <NavLink href="/expedientes" icon={<FolderOpen className="h-4 w-4" />}>Expedientes</NavLink>
+                )}
+                {puedeVerOT && (
+                  <NavLink href="/transformadores" icon={<Zap className="h-4 w-4" />}>Transformadores</NavLink>
+                )}
+              </NavGroup>
+
+              <NavGroup label="Comercial">
+                <NavLink href="/cotizaciones" icon={<FileText className="h-4 w-4" />}>Cotizaciones</NavLink>
+                <NavLink href="/contratos" icon={<FileSignature className="h-4 w-4" />}>Contratos</NavLink>
+                <NavLink href="/clientes" icon={<Users className="h-4 w-4" />}>Clientes</NavLink>
+              </NavGroup>
+
+              <NavGroup label="Soporte">
+                <NavLink href="/inventario" icon={<Boxes className="h-4 w-4" />}>Bodega</NavLink>
+                {puedeVerOT && (
+                  <NavLink href="/garantias" icon={<Shield className="h-4 w-4" />}>Garantías</NavLink>
+                )}
+                {user && <NotifLink />}
+              </NavGroup>
+
               {puedeVerCompras && (
-                <>
-                  <Link href="/compras" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground font-medium">
-                    🛒 Compras
-                  </Link>
-                  <Link href="/compras/solicitudes" className="block rounded px-3 py-1.5 pl-7 text-xs hover:bg-accent hover:text-accent-foreground">
-                    Solicitudes
-                  </Link>
-                  <Link href="/compras/ordenes-compra" className="block rounded px-3 py-1.5 pl-7 text-xs hover:bg-accent hover:text-accent-foreground">
-                    Órdenes de compra
-                  </Link>
-                  <Link href="/compras/recepciones" className="block rounded px-3 py-1.5 pl-7 text-xs hover:bg-accent hover:text-accent-foreground">
-                    Recepciones
-                  </Link>
-                  <Link href="/admin/proveedores" className="block rounded px-3 py-1.5 pl-7 text-xs hover:bg-accent hover:text-accent-foreground">
-                    Proveedores
-                  </Link>
-                </>
+                <NavGroup label="Compras">
+                  <NavLink href="/compras" icon={<ShoppingCart className="h-4 w-4" />}>Resumen</NavLink>
+                  <NavSubLink href="/compras/solicitudes" icon={<ClipboardList className="h-3 w-3" />}>Solicitudes</NavSubLink>
+                  <NavSubLink href="/compras/ordenes-compra" icon={<FileText className="h-3 w-3" />}>Órdenes de compra</NavSubLink>
+                  <NavSubLink href="/compras/recepciones" icon={<PackageCheck className="h-3 w-3" />}>Recepciones</NavSubLink>
+                  <NavSubLink href="/admin/proveedores" icon={<Truck className="h-3 w-3" />}>Proveedores</NavSubLink>
+                </NavGroup>
               )}
 
-              {(puedeAdminUsuarios || puedeAdminRoles) && (
-                <>
-                  <div className="mt-4 px-3 text-xs font-semibold uppercase text-muted-foreground">Administracion</div>
+              {(puedeAdminUsuarios || puedeAdminRoles || (puedeVerProveedores && !puedeVerCompras)) && (
+                <NavGroup label="Administración">
                   {puedeAdminUsuarios && (
-                    <Link href="/admin/usuarios" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-                      Usuarios
-                    </Link>
+                    <NavLink href="/admin/usuarios" icon={<UsersRound className="h-4 w-4" />}>Usuarios</NavLink>
                   )}
                   {puedeAdminRoles && (
                     <>
-                      <Link href="/admin/roles" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-                        Roles y permisos
-                      </Link>
-                      <Link href="/admin/hito-plantillas" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-                        Hitos del catalogo
-                      </Link>
-                      <Link href="/admin/cotizacion-plantillas" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-                        Plantillas de cotizacion
-                      </Link>
+                      <NavLink href="/admin/roles" icon={<KeySquare className="h-4 w-4" />}>Roles y permisos</NavLink>
+                      <NavLink href="/admin/hito-plantillas" icon={<FolderOpen className="h-4 w-4" />}>Hitos del catálogo</NavLink>
+                      <NavLink href="/admin/cotizacion-plantillas" icon={<FileText className="h-4 w-4" />}>Plantillas cotización</NavLink>
                     </>
                   )}
                   {puedeVerProveedores && !puedeVerCompras && (
-                    <Link href="/admin/proveedores" className="block rounded px-3 py-2 hover:bg-accent hover:text-accent-foreground">
-                      Proveedores
-                    </Link>
+                    <NavLink href="/admin/proveedores" icon={<Truck className="h-4 w-4" />}>Proveedores</NavLink>
                   )}
-                </>
+                </NavGroup>
               )}
             </>
           )}
         </nav>
 
-        {user ? (
-          <div className="mt-8 border-t pt-4">
-            <div className="mb-2 px-3 text-xs">
-              <div className="font-medium truncate">{user.nombres} {user.apellidos}</div>
-              <div className="text-muted-foreground">{user.rol_nombre ?? "sin rol"}</div>
+        {/* User card + system status */}
+        <div className="mt-3 border-t border-glass pt-3">
+          {user ? (
+            <>
+              <div className="flex items-center gap-3 rounded-xl border border-glass bg-glass p-2.5 inset-highlight">
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-ttteal to-ttteal-deep font-display text-xs font-bold text-background inset-highlight-md">
+                  {iniciales(user.nombres, user.apellidos)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium">{user.nombres} {user.apellidos}</p>
+                  <p className="truncate font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                    {user.rol_nombre ?? "sin rol"}{user.es_super_admin ? " · ★" : ""}
+                  </p>
+                </div>
+                <Link
+                  href="/perfil"
+                  className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-glass-hover hover:text-foreground"
+                  aria-label="Mi perfil"
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </Link>
+              </div>
+              <div className="mt-3 flex items-center justify-between px-2">
+                <span className="flex items-center gap-2 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                  <span className="led-green" /> Sistema · 99.8%
+                </span>
+                <LogoutButton />
+              </div>
+            </>
+          ) : (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.06] p-3 inset-highlight">
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <Bell className="h-3.5 w-3.5 text-amber-400" />
+                <p className="text-xs font-semibold text-amber-200">Sin sesión activa</p>
+              </div>
+              <p className="mb-2.5 text-[11px] leading-snug text-amber-200/80">
+                Tu cookie expiró. Volvé a iniciar sesión.
+              </p>
+              <SessionExpiredButton />
             </div>
-            <Link href="/perfil" className="mb-1 block rounded px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground">
-              Mi perfil
-            </Link>
-            <LogoutButton />
-          </div>
-        ) : (
-          <div className="mt-8 rounded border border-yellow-500/40 bg-yellow-50/60 p-3 text-xs">
-            <p className="mb-2 font-semibold text-yellow-800">Sin sesión activa</p>
-            <p className="mb-2 text-yellow-700">Tu cookie expiró. Volvé a iniciar sesión.</p>
-            <SessionExpiredButton />
-          </div>
-        )}
+          )}
+        </div>
       </aside>
-      <main className="flex-1 p-8">{children}</main>
+
+      {/* ═════════════ Main ═════════════ */}
+      <main className="flex-1 overflow-x-hidden p-8">{children}</main>
     </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Sidebar helpers
+// ═══════════════════════════════════════════════════════════════
+
+function NavGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="mb-1 px-3 font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground/60">
+        {label}
+      </p>
+      <div className="space-y-px">{children}</div>
+    </div>
+  );
+}
+
+function NavLink({ href, icon, children }: { href: string; icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="group flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-glass hover:text-foreground"
+    >
+      <span className="text-muted-foreground/70 transition-colors group-hover:text-copper">{icon}</span>
+      <span className="flex-1">{children}</span>
+    </Link>
+  );
+}
+
+function NavSubLink({ href, icon, children }: { href: string; icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="group flex items-center gap-2 rounded-lg px-3 py-1.5 pl-9 text-[11.5px] text-muted-foreground/80 transition-colors hover:bg-glass hover:text-foreground"
+    >
+      <span className="text-muted-foreground/50">{icon}</span>
+      <span className="flex-1">{children}</span>
+    </Link>
   );
 }
