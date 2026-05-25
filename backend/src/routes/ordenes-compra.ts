@@ -467,7 +467,7 @@ router.post("/:id/aprobar", requirePermission("compras", "read"), async (req, re
         where: { id: BigInt(id) },
         data: {
           estado: "aprobada",
-          aprobador_id: req.user!.id,
+          usuarios_ordenes_compra_aprobador_idTousuarios: { connect: { id: req.user!.id } },
           fecha_aprobacion: new Date(),
           motivo_rechazo: null,
           usuarios_ordenes_compra_actualizado_porTousuarios: { connect: { id: req.user!.id } },
@@ -519,7 +519,7 @@ router.post("/:id/rechazar", requirePermission("compras", "read"), async (req, r
         data: {
           estado: "rechazada",
           motivo_rechazo: motivo.data,
-          aprobador_id: req.user!.id,
+          usuarios_ordenes_compra_aprobador_idTousuarios: { connect: { id: req.user!.id } },
           fecha_aprobacion: new Date(),
           usuarios_ordenes_compra_actualizado_porTousuarios: { connect: { id: req.user!.id } },
         },
