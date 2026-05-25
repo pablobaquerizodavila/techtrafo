@@ -246,11 +246,11 @@ export function PlantillaForm({ initial, onSubmit, onCancel }: Props) {
               <TableHead className="w-40">Categoría</TableHead>
               <TableHead>Descripción</TableHead>
               <TableHead className="w-32">Código bodega</TableHead>
-              <TableHead className="w-20">Cant.</TableHead>
+              <TableHead className="w-28">Cant.</TableHead>
               <TableHead className="w-20">Unid.</TableHead>
               <TableHead className="w-28">Precio U.</TableHead>
               <TableHead className="w-28">Costo U.</TableHead>
-              <TableHead className="w-20">Días apro.</TableHead>
+              <TableHead className="w-24">Días apro.</TableHead>
               <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
