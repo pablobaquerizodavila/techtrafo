@@ -157,7 +157,7 @@ router.get("/:id", requirePermission("ot", "read"), async (req, res) => {
       historial_stats: {
         total_intervenciones: totalOT,
         completadas,
-        en_curso,
+        en_curso: enCurso,
         ultima_intervencion: ultimaIntervencion,
       },
     },
