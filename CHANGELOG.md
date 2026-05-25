@@ -6,6 +6,55 @@ El formato sigue Keep a Changelog y este proyecto adhiere a Semantic Versioning.
 
 ---
 
+## [0.16.1] — 2026-05-25 — chore(tooling): script automatizado de backup al NAS
+
+Automatiza el workflow de snapshot al NAS que veniamos haciendo a mano
+despues de cada commit + push.
+
+Nuevo en `scripts/`:
+
+- `scripts/tt-backup.sh` — script bash que genera un snapshot zip del
+  estado de HEAD via `git archive`, lo deposita en `\\NAS1821\...\
+  tech-trafo-commit-backup\code\` y refresca README.md + CHANGELOG.md
+  en el raiz del backup. Auto-detecta version del primer encabezado
+  `## [X.Y.Z]` del CHANGELOG y auto-detecta label slug-eando el
+  subject del ultimo commit (le quita el prefijo `type(scope):` y
+  lo convierte a kebab-case ASCII).
+
+- `scripts/README.md` — documentacion: pre-requisitos, uso, salida,
+  errores comunes y workflow tipico.
+
+Validaciones del script:
+
+- Verifica que sea un repositorio git valido
+- Verifica branch (`main` por default, con override interactivo)
+- Verifica working tree limpio
+- Verifica sync con `origin/main` (fetch + comparar SHAs)
+- Verifica acceso al NAS via SMB
+- Falla rapido (`set -euo pipefail`) si algo no cumple
+
+Uso:
+
+```bash
+# Auto-detecta label del commit msg
+./scripts/tt-backup.sh
+
+# Con label explicito (recomendado para hitos)
+./scripts/tt-backup.sh voltage-os-ola-3c
+```
+
+Salida en NAS:
+
+```
+tech-trafo-v0.16.1-chore-tooling-script-automatizado-<sha>-<ts>.zip
+```
+
+A partir de ahora cada commit + push hecho con asistente IA invocara
+el script automaticamente. Para uso manual: invocar desde la raiz
+del repo despues de cualquier `git push` exitoso.
+
+---
+
 ## [0.16.0] — 2026-05-25 — Voltage OS Ola 3C: cierre del rebrand
 
 Ultima ola del rebrand. Migra al lenguaje Voltage OS las paginas que
