@@ -108,28 +108,48 @@ function pintarCabecera(doc: InstanceType<typeof PDFDocument>, meta: PdfMeta): v
      .text(meta.fecha.toLocaleDateString("es-EC"), w - 250, 56, { width: 200, align: "right" });
 
   doc.restore();
-  // Reset cursor debajo de la cabecera
-  doc.y = 110;
 
-  // Pintar pie al final de la pagina (numeracion la hace el caller en pageAdded final si quiere)
+  // Pintar pie ANTES de resetear el cursor. El footer usa coordenadas absolutas
+  // (h-28) pero PDFKit mueve doc.y al terminar text(), dejandolo cerca del bottom.
+  // Si reseteamos doc.y a 110 ANTES del pie, el pie lo vuelve a llevar al bottom,
+  // y la siguiente vez que el wrapper de texto agrega una pagina, queda en loop
+  // infinito (Maximum call stack size exceeded). Hay que pintarlo primero y
+  // resetear despues.
   pintarPie(doc, meta);
+
+  // Reset cursor debajo de la cabecera (para el cuerpo)
+  doc.y = 110;
 }
 
 function pintarPie(doc: InstanceType<typeof PDFDocument>, meta: PdfMeta): void {
   const w = doc.page.width;
   const h = doc.page.height;
+
+  // BUG SUTIL: text() en y = h - 28 cae DEBAJO del bottom margin (h - 80).
+  // PDFKit interpreta esto como overflow y dispara addPage internamente. Si esta
+  // funcion se llama desde el listener pageAdded (lo que hacemos en cada pagina),
+  // el ciclo addPage -> listener -> footer text -> overflow -> addPage es infinito
+  // y produce "Maximum call stack size exceeded".
+  // Workaround: bajar temporalmente el bottom margin a casi 0 mientras pintamos
+  // el footer, y restaurarlo despues. Asi y = h - 28 queda DENTRO del area de
+  // contenido y no dispara pagination.
+  const origBottom = doc.page.margins.bottom;
+  doc.page.margins.bottom = 5;
+
   doc.save();
   doc.rect(0, h - 40, w, 40).fill(COLORS.bgSoft);
   doc.fillColor(COLORS.muted).font("Helvetica").fontSize(7)
      .text(
        `TECHTRAFO  ·  Documento generado automáticamente — nivel ${meta.nivel}  ·  ${meta.fecha.toLocaleString("es-EC")}`,
-       50, h - 28, { width: w - 100, align: "center" },
+       50, h - 28, { width: w - 100, align: "center", lineBreak: false },
      );
   if (meta.nivel >= 3) {
     doc.fillColor(COLORS.warning).fontSize(7)
-       .text("CONFIDENCIAL — Solo uso interno", 50, h - 18, { width: w - 100, align: "center" });
+       .text("CONFIDENCIAL — Solo uso interno", 50, h - 18, { width: w - 100, align: "center", lineBreak: false });
   }
   doc.restore();
+
+  doc.page.margins.bottom = origBottom;
 }
 
 // ===================================================================
