@@ -78,3 +78,24 @@ export async function updateCliente(id: number, payload: ClienteInput): Promise<
 export async function archiveCliente(id: number): Promise<void> {
   await api.delete(`/api/clientes/${id}`);
 }
+
+/**
+ * Hard delete (eliminacion permanente). Solo se puede usar si el cliente
+ * NO tiene cotizaciones, expedientes, contratos, transformadores,
+ * garantias ni usuarios del portal asociados.
+ *
+ * Si tiene historial el backend devuelve 409 con cuerpo:
+ *   { error: "cliente_con_historial", message, dependencias: {...} }
+ */
+export async function deleteClientePermanente(id: number): Promise<void> {
+  await api.delete(`/api/clientes/${id}/permanente`);
+}
+
+export interface ClienteDependencias {
+  cotizaciones: number;
+  expedientes: number;
+  contratos: number;
+  transformadores: number;
+  garantias: number;
+  usuarios_portal: number;
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Search, Pencil, Archive, Users } from "lucide-react";
+import { Plus, Search, Pencil, Archive, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -32,15 +32,18 @@ import { PageHeader, HeaderActionPrimary } from "@/components/page-header";
 import { Panel } from "@/components/panel";
 import {
   Cliente,
+  ClienteDependencias,
   EstadoCliente,
   Segmento,
   Sector,
   archiveCliente,
   createCliente,
+  deleteClientePermanente,
   listClientes,
   updateCliente,
 } from "@/lib/clientes";
 import { ApiError } from "@/lib/api";
+import { AuthUser, getCurrentUser, hasPermission } from "@/lib/auth";
 import { ClienteForm } from "./cliente-form";
 
 const PAGE_LIMIT = 25;
@@ -59,6 +62,10 @@ export default function ClientesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<DialogMode>({ kind: "closed" });
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => { getCurrentUser().then(setUser); }, []);
+  const canDelete = hasPermission(user, "clientes", "delete");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -120,14 +127,60 @@ export default function ClientesPage() {
   }
 
   async function handleArchive(cliente: Cliente) {
-    const ok = window.confirm(`¿Archivar el cliente "${cliente.razon_social}"?`);
+    const ok = window.confirm(
+      `¿Archivar el cliente "${cliente.razon_social}"?\n\n` +
+      `El cliente queda oculto en el listado activo pero se conserva ` +
+      `toda su historia (cotizaciones, expedientes, etc.). Podés restaurarlo ` +
+      `cambiando el filtro a "Archivado" y editando su estado.`,
+    );
     if (!ok) return;
     try {
       await archiveCliente(cliente.id);
       toast.success("Cliente archivado");
       load();
-    } catch {
-      toast.error("Error archivando cliente");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) {
+        toast.error("No tenés permisos para archivar clientes");
+      } else {
+        toast.error("Error archivando cliente");
+      }
+    }
+  }
+
+  async function handleDeletePermanente(cliente: Cliente) {
+    const ok = window.confirm(
+      `⚠️ ELIMINAR PERMANENTEMENTE a "${cliente.razon_social}"?\n\n` +
+      `Esta acción NO se puede deshacer. El cliente y sus contactos se borran ` +
+      `del sistema. Solo funciona si el cliente NO tiene cotizaciones, ` +
+      `expedientes, contratos, transformadores, garantías ni usuarios del portal ` +
+      `asociados. Si tiene historial, te va a sugerir archivarlo en su lugar.`,
+    );
+    if (!ok) return;
+    try {
+      await deleteClientePermanente(cliente.id);
+      toast.success(`Cliente "${cliente.razon_social}" eliminado permanentemente`);
+      load();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status === 403) {
+          toast.error("No tenés permisos para eliminar clientes");
+          return;
+        }
+        if (err.status === 409) {
+          const body = err.body as { dependencias?: ClienteDependencias; message?: string };
+          const d = body?.dependencias;
+          const detalle = d ? Object.entries(d)
+            .filter(([, v]) => v > 0)
+            .map(([k, v]) => `${v} ${k.replace("_", " ")}`)
+            .join(" · ") : "";
+          toast.error(
+            body?.message ?? "No se puede eliminar",
+            { description: detalle ? `Tiene: ${detalle}` : undefined, duration: 8000 },
+          );
+          return;
+        }
+      }
+      toast.error("Error eliminando cliente");
     }
   }
 
@@ -237,15 +290,28 @@ export default function ClientesPage() {
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      {c.estado !== "archivado" && (
+                      {canDelete && c.estado !== "archivado" && (
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleArchive(c)}
                           aria-label={`Archivar ${c.razon_social}`}
+                          title="Archivar (soft delete · se puede revertir)"
                           className="text-muted-foreground hover:bg-glass-elev hover:text-amber-400"
                         >
                           <Archive className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeletePermanente(c)}
+                          aria-label={`Eliminar permanentemente ${c.razon_social}`}
+                          title="Eliminar permanentemente (solo si no tiene historial)"
+                          className="text-muted-foreground hover:bg-rose-500/10 hover:text-rose-400"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       )}
                     </TableCell>

@@ -236,6 +236,74 @@ router.delete("/:id", requirePermission("clientes", "delete"), async (req, res) 
 });
 
 // -------------------------------------------------------------------
+// DELETE /api/clientes/:id/permanente  -  hard delete
+//
+// Solo permitido si el cliente NO tiene historial asociado:
+//   - cotizaciones, expedientes, contratos, ordenes_trabajo,
+//     transformadores, garantias, ni usuarios con cliente_id apuntando.
+// Si hay >=1 → 409 con detalle de cuantos en cada modulo, para que el
+// frontend muestre el motivo y sugiera archivar en su lugar.
+//
+// cliente_contactos se borra por CASCADE.
+// Requiere permiso clientes.delete (lo tienen super_admin y los roles
+// con all:true: presidencia, gerencia_general, gerencia_comercial).
+// -------------------------------------------------------------------
+router.delete("/:id/permanente", requirePermission("clientes", "delete"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  const userId = req.user!.id;
+
+  try {
+    const cliente = await prisma.clientes.findUnique({ where: { id } });
+    if (!cliente) {
+      res.status(404).json({ error: "not_found" });
+      return;
+    }
+
+    // Contar dependencias en paralelo
+    const [
+      cotizaciones, expedientes, contratos, transformadores,
+      garantias, usuarios,
+    ] = await Promise.all([
+      prisma.cotizaciones.count({ where: { cliente_id: id } }),
+      prisma.expedientes.count({ where: { cliente_id: id } }),
+      prisma.contratos.count({ where: { cliente_id: id } }),
+      prisma.transformadores.count({ where: { cliente_id: id } }),
+      prisma.garantias.count({ where: { cliente_id: id } }),
+      prisma.usuarios.count({ where: { cliente_id: id } }),
+    ]);
+
+    const total = cotizaciones + expedientes + contratos + transformadores + garantias + usuarios;
+    if (total > 0) {
+      res.status(409).json({
+        error: "cliente_con_historial",
+        message: "El cliente tiene registros asociados y no puede eliminarse permanentemente. Usá 'Archivar' en su lugar.",
+        dependencias: {
+          cotizaciones, expedientes, contratos, transformadores,
+          garantias, usuarios_portal: usuarios,
+        },
+      });
+      return;
+    }
+
+    // Sin dependencias: borrar (cliente_contactos cascade)
+    await withAppUser(userId, (tx) =>
+      tx.clientes.delete({ where: { id } }),
+    );
+    res.status(204).end();
+  } catch (err) {
+    if (isNotFound(err)) {
+      res.status(404).json({ error: "not_found" });
+      return;
+    }
+    throw err;
+  }
+});
+
+// -------------------------------------------------------------------
 // Helpers de error
 // -------------------------------------------------------------------
 function isUniqueViolation(err: unknown): boolean {
