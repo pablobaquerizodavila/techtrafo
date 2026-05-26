@@ -299,6 +299,16 @@ techtrafo/
 - **Synology MailPlus**: tiene 4 capas de control (active_member_table, local_recipient_map, login_map, alias.db). Crear cuentas nuevas necesita la UI de DSM. Reusar las existentes.
 - **PDFKit con listener `pageAdded`**: si el listener pinta texto a coordenadas absolutas debajo del bottom margin (ej. footer en y=h-28 con margin.bottom=80), el text wrapper interpreta eso como overflow y dispara otro `addPage`, generando recursión infinita. Solución: bajar temporalmente `doc.page.margins.bottom` durante el render del footer.
 - **Prisma UpdateInput** rechaza FK escalar cuando hay múltiples FKs al mismo modelo destino. Usar relación nombrada (`usuarios_<tabla>_<campo>Tousuarios: { connect: {...} }`).
+- **NUNCA usar `TRUNCATE ... CASCADE` en tablas raíz como `comercial.clientes` o `core.usuarios`**: las FKs `creado_por`/`actualizado_por` de la mayoría de las tablas a `core.usuarios` están con `ON DELETE CASCADE`, así que un TRUNCATE cascadea por toda la cadena y vacía el DB completo (items, ubicaciones, plantillas, hitos, roles, proveedores, todo). Para wipes acotados usar `DELETE FROM` en orden topológico — DELETE respeta los `ON DELETE` específicos sin propagar de más. Patrón seguro:
+  ```sql
+  BEGIN;
+    DELETE FROM core.usuarios WHERE cliente_id IS NOT NULL;
+    DELETE FROM produccion.transformadores;
+    DELETE FROM comercial.clientes;
+    ALTER SEQUENCE comercial.clientes_id_seq RESTART WITH 1;
+  COMMIT;
+  ```
+  Quemado en sesión 2026-05-26: TRUNCATE clientes CASCADE vació todo el DB, hubo que restaurar desde backup pre-wipe.
 
 ## 10. Cómo arrancar la nueva sesión
 
