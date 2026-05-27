@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { SessionExpiredButton } from "../session-expired-button";
 import { LiveTime, LiveDate } from "@/components/live-datetime";
+import { SystemHealthCard } from "@/components/system-health-card";
 
 interface AuthMeResponse {
   user: {
@@ -367,21 +368,7 @@ export default async function DashboardPage() {
             </ul>
           </Panel>
 
-          <Panel
-            title="Estado del sistema"
-            subtitle="Servicios operativos"
-            icon={<Activity className="h-3.5 w-3.5" />}
-          >
-            <ul className="space-y-1.5">
-              <SysStatus label="API · panel.techtrafo" ok />
-              <SysStatus label="Base de datos PostgreSQL" ok />
-              <SysStatus label="Notificaciones email" ok />
-              <SysStatus label="Cron hitos estancados" ok />
-            </ul>
-            <p className="mt-4 border-t border-glass pt-3 font-mono text-[10px] text-muted-foreground/70">
-              Sesión: <span className="text-foreground/80">{user.email}</span>
-            </p>
-          </Panel>
+          <SystemHealthCard />
         </section>
       </div>
     </div>
