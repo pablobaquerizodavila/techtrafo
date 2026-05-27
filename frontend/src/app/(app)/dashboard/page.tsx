@@ -3,13 +3,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   Activity, AlertOctagon, AlertTriangle, ArrowUpRight, Bell, BellRing,
-  Boxes, CheckCircle2, Clock, FileSignature, FileText,
+  Boxes, CheckCircle2, FileSignature, FileText,
   Factory, Flag, FolderOpen, Gauge, LayoutDashboard, Plus, Shield, Sparkles,
   Truck, Users, Zap,
 } from "lucide-react";
 import { SessionExpiredButton } from "../session-expired-button";
 import { LiveTime, LiveDate } from "@/components/live-datetime";
 import { SystemHealthCard } from "@/components/system-health-card";
+import { RecentActivityCard } from "@/components/recent-activity-card";
 
 interface AuthMeResponse {
   user: {
@@ -356,24 +357,9 @@ export default async function DashboardPage() {
           </div>
         </Panel>
 
-        {/* ───── Roadmap + Estado sistema ───── */}
+        {/* ───── Actividad reciente + Estado sistema ───── */}
         <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <Panel
-            title="Roadmap del proyecto"
-            subtitle="Progreso de las fases del producto"
-            icon={<Activity className="h-3.5 w-3.5" />}
-            className="lg:col-span-2"
-          >
-            <ul className="space-y-2">
-              <RoadmapItem state="done"     label="FASE 4.A–4.D — expedientes, OT, notificaciones email vía Synology" />
-              <RoadmapItem state="done"     label="FASE 4.5 — Órdenes de trabajo con pipeline de pasos y gates" />
-              <RoadmapItem state="done"     label="Dashboard producción ejecutivo — disponible en /produccion" />
-              <RoadmapItem state="done"     label="Voltage OS — identidad visual del panel" />
-              <RoadmapItem state="upcoming" label="Migration 012 — transformadores como entidad (capacidad/tipo/serie)" />
-              <RoadmapItem state="upcoming" label="Migration 013 — áreas, causas de demora, tiempos de trabajo" />
-              <RoadmapItem state="upcoming" label="Vista cliente externa (portal.techtrafo.com en FASE 5)" />
-            </ul>
-          </Panel>
+          <RecentActivityCard className="lg:col-span-2" />
 
           <SystemHealthCard />
         </section>
@@ -498,29 +484,3 @@ function ModuloTile({ href, titulo, descripcion, icono, chip }: ModuloCard) {
   );
 }
 
-function RoadmapItem({ state, label }: { state: "done" | "upcoming"; label: string }) {
-  const cfg = state === "done"
-    ? { icon: <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />, badge: "border-green-500/30 bg-green-500/10 text-green-300", labelTxt: "Hecho",  text: "text-foreground/90" }
-    : { icon: <Clock className="h-3.5 w-3.5 text-muted-foreground" />, badge: "border-glass bg-glass text-muted-foreground",        labelTxt: "Próximo", text: "text-muted-foreground" };
-  return (
-    <li className="flex items-center gap-3 rounded-lg border border-glass bg-glass px-3 py-2">
-      {cfg.icon}
-      <span className={`flex-1 text-xs ${cfg.text}`}>{label}</span>
-      <span className={`rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider ${cfg.badge}`}>
-        {cfg.labelTxt}
-      </span>
-    </li>
-  );
-}
-
-function SysStatus({ label, ok }: { label: string; ok: boolean }) {
-  return (
-    <li className="flex items-center justify-between rounded-lg border border-glass bg-glass px-3 py-2">
-      <span className="text-xs text-foreground/85">{label}</span>
-      <span className={`inline-flex items-center gap-1.5 font-mono text-[10px] font-medium ${ok ? "text-green-400" : "text-rose-400"}`}>
-        {ok && <span className="led-green" />}
-        {ok ? "Operativo" : "Caído"}
-      </span>
-    </li>
-  );
-}
