@@ -49,7 +49,14 @@ function hasPerm(user: AuthMeResponse["user"] | null, mod: string, accion: strin
 }
 
 function saludo(): string {
-  const h = new Date().getHours();
+  // Server Component: el contenedor corre en UTC. Forzamos la hora de Ecuador
+  // (America/Guayaquil, UTC-5 sin DST) para que el saludo siempre coincida
+  // con la hora local del usuario.
+  const h = Number(new Intl.DateTimeFormat("es-EC", {
+    hour: "numeric",
+    hour12: false,
+    timeZone: "America/Guayaquil",
+  }).format(new Date()));
   if (h < 12) return "Buenos días";
   if (h < 19) return "Buenas tardes";
   return "Buenas noches";
