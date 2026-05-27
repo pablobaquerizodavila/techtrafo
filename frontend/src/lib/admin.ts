@@ -78,6 +78,15 @@ export async function resetPasswordUsuarioAdmin(id: string, new_password: string
   return api.post(`/api/admin/usuarios/${id}/password`, { new_password });
 }
 
+/**
+ * Hard delete de usuario. Solo super_admin. Falla con 409 si el usuario
+ * tiene cualquier registro asociado (creó cotizaciones, OTs, expedientes,
+ * etc.); en ese caso se recomienda usar updateUsuarioAdmin({ activo: false }).
+ */
+export async function deleteUsuarioPermanente(id: string): Promise<void> {
+  await api.delete(`/api/admin/usuarios/${id}`);
+}
+
 // ---------- Hito plantillas (catalogo maestro) ----------
 export interface HitoPlantilla {
   id: number;

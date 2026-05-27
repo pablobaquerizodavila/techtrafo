@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Search, CheckCircle2, XCircle, UserX, UserCheck, Pencil, KeyRound, Users } from "lucide-react";
+import { Search, CheckCircle2, XCircle, UserX, UserCheck, Pencil, KeyRound, Users, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +37,7 @@ import {
   RolAdmin,
   UsuarioAdmin,
   aprobarUsuario,
+  deleteUsuarioPermanente,
   estadoAprobVariant,
   listRolesAdmin,
   listUsuariosAdmin,
@@ -45,6 +46,7 @@ import {
   updateUsuarioAdmin,
 } from "@/lib/admin";
 import { ApiError } from "@/lib/api";
+import { AuthUser, getCurrentUser } from "@/lib/auth";
 
 const PAGE_LIMIT = 25;
 
@@ -80,9 +82,11 @@ export default function UsuariosAdminPage() {
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
+  const [me, setMe] = useState<AuthUser | null>(null);
 
   useEffect(() => {
     listRolesAdmin().then((r) => setRoles(r.data.filter((x) => x.activo))).catch(() => {});
+    getCurrentUser().then(setMe).catch(() => {});
   }, []);
 
   const load = useCallback(async () => {
@@ -143,6 +147,34 @@ export default function UsuariosAdminPage() {
     } catch (err) {
       const e = err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error";
       toast.error(e);
+    }
+  }
+
+  async function handleDeletePermanente(u: UsuarioAdmin) {
+    const ok = window.confirm(
+      `⚠️ ELIMINAR PERMANENTEMENTE a ${u.email}?\n\n` +
+      `Esta acción NO se puede deshacer. El usuario se borra del sistema.\n` +
+      `Solo funciona si el usuario NO creó cotizaciones, expedientes, OTs, ` +
+      `recepciones, etc. Si tiene historial, te va a sugerir Desactivar en su lugar.`,
+    );
+    if (!ok) return;
+    try {
+      await deleteUsuarioPermanente(u.id);
+      toast.success(`Usuario ${u.email} eliminado permanentemente`);
+      load();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const body = err.body as { error?: string; message?: string };
+        if (err.status === 409 && body?.message) {
+          toast.error(body.message, { duration: 8000 });
+          return;
+        }
+        if (err.status === 403) {
+          toast.error("Solo super_admin puede eliminar usuarios permanentemente");
+          return;
+        }
+      }
+      toast.error("Error eliminando usuario");
     }
   }
 
@@ -335,10 +367,17 @@ export default function UsuariosAdminPage() {
                               className="rounded-md p-1.5 text-muted-foreground hover:bg-glass-elev hover:text-copper">
                               <KeyRound className="h-3.5 w-3.5" />
                             </button>
-                            <button type="button" onClick={() => toggleActivo(u)} title={u.activo ? "Desactivar" : "Activar"}
+                            <button type="button" onClick={() => toggleActivo(u)} title={u.activo ? "Desactivar (bloquea acceso, conserva historial)" : "Reactivar acceso"}
                               className="rounded-md p-1.5 text-muted-foreground hover:bg-glass-elev hover:text-copper">
                               {u.activo ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
                             </button>
+                            {me?.es_super_admin && me.id !== u.id && (
+                              <button type="button" onClick={() => handleDeletePermanente(u)}
+                                title="Eliminar permanentemente (solo si no tiene historial)"
+                                className="rounded-md p-1.5 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-400">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                           </div>
                         )}
                       </TableCell>

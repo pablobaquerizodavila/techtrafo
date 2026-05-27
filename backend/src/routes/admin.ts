@@ -369,6 +369,78 @@ router.post("/usuarios/:id/password", requirePermission("admin", "usuarios"), as
   res.json({ status: "password_reset" });
 });
 
+// -------------------------------------------------------------------
+// DELETE /api/admin/usuarios/:id  -  hard delete
+//
+// Solo super_admin. Safeguards:
+//   - No se puede borrar a si mismo (evita lockout accidental)
+//   - No se puede borrar el ultimo super_admin activo (evita brickear)
+//   - Si el usuario tiene historial (cotizaciones, OTs, expedientes, etc),
+//     el FK con ON DELETE NO ACTION hace fallar el DELETE -> 409 con la
+//     tabla que bloqueo. El frontend sugiere usar Desactivar.
+// -------------------------------------------------------------------
+router.delete("/usuarios/:id", requireSuperAdmin, async (req, res) => {
+  const targetId = req.params.id;
+  if (typeof targetId !== "string" || targetId.length < 10) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+
+  // Safeguard 1: no borrarse a si mismo
+  if (targetId === req.user!.id) {
+    res.status(409).json({ error: "no_self_delete", message: "No podés eliminar tu propio usuario." });
+    return;
+  }
+
+  const target = await prisma.usuarios.findUnique({
+    where: { id: targetId },
+    include: { roles: { select: { id: true, nombre: true, es_super_admin: true } } },
+  });
+  if (!target) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+
+  // Safeguard 2: si el target es super_admin activo, validar que no sea el ultimo
+  if (target.roles?.es_super_admin === true && target.activo === true) {
+    const otrosSuperAdminActivos = await prisma.usuarios.count({
+      where: {
+        id: { not: targetId },
+        activo: true,
+        estado_aprobacion: "aprobado",
+        roles: { es_super_admin: true },
+      },
+    });
+    if (otrosSuperAdminActivos === 0) {
+      res.status(409).json({
+        error: "ultimo_super_admin",
+        message: "No se puede eliminar el último super_admin activo del sistema.",
+      });
+      return;
+    }
+  }
+
+  try {
+    await prisma.usuarios.delete({ where: { id: targetId } });
+    res.status(204).end();
+  } catch (err) {
+    // 23503 = foreign_key_violation. El usuario tiene historial en alguna tabla
+    // con ON DELETE NO ACTION (casi todas: cotizaciones, OT, expedientes, etc).
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2003") {
+      const meta = (err.meta ?? {}) as { field_name?: string; modelName?: string; constraint?: string };
+      res.status(409).json({
+        error: "usuario_con_historial",
+        message:
+          "El usuario tiene registros asociados (creó cotizaciones, OTs, expedientes u otros). " +
+          "Usá 'Desactivar' para bloquear su acceso conservando el historial.",
+        constraint: meta.constraint ?? meta.field_name ?? null,
+      });
+      return;
+    }
+    throw err;
+  }
+});
+
 // ===================================================================
 // ROLES
 // ===================================================================
