@@ -194,7 +194,7 @@ export default async function DashboardPage() {
               <span className="bg-gradient-to-b from-foreground to-foreground/60 bg-clip-text text-transparent">
                 {saludo()},{" "}
               </span>
-              <span className="bg-gradient-to-br from-copper to-copper-soft bg-clip-text italic text-transparent">
+              <span className="italic text-orange-400 drop-shadow-[0_0_12px_rgba(251,146,60,0.35)]">
                 {user.nombres.split(" ")[0]}
               </span>
             </h1>
