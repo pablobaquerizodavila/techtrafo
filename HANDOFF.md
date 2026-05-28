@@ -39,35 +39,106 @@
   - Iterar campos del form de visita técnica e informe técnico con data real
 - **Repo**: https://github.com/pablobaquerizodavila/techtrafo (branch `main`)
 
-## 2. Topología real (no la del CLAUDE.md genérico)
+## 2. Topología real (actualizada 2026-05-27 tras cambio de NAS)
+
+> ⚠️ **CAMBIO HISTÓRICO 2026-05-27**: se cambió el NAS Synology. Los discos fueron reutilizados (data intacta) pero las configs de DSM se perdieron, incluida la **VM nginx `192.168.0.7`** que vivía en VMM del NAS viejo y servía de reverse proxy + Netvoice. Se reconstruyó la infra moviendo el reverse proxy + sitios web a la PC `192.168.0.23` como containers Docker. Las VMs de Netvoice (`eneural.org`, `panel.eneural.org`, SIP) **se perdieron también** y quedan pendientes de reconstruir aparte.
+
+### Red física — DOS routers en serie
 
 ```
-Internet (186.101.238.135)
-  └─ NAT 80/443 → VM nginx 192.168.0.7 (Ubuntu 22.04 + Let's Encrypt)
-      ├─ techtrafo.com / www       → NAS Web Station :80 (landing)
-      ├─ panel.techtrafo.com       → PC Ubuntu :3002 (frontend Next.js, panel interno)
-      ├─ portal.techtrafo.com      → PC Ubuntu :3002 (mismo container, middleware reescribe a /portal/*)
-      └─ api.techtrafo.com         → PC Ubuntu :3000 (backend Express)
+Internet · ISP CNT
+       │
+       ▼
+ONT Huawei EG8145V5
+  Admin: http://192.168.100.1    ← acceso solo desde LAN .100/24
+  WAN: IP pública 186.101.238.135
+  LAN: 192.168.100.0/24
+  Forward → 192.168.100.89 (el TP-Link)
+       │
+       ▼
+Router TP-Link AX6600 Wi-Fi 6   ← ROUTER REAL DE LA RED
+  Admin: http://192.168.0.1      ← acá viven las reglas de Port Forwarding
+  WAN: 192.168.100.89 (del Huawei)
+  LAN: 192.168.0.0/24
+  Gateway interno: 192.168.0.1
+```
 
-  El cert SAN /etc/letsencrypt/live/panel.techtrafo.com/ cubre los 3 subdomains
-  (panel + api + portal). Renovación automática vía certbot timer.
+### Port Forwarding del TP-Link (estado actual)
 
-NAS Synology DS1821+ 192.168.0.116 (DSM 7.3.2)
-  ├─ Web Station: techtrafo.com (landing comercial estática)
-  └─ MailPlus Server: SMTP submission 465/587 con DKIM en eneural.org, medicvip.org, siscormed.com
-      Y ADEMÁS techtrafo.com (agregado en v0.12.0 con DKIM rspamd manual).
-      Cuenta operativa actual: notificaciones@techtrafo.com (alias techtrafonotif).
+| Service Name | Puerto ext | Destino LAN | Estado |
+|---|---|---|---|
+| Web-HTTP (ex MedicVIP-HTTP) | 80 | `192.168.0.23` | ✅ OK (era .7 caída) |
+| Web-HTTPS (ex MedicVIP-HTTPS) | 443 | `192.168.0.23` | ✅ OK |
+| MailPlus-SMTP | 25 | `192.168.0.116` (NAS) | ✅ OK |
+| MailPlus-IMAP | 993 | `192.168.0.116` | ✅ OK |
+| MailPlus-STARTTLS | 587 | `192.168.0.116` | ✅ OK |
+| MailPlus-SMTPS | 465 | `192.168.0.116` | ✅ OK |
+| Netvoice-SIP | 5060/UDP | `192.168.0.10` | ❌ apunta a host caído (Netvoice pendiente) |
+| Netvoice-HTTP | 8080→80 | `192.168.0.7` | ❌ apunta a VM caída |
+| Netvoice-HTTPS | 8443 | `192.168.0.7` | ❌ apunta a VM caída |
 
-PC Ubuntu 192.168.0.23 (Docker Compose stack)
-  ├─ techtrafo-api        Express+TS+Prisma  :3000  (workers: notificaciones + scada-bridge in-process)
+### Servicios públicos
+
+```
+Internet → Router TP-Link → PC Ubuntu 192.168.0.23
+                              └─ web-nginx (puerto 80+443, SSL Let's Encrypt)
+                                  ├─ techtrafo.com / www → /home/techtrafo/sites/techtrafo
+                                  ├─ medicvip.org / www  → /home/techtrafo/sites/medicvip (PHP 8.2)
+                                  ├─ siscormed.com / www → /home/techtrafo/sites/siscormed (HTML + PHP /api)
+                                  ├─ panel.techtrafo.com  → proxy techtrafo-web:3002
+                                  ├─ api.techtrafo.com    → proxy techtrafo-api:3000
+                                  └─ portal.techtrafo.com → proxy techtrafo-web:3002
+                              └─ web-php (php-fpm 8.2)
+
+3 certificados Let's Encrypt (vencen 2026-08-26, renueva cron diario 03:00):
+  - techtrafo.com (SAN: techtrafo.com, www, panel, api, portal)
+  - medicvip.org (SAN: medicvip.org, www)
+  - siscormed.com (SAN: siscormed.com, www)
+
+mediconline.com NO está en esta infra — apunta a hosting externo (67.225.160.133).
+```
+
+### NAS Synology nuevo (hostname `Nasr24`)
+
+```
+192.168.0.116 (eth0) + 192.168.0.88 (eth1)  ← 2 NICs en LAN, llegan al mismo NAS
+DSM 7.3.2-86009 (instalación 2026-03-17)
+
+  ├─ /volume1/  (7 TB · ContainerManager appdata + homes + photos)
+  ├─ /volume2/  (3.5 TB · web/ con los sitios + MailPlus)
+  │   └─ /volume2/web/   ← ORIGEN de los sitios (mirror RO, no producción)
+  │        ├─ techtrafo/    (5.0 MB · landing JSX+CSS+assets)
+  │        ├─ medicvip/     (424 KB · HTML + PHP + uploads)
+  │        ├─ siscormed/    (328 KB · HTML + PHP /api)
+  │        └─ mediconline/  (372 KB · backup local, sitio real está afuera)
+  └─ /volume3/  (3.5 TB · surveillance / backups)
+
+  ├─ MailPlus Server      ⚠️ Paquete instalado pero SIN CONFIGURAR (dominios + DKIM perdidos)
+  ├─ Web Station          ⚠️ Instalado pero virgen (vhosts perdidos · no se usa actualmente)
+  ├─ Container Manager    ⚠️ Estado de containers n8n/openclaw pendiente verificar
+  └─ Virtualization Mgr   ⚠️ Sin VMs (las que había se perdieron con el NAS viejo)
+```
+
+### PC Ubuntu 192.168.0.23 (Docker Compose stacks)
+
+```
+Stack original: /home/techtrafo/techtrafo/infrastructure/docker/
+  ├─ techtrafo-api        Express+TS+Prisma  :3000
   ├─ techtrafo-web        Next.js 15 App Router :3002
-  ├─ techtrafo-postgres   PostgreSQL 16.14 :5432 (datos de negocio)
-  ├─ techtrafo-redis      :6379
-  ├─ techtrafo-grafana    :3001 (5 dashboards provisioned, datasources Postgres + Influx)
-  ├─ techtrafo-influxdb   :8086 (telemetria SCADA, retention 30d)
-  ├─ techtrafo-mosquitto  :1883 interno (MQTT broker, sin port host)
-  ├─ techtrafo-simulador  perfil "simulador" — publica lecturas demo (apagar cuando haya hardware)
-  └─ techtrafo-nginx      proxy local + health
+  ├─ techtrafo-postgres   PostgreSQL 16.14 :5432 (127.0.0.1)
+  ├─ techtrafo-redis      :6379 (127.0.0.1)
+  ├─ techtrafo-grafana    :3001
+  ├─ techtrafo-influxdb   :8086 (127.0.0.1)
+  ├─ techtrafo-mosquitto  :1883 interno
+  ├─ techtrafo-simulador  perfil "simulador" demo
+  └─ techtrafo-nginx      proxy interno health en :8080
+
+Stack web público NUEVO: /home/techtrafo/web-public/    ← agregado 2026-05-27
+  ├─ web-nginx            :80 + :443 (frontfacing del internet)
+  └─ web-php              :9000 (PHP 8.2-fpm para sitios)
+  Comparten red docker `techtrafo_net` para proxy_pass a techtrafo-api/web.
+
+Auto-renovación SSL: cron @ 03:00 /home/techtrafo/web-public/certbot-renew.sh
 ```
 
 Volúmenes Docker importantes:
@@ -83,7 +154,8 @@ Volúmenes Docker importantes:
 | Host | Usuario | Password | Para qué |
 |---|---|---|---|
 | `192.168.0.23` (PC Ubuntu, Docker host) | `techtrafo` | `techtrafo$` | Operar contenedores, editar archivos del repo |
-| `192.168.0.7` (VM nginx, voip-panel-01) | `pbaquerizo` | `Groundunder8299$` | Editar nginx vhost en `/etc/nginx/sites-available/netvoice` (un solo archivo para todos los dominios — Netvoice, TECHTRAFO, MedicVIP, Siscormed). Sudo con password. |
+| `192.168.0.7` (VM nginx, voip-panel-01) | `pbaquerizo` | `Groundunder8299$` | ❌ **CAÍDA desde 2026-05-27** (vivía en VMM del NAS viejo, se perdió). Reverse proxy migrado a containers en .23. |
+| `192.168.0.116` o `.88` (NAS Synology nuevo, hostname `Nasr24`) | `pbaquerizo` | `Groundunder8299*` | Admin DSM (`:5001` HTTPS), SSH, MailPlus. ⚠️ password termina con `*` no `$`. Sudo requiere password. `synowebapi` / `synopkg` requieren path absoluto `/usr/syno/bin/` |
 | `192.168.0.116` (NAS Synology) | `pbaquerizo` | `Groundunder8299*` | Inspeccionar/operar Synology, configurar MailPlus |
 | PostgreSQL en container | `techtrafo_admin` | `Cambiar_Esta_Password_Segura_2026` | Consultas DB directas |
 | Cuenta SMTP TECHTRAFO en MailPlus | `techtrafonotif` (alias `notificaciones@techtrafo.com`) | Persiste en /opt/techtrafo/.env como SMTP_PASS | Saliente desde el worker |
