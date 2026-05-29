@@ -28,7 +28,7 @@ const clienteCreateSchema = z.object({
   pais: z.string().max(80).optional().default("Ecuador"),
   telefono: z.string().max(20).optional().nullable(),
   email: z.string().email().max(255).optional().nullable(),
-  sitio_web: z.string().url().max(255).optional().nullable(),
+  sitio_web: z.string().max(255).optional().nullable(),
   segmento: segmentoEnum.optional().nullable(),
   sector: sectorEnum.optional().nullable(),
   credito_habilitado: z.boolean().optional().default(false),
