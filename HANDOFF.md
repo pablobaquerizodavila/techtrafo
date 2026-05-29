@@ -6,6 +6,41 @@
 
 ---
 
+## 00. Trabajo desde 2 PCs (escritorio + laptop) — PROTOCOLO
+
+Pablo alterna entre 2 PCs Windows, cada una con su sesión de Claude y su mirror
+local del repo. Para que el estado esté SIEMPRE consistente sin importar la PC:
+
+**Mental model**: el trabajo NO vive en las PCs. Vive en GitHub (código + este
+HANDOFF), en el server `.23` (sistema + DB + donde se commitea) y en el NAS
+(backups + mirror). Las PCs son terminales intercambiables.
+
+**REGLA DE ORO**: commit + push SIEMPRE desde el server `.23`, nunca desde la PC.
+Antes de editar, `git pull` en el server. Así da igual qué PC se use.
+
+**Al INICIAR sesión (cualquier PC)** — Claude corre esto primero:
+```bash
+plink -ssh -pw "techtrafo$" techtrafo@192.168.0.23 \
+  'bash /home/techtrafo/techtrafo/scripts/session-start.sh'
+```
+(hace git fetch+ff a origin/main si el working tree está limpio, avisa si hay
+cambios sin commitear, y muestra HEAD + últimos commits + estado de containers).
+Después leer este HANDOFF §0 para el estado al cierre anterior.
+
+**Al CERRAR sesión** — Claude:
+1. Commit + push DESDE el server `.23` (no desde la PC).
+2. Actualizar HANDOFF §0 con lo hecho.
+3. `bash scripts/tt-backup.sh` (DB+env+código al NAS + sincroniza mirror).
+
+**El mirror local de cada PC** (`C:\Users\<user>\techtrafo\`) es scratch para
+editar. Si se va a editar local antes de pscp, primero alinearlo:
+`git fetch origin && git reset --hard origin/main`. NO es la fuente de verdad.
+
+> ⚠️ CRLF: `.gitattributes` fuerza `eol=lf`. Si un script `.sh` editado desde
+> Windows llega al server con `\r` (rompe bash), normalizar con `sed -i 's/\r$//'`.
+
+---
+
 ## 0. Estado al cierre 2026-05-29 (leer primero)
 
 **Todo operativo tras el cambio de NAS** (ver §2 para la topología nueva):
