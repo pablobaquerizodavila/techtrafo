@@ -59,6 +59,7 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 - ✅ **Registro de usuarios**: nuevo campo "Nombre de usuario" (mínimo 3 chars, alfanumérico + puntos/guiones) — el email ya no es el identificador visible
 - ✅ **Formulario clientes**: quitada sección "Habilitar crédito"; campos dirección fiscal, ciudad, provincia, país, teléfono, email ahora son obligatorios; provincia es dropdown con las 24 provincias de Ecuador; sitio web acepta cualquier dominio (sin validación URL estricta); país default = Ecuador
 - ✅ **PC nueva configurada**: plink en `C:\Program Files\PuTTY\plink.exe`, hostkey server `.23` = `ssh-ed25519 255 SHA256:tjQeyEAeaOk0T9XLKPOCKIrdqeQsyrMNsY+inkj8e60`, git credenciales GitHub OK
+- ✅ **Fix hitos sin responsable** (commit `de37198`): `puedeActuarEnHito` para reintentar/reabrir/escalar ahora hace fallback a `rol_aprobador_id` cuando `responsable_id = null` (hitos auto-arrancados por el pipeline). Los endpoints `reintentar`, `reabrir-anterior`, `escalar` pasan de requerir `expedientes.write` a `expedientes.aprobar`. Esto desbloquea a `ingeniero_diagnostico` (y otros roles aprobadores) después de rechazar un hito. **Root cause original**: los botones Aprobar/Rechazar son correctos y aparecen cuando el hito está en `en_curso`; el reporte inicial era porque `visita_tecnica` aún no había sido auto-arrancada (faltaba que `gerencia_comercial` aprobara `validacion_credito` primero).
 
 **Pendiente inmediato**:
 - ⚠️ **README.md desactualizado** — dice v0.13.0, hay que actualizarlo a v0.14.0 (módulo Compras)
