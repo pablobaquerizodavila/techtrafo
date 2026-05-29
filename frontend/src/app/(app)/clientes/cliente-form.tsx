@@ -215,7 +215,7 @@ export function ClienteForm({ initial, onSubmit, onCancel }: Props) {
         </div>
         <div className="space-y-2">
           <Label htmlFor="sitio_web">Sitio web</Label>
-          <Input id="sitio_web" type="url" value={sitioWeb} onChange={(e) => setSitioWeb(e.target.value)} />
+          <Input id="sitio_web" value={sitioWeb} onChange={(e) => setSitioWeb(e.target.value)} />
         </div>
       </div>
 
