@@ -12,8 +12,12 @@
 - ✅ Panel TECHTRAFO + sitios públicos (techtrafo.com, medicvip.org, siscormed.com) con HTTPS Let's Encrypt
 - ✅ Email saliente: MailPlus en NAS nuevo con DKIM/SPF/DMARC en 4 dominios. Cuenta `techtrafonotif@techtrafo.com` (pass en `.env` y en ACCESO-Y-BACKUPS.md). `notif-worker SMTP OK`.
 - ✅ NAS accesible **solo por LAN** `https://192.168.0.116:5001` (warning self-signed esperado, Pablo eligió aceptarlo — NO exponerlo a dominio)
-- ✅ Reverse proxy ahora es un container `web-nginx` en la PC `.23` (la VM `.7` se perdió con el NAS viejo, NO reconstruir esa VM)
-- ❌ **Netvoice** (`eneural.org` / `panel.eneural.org` / SIP) sigue CAÍDO — su VM se perdió, reconstrucción pendiente (backlog #36)
+- ✅ **VM `.7` voip-panel-01 RECONSTRUIDA y VIVA** (Pablo la reconstruyó en otra sesión, 2026-05-28). Es el **reverse proxy central** (nginx 1.18, vhost `/etc/nginx/sites-enabled/netvoice`). Credencial: `pbaquerizo` / `Groundunder8299` (SIN el `$`). Routing real:
+  - `techtrafo.com` / `medicvip.org` / `siscormed.com` → proxy_pass → **NAS `192.168.0.116`** (Web Station). El sitio techtrafo vive en `/volume2/web/techtrafo/app.jsx` en el NAS — EDITAR AHÍ, no en `.23`.
+  - `panel.techtrafo.com` → proxy → `.23:3002` · `api.techtrafo.com` → proxy → `.23:3000`
+  - `eneural.org` / `panel.eneural.org` → Netvoice (frontend en `.7` + Asterisk `192.168.0.161:8088`)
+- ⚠️ El stack `web-public` (web-nginx + web-php) que armé en `.23` el 2026-05-27 quedó **REDUNDANTE** — el NAT del router va a `.7`, no a `.23`. No recibe tráfico. Decidir si retirarlo o dejarlo standby.
+- ✅ **Netvoice OPERATIVO** otra vez (eneural.org / panel.eneural.org sirven desde `.7`).
 
 **Pendiente inmediato (sesión 2026-05-29 PC nueva)**:
 - ⚠️ **README.md desactualizado** — dice v0.13.0, hay que actualizarlo a v0.14.0 (módulo Compras)
@@ -75,7 +79,7 @@
 
 ## 2. Topología real (actualizada 2026-05-27 tras cambio de NAS)
 
-> ⚠️ **CAMBIO HISTÓRICO 2026-05-27**: se cambió el NAS Synology. Los discos fueron reutilizados (data intacta) pero las configs de DSM se perdieron, incluida la **VM nginx `192.168.0.7`** que vivía en VMM del NAS viejo y servía de reverse proxy + Netvoice. Se reconstruyó la infra moviendo el reverse proxy + sitios web a la PC `192.168.0.23` como containers Docker. Las VMs de Netvoice (`eneural.org`, `panel.eneural.org`, SIP) **se perdieron también** y quedan pendientes de reconstruir aparte.
+> ⚠️ **HISTÓRICO 2026-05-27 → 2026-05-29 (corregido)**: se cambió el NAS Synology y temporalmente la VM `.7` quedó caída. Durante esa ventana se armó un stack reverse-proxy de respaldo en `.23` (`web-public`). PERO Pablo **reconstruyó la VM `.7` voip-panel-01** en otra sesión (2026-05-28) y ESA es la que está en producción ahora: es el reverse proxy central que recibe el NAT del router y enruta a NAS/`.23`/Netvoice (ver §0). El stack `web-public` de `.23` quedó redundante. La VM `.7` ya NO está en el NAS viejo — corre en hardware independiente. **Netvoice está operativo de nuevo.**
 
 ### Red física — DOS routers en serie
 
@@ -101,15 +105,15 @@ Router TP-Link AX6600 Wi-Fi 6   ← ROUTER REAL DE LA RED
 
 | Service Name | Puerto ext | Destino LAN | Estado |
 |---|---|---|---|
-| Web-HTTP (ex MedicVIP-HTTP) | 80 | `192.168.0.23` | ✅ OK (era .7 caída) |
-| Web-HTTPS (ex MedicVIP-HTTPS) | 443 | `192.168.0.23` | ✅ OK |
+| HTTP | 80 | `192.168.0.7` (VM reverse proxy) | ✅ OK — todo entra por `.7` |
+| HTTPS | 443 | `192.168.0.7` | ✅ OK — `.7` enruta a NAS/`.23`/Netvoice |
 | MailPlus-SMTP | 25 | `192.168.0.116` (NAS) | ✅ OK |
 | MailPlus-IMAP | 993 | `192.168.0.116` | ✅ OK |
 | MailPlus-STARTTLS | 587 | `192.168.0.116` | ✅ OK |
 | MailPlus-SMTPS | 465 | `192.168.0.116` | ✅ OK |
-| Netvoice-SIP | 5060/UDP | `192.168.0.10` | ❌ apunta a host caído (Netvoice pendiente) |
-| Netvoice-HTTP | 8080→80 | `192.168.0.7` | ❌ apunta a VM caída |
-| Netvoice-HTTPS | 8443 | `192.168.0.7` | ❌ apunta a VM caída |
+| Netvoice-SIP | 5060/UDP | `192.168.0.161` (Asterisk) | ✅ Netvoice operativo |
+
+> ⚠️ El NAT 80/443 va a la **VM `.7`** (nginx reverse proxy central), NO a `.23` como decía la versión anterior de este doc. `.7` hace el fan-out a NAS (sitios), `.23` (panel/api) y Netvoice. El stack `web-public` de `.23` quedó redundante.
 
 ### Servicios públicos
 
@@ -188,7 +192,7 @@ Volúmenes Docker importantes:
 | Host | Usuario | Password | Para qué |
 |---|---|---|---|
 | `192.168.0.23` (PC Ubuntu, Docker host) | `techtrafo` | `techtrafo$` | Operar contenedores, editar archivos del repo |
-| `192.168.0.7` (VM nginx, voip-panel-01) | `pbaquerizo` | `Groundunder8299$` | ❌ **CAÍDA desde 2026-05-27** (vivía en VMM del NAS viejo, se perdió). Reverse proxy migrado a containers en .23. |
+| `192.168.0.7` (VM nginx, voip-panel-01) | `pbaquerizo` | `Groundunder8299` ⚠️ SIN `$` | ✅ **VIVA — reverse proxy central** + Netvoice. Reconstruida 2026-05-28. vhost en `/etc/nginx/sites-enabled/netvoice` (todos los dominios). El sitio `techtrafo.com` lo proxea al NAS (`/volume2/web/techtrafo/` — EDITAR AHÍ). |
 | `192.168.0.116` o `.88` (NAS Synology nuevo, hostname `Nasr24`) | `pbaquerizo` | `Groundunder8299*` | Admin DSM (`:5001` HTTPS), SSH, MailPlus. ⚠️ password termina con `*` no `$`. Sudo requiere password. `synowebapi` / `synopkg` requieren path absoluto `/usr/syno/bin/` |
 | `192.168.0.116` (NAS Synology) | `pbaquerizo` | `Groundunder8299*` | Inspeccionar/operar Synology, configurar MailPlus |
 | PostgreSQL en container | `techtrafo_admin` | `Cambiar_Esta_Password_Segura_2026` | Consultas DB directas |
