@@ -329,6 +329,7 @@ model usuarios {
   cliente_id                                                            BigInt?
   token_version                                                         Int                                     @default(1)
   nombre_completo                                                       String?                                 @default(dbgenerated("(((nombres)::text || ' '::text) || (apellidos)::text)")) @db.VarChar(201)
+  nombre_usuario                                                        String                                  @unique @db.VarChar(50)
   cliente_contactos_cliente_contactos_actualizado_porTousuarios         cliente_contactos[]                     @relation("cliente_contactos_actualizado_porTousuarios")
   cliente_contactos_cliente_contactos_creado_porTousuarios              cliente_contactos[]                     @relation("cliente_contactos_creado_porTousuarios")
   clientes_clientes_actualizado_porTousuarios                           clientes[]                              @relation("clientes_actualizado_porTousuarios")
@@ -420,6 +421,7 @@ model usuarios {
   @@index([rol_id], map: "idx_usuarios_rol")
   @@index([estado_aprobacion], map: "idx_usuarios_estado_aprobacion")
   @@index([nombre_completo], map: "idx_usuarios_nombre_completo")
+  @@index([nombre_usuario], map: "idx_usuarios_nombre_usuario")
   @@schema("core")
 }
 
