@@ -1,155 +1,101 @@
 #!/usr/bin/env bash
-# ═══════════════════════════════════════════════════════════════
-# tt-backup.sh — Snapshot del repo al NAS post-commit
-# ═══════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════
+# tt-backup.sh — Backup consolidado de TECHTRAFO
+# ═══════════════════════════════════════════════════════════════════
+# Respalda en UNA sola corrida:
+#   1. DB PostgreSQL  → db/techtrafo-db-<stamp>.sql.gz
+#   2. .env del panel → env/techtrafo-env-<stamp>.env
+#   3. Código (HEAD)  → code/tech-trafo-v<ver>-<label>-<sha>-<stamp>.zip
 #
-# Crea un snapshot zip del estado actual de HEAD al NAS1821 y
-# refresca README.md + CHANGELOG.md en la carpeta raíz del backup.
+# Doble destino (redundancia):
+#   - Local PC .23 : /home/techtrafo/backups/{db,env,code}/
+#   - NAS Nasr24   : /volume1/homes/pbaquerizo/Repositorios/techtrafo/{db,env,code}/
+#                    (= ruta SMB \\Nasr24\home\Repositorios\techtrafo)
 #
-# Pre-requisitos:
-#   - Estar en main (o pasar override)
-#   - Working tree limpio (sin cambios sin commit)
-#   - Local sincronizado con origin/main
-#   - NAS accesible via SMB en \\NAS1821\Carpeta Hellius\...
+# Corre EN LA PC .23 (ahí están el container postgres y el repo git).
+# Reemplaza a los scripts previos backup.sh + tt-backup.sh (que apuntaba
+# al NAS viejo NAS1821, ya retirado tras el cambio de NAS 2026-05-27).
 #
 # Uso:
-#   ./scripts/tt-backup.sh                       (auto-detecta label del commit)
-#   ./scripts/tt-backup.sh <label>               (label manual)
-#   ./scripts/tt-backup.sh voltage-os-ola-3c     (ejemplo)
-#
-# Salida:
-#   tech-trafo-v<version>-<label>-<sha>-<YYYY-MM-DD-HHMM>.zip
-#   en \\NAS1821\...\tech-trafo-commit-backup\code\
-# ═══════════════════════════════════════════════════════════════
+#   bash /home/techtrafo/techtrafo/scripts/tt-backup.sh            (label auto del último commit)
+#   bash /home/techtrafo/techtrafo/scripts/tt-backup.sh <label>    (label manual)
+# ═══════════════════════════════════════════════════════════════════
+set -uo pipefail
 
-set -euo pipefail
+# ─── Config ───
+REPO_DIR="/home/techtrafo/techtrafo"
+LOCAL_ROOT="/home/techtrafo/backups"
+NAS_USER="pbaquerizo"
+NAS_HOST="192.168.0.116"
+NAS_ROOT="/volume1/homes/pbaquerizo/Repositorios/techtrafo"
+SSH_KEY="/home/techtrafo/.ssh/id_ed25519"
+SSH_OPTS="-q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $SSH_KEY"
+RETENTION_DAYS=30
 
-# ─── Configuración ───
-BACKUP_ROOT='//NAS1821/Carpeta Hellius/Documentos Helius/compañias/Desarrollos/Techtrafo/tech-trafo-commit-backup'
+STAMP=$(date +%Y%m%d-%H%M%S)
+DB_FILE="techtrafo-db-${STAMP}.sql.gz"
+ENV_FILE="techtrafo-env-${STAMP}.env"
 
-# ─── Colores (sólo si terminal soporta) ───
-if [ -t 1 ] && command -v tput >/dev/null && [ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]; then
-  C_RED=$(tput setaf 1); C_GREEN=$(tput setaf 2); C_YELLOW=$(tput setaf 3)
-  C_CYAN=$(tput setaf 6); C_BOLD=$(tput bold); C_RESET=$(tput sgr0)
-else
-  C_RED=""; C_GREEN=""; C_YELLOW=""; C_CYAN=""; C_BOLD=""; C_RESET=""
+mkdir -p "$LOCAL_ROOT/db" "$LOCAL_ROOT/env" "$LOCAL_ROOT/code"
+
+echo "[$(date)] === Backup TECHTRAFO ${STAMP} ==="
+
+# ─── 1. Dump DB ───
+echo "-> [1/3] Dump PostgreSQL..."
+docker exec techtrafo-postgres pg_dump -U techtrafo_admin --clean --if-exists --no-owner techtrafo \
+  | gzip > "$LOCAL_ROOT/db/$DB_FILE"
+if [ ! -s "$LOCAL_ROOT/db/$DB_FILE" ]; then
+  echo "ERROR: dump DB vacio. Aborto."; exit 1
 fi
+echo "   OK DB: $(du -h "$LOCAL_ROOT/db/$DB_FILE" | cut -f1)"
 
-info()  { printf "%s%s%s\n" "$C_CYAN" "$1" "$C_RESET"; }
-ok()    { printf "%s✓ %s%s\n" "$C_GREEN" "$1" "$C_RESET"; }
-warn()  { printf "%s⚠ %s%s\n" "$C_YELLOW" "$1" "$C_RESET" >&2; }
-err()   { printf "%s✗ %s%s\n" "$C_RED" "$1" "$C_RESET" >&2; }
+# ─── 2. Snapshot .env ───
+echo "-> [2/3] Snapshot .env..."
+cp /opt/techtrafo/.env "$LOCAL_ROOT/env/$ENV_FILE" 2>/dev/null \
+  && echo "   OK .env copiado" || echo "   WARN no se pudo leer /opt/techtrafo/.env"
 
-# ─── 1. Verificar repo git ───
-if ! git rev-parse --git-dir >/dev/null 2>&1; then
-  err "No estás en un repositorio git"
-  exit 1
-fi
-
-# Asegurar cwd = root del repo
-ROOT_REPO=$(git rev-parse --show-toplevel)
-cd "$ROOT_REPO"
-
-# ─── 2. Branch check ───
-BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || echo "DETACHED")
-if [ "$BRANCH" != "main" ]; then
-  warn "Estás en branch '$BRANCH' (no main). ¿Continuar igual?"
-  printf "  [s/N] "
-  read -r ans
-  case "$ans" in
-    s|S|y|Y|si|sí|yes) ;;
-    *) err "Cancelado"; exit 1 ;;
-  esac
-fi
-
-# ─── 3. Working tree limpio ───
-if [ -n "$(git status --porcelain)" ]; then
-  err "Hay cambios sin commitear. Hacé commit o stash primero:"
-  git status --short
-  exit 1
-fi
-
-# ─── 4. Sincronización con origin ───
-info "Verificando sincronización con origin/$BRANCH…"
-if ! git fetch --quiet origin "$BRANCH" 2>/dev/null; then
-  warn "No se pudo hacer fetch (sin conexión a GitHub?). Sigo con HEAD local."
-else
-  LOCAL=$(git rev-parse HEAD)
-  REMOTE=$(git rev-parse "origin/$BRANCH" 2>/dev/null || echo "")
-  if [ -n "$REMOTE" ] && [ "$LOCAL" != "$REMOTE" ]; then
-    err "Local y origin/$BRANCH no están sincronizados:"
-    err "  local:  $LOCAL"
-    err "  origin: $REMOTE"
-    err "Hacé git pull o git push primero."
-    exit 1
+# ─── 3. Snapshot codigo (git archive) ───
+echo "-> [3/3] Snapshot codigo..."
+if git -C "$REPO_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  VERSION="unknown"
+  if [ -f "$REPO_DIR/CHANGELOG.md" ]; then
+    VERSION=$(grep -oE '## \[[0-9]+\.[0-9]+\.[0-9]+\]' "$REPO_DIR/CHANGELOG.md" 2>/dev/null \
+              | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
   fi
-fi
-
-# ─── 5. Verificar acceso al NAS ───
-if [ ! -d "$BACKUP_ROOT" ]; then
-  err "NAS no accesible: $BACKUP_ROOT"
-  err "Verificá conexión SMB al NAS1821 desde el explorador de Windows"
-  exit 1
-fi
-
-# Crear estructura si no existe
-mkdir -p "$BACKUP_ROOT/code" "$BACKUP_ROOT/db-dumps" "$BACKUP_ROOT/_archive"
-
-# ─── 6. Calcular nombre del snapshot ───
-# Versión: primera entrada del CHANGELOG con formato ## [X.Y.Z]
-VERSION="unknown"
-if [ -f CHANGELOG.md ]; then
-  VERSION=$(grep -oE '## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md 2>/dev/null \
-            | head -n1 \
-            | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
-fi
-
-# Label: arg 1 explícito, o slug del último commit subject
-if [ "$#" -ge 1 ] && [ -n "$1" ]; then
-  LABEL="$1"
+  if [ "$#" -ge 1 ] && [ -n "$1" ]; then
+    LABEL="$1"
+  else
+    LAST_MSG=$(git -C "$REPO_DIR" log -1 --pretty=%s 2>/dev/null || echo "snapshot")
+    LABEL=$(printf '%s' "$LAST_MSG" | sed -E 's/^[a-z]+(\([^)]+\))?:\s*//' \
+            | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//' | cut -c1-50)
+    [ -z "$LABEL" ] && LABEL="snapshot"
+  fi
+  SHORT_SHA=$(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || echo "nogit")
+  ZIP_NAME="tech-trafo-v${VERSION}-${LABEL}-${SHORT_SHA}-${STAMP}.zip"
+  git -C "$REPO_DIR" archive --format=zip HEAD -o "$LOCAL_ROOT/code/$ZIP_NAME" 2>/dev/null \
+    && echo "   OK codigo: $ZIP_NAME ($(du -h "$LOCAL_ROOT/code/$ZIP_NAME" | cut -f1))" \
+    || echo "   WARN git archive fallo"
 else
-  # Saca el subject del último commit, le quita prefijo "type(scope): "
-  # y lo convierte a slug ascii lowercase con guiones
-  LAST_MSG=$(git log -1 --pretty=%s 2>/dev/null || echo "snapshot")
-  LABEL=$(printf '%s' "$LAST_MSG" \
-          | sed -E 's/^[a-z]+(\([^)]+\))?:\s*//' \
-          | tr '[:upper:]' '[:lower:]' \
-          | tr -cs 'a-z0-9' '-' \
-          | sed 's/^-//;s/-$//' \
-          | cut -c1-60)
-  [ -z "$LABEL" ] && LABEL="snapshot"
+  echo "   WARN $REPO_DIR no es repo git, omito snapshot de codigo"
 fi
 
-SHORT_SHA=$(git rev-parse --short HEAD)
-TS=$(date +%Y-%m-%d-%H%M)
-NAME="tech-trafo-v${VERSION}-${LABEL}-${SHORT_SHA}-${TS}"
+# ─── 4. Copia al NAS ───
+echo "-> Copiando al NAS ${NAS_ROOT}..."
+ssh $SSH_OPTS "${NAS_USER}@${NAS_HOST}" "mkdir -p '${NAS_ROOT}/db' '${NAS_ROOT}/env' '${NAS_ROOT}/code'" 2>/dev/null
+NAS_OK=0
+for sub in db env code; do
+  tar -C "$LOCAL_ROOT/$sub" -cf - . 2>/dev/null \
+    | ssh $SSH_OPTS "${NAS_USER}@${NAS_HOST}" "tar -C '${NAS_ROOT}/$sub' -xf -" 2>/dev/null \
+    || NAS_OK=1
+done
+[ "$NAS_OK" -eq 0 ] && echo "   OK copiado al NAS (db/env/code)" || echo "   ERROR copiando al NAS (local quedo OK)"
 
-# ─── 7. Generar snapshot ───
-info "Creando snapshot…"
-printf "  versión: %s%s%s\n" "$C_BOLD" "$VERSION" "$C_RESET"
-printf "  label:   %s%s%s\n" "$C_BOLD" "$LABEL" "$C_RESET"
-printf "  sha:     %s%s%s\n" "$C_BOLD" "$SHORT_SHA" "$C_RESET"
-printf "  archivo: %s.zip\n" "$NAME"
+# ─── 5. Retencion ───
+echo "-> Retencion ${RETENTION_DAYS} dias (local + NAS)..."
+for sub in db env code; do
+  find "$LOCAL_ROOT/$sub" -type f -mtime +${RETENTION_DAYS} -delete 2>/dev/null
+done
+ssh $SSH_OPTS "${NAS_USER}@${NAS_HOST}" \
+  "for s in db env code; do find '${NAS_ROOT}'/\$s -type f -mtime +${RETENTION_DAYS} -delete 2>/dev/null; done" 2>/dev/null
 
-# git archive a temp + mover (evita locks en NAS)
-TMP_ZIP=$(mktemp -t "tt-backup-XXXXXX.zip")
-trap 'rm -f "$TMP_ZIP"' EXIT
-
-git archive --format=zip HEAD -o "$TMP_ZIP"
-mv "$TMP_ZIP" "$BACKUP_ROOT/code/${NAME}.zip"
-trap - EXIT
-
-# ─── 8. Refrescar README + CHANGELOG en raíz del backup ───
-[ -f README.md ]    && cp README.md    "$BACKUP_ROOT/README.md"
-[ -f CHANGELOG.md ] && cp CHANGELOG.md "$BACKUP_ROOT/CHANGELOG.md"
-
-# ─── 9. Reporte ───
-SIZE=$(du -h "$BACKUP_ROOT/code/${NAME}.zip" | cut -f1)
-TOTAL=$(find "$BACKUP_ROOT/code" -maxdepth 1 -name '*.zip' 2>/dev/null | wc -l | tr -d ' ')
-
-echo ""
-ok "Snapshot creado · ${SIZE}"
-printf "  %s↳%s %s/code/%s.zip\n" "$C_CYAN" "$C_RESET" "$BACKUP_ROOT" "$NAME"
-ok "README.md + CHANGELOG.md refrescados en raíz del backup"
-printf "  %s↳%s Total snapshots históricos: %s%s%s\n" "$C_CYAN" "$C_RESET" "$C_BOLD" "$TOTAL" "$C_RESET"
-echo ""
+echo "[$(date)] === Backup completo ==="

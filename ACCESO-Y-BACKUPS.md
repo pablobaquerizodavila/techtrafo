@@ -72,23 +72,27 @@ El HANDOFF.md y este documento viven dentro del repo.
 
 ## 4. Ubicación de los BACKUPS
 
-### 4.1 Backups del panel TECHTRAFO (DB + .env)
-**Doble destino** (redundancia):
-1. **Local PC `.23`**: `/home/techtrafo/backups/`
-2. **NAS** (copia espejo): `/volume1/homes/pbaquerizo/Repositorios/techtrafo/`
-   = ruta SMB `\\Nasr24\home\Repositorios\techtrafo`
+### 4.1 Backups del panel TECHTRAFO (DB + .env + código)
+**Un solo script consolidado** `scripts/tt-backup.sh` respalda 3 cosas a **doble destino**:
 
-Cada backup es un par de archivos con timestamp:
-- `techtrafo-db-YYYYMMDD-HHMMSS.sql.gz` → dump completo de PostgreSQL (gzip)
-- `techtrafo-env-YYYYMMDD-HHMMSS.env` → snapshot del `.env` del panel (credenciales)
+| Destino | Ruta |
+|---|---|
+| **Local PC `.23`** | `/home/techtrafo/backups/{db,env,code}/` |
+| **NAS** (espejo) | `/volume1/homes/pbaquerizo/Repositorios/techtrafo/{db,env,code}/` = `\\Nasr24\home\Repositorios\techtrafo` |
 
-**Cómo se generan**: script `/home/techtrafo/backup.sh` (versionado en el repo como `scripts/backup.sh`). Hace dump DB + .env, lo guarda local, lo copia al NAS via SSH key, y aplica retención de 30 días en ambos lados. Ejecutar con:
+Estructura de subcarpetas en ambos destinos:
+- `db/techtrafo-db-<stamp>.sql.gz` → dump completo PostgreSQL
+- `env/techtrafo-env-<stamp>.env` → snapshot del `.env` del panel (credenciales)
+- `code/tech-trafo-v<ver>-<label>-<sha>-<stamp>.zip` → snapshot del código (git archive HEAD)
+
+**Cómo se ejecuta** (manual; copia a local + NAS + retención 30 días):
 ```bash
-plink -ssh -pw "techtrafo$" techtrafo@192.168.0.23 'bash /home/techtrafo/backup.sh'
+plink -ssh -pw "techtrafo$" techtrafo@192.168.0.23 \
+  'bash /home/techtrafo/techtrafo/scripts/tt-backup.sh'
 ```
-> Hoy es manual. Para automatizarlo, agregar cron diario (ver §6, tarea #45).
+> Corre EN la PC `.23` (ahí están el container postgres y el repo git). Usa la SSH key `/home/techtrafo/.ssh/id_ed25519` autorizada en el NAS. Hoy es manual → automatizar con cron (§6, tarea #45).
 
-Backup destacado: `techtrafo-db-20260526-151950-pre-wipe-clientes.sql.gz` (antes del wipe de clientes ficticios).
+Backup destacado: `db/techtrafo-db-20260526-151950-pre-wipe-clientes.sql.gz` (antes del wipe de clientes ficticios).
 
 ### 4.2 Código fuente
 - **Panel TECHTRAFO**: repo git en `/home/techtrafo/techtrafo/` (PC `.23`) ↔ GitHub `pablobaquerizodavila/techtrafo` ↔ mirror local `C:\Users\Pablo B\techtrafo\`
@@ -149,27 +153,32 @@ docker exec web-nginx nginx -s reload
 
 ---
 
-## 6. Backup (script automatizado)
+## 6. Backup (script consolidado `tt-backup.sh`)
 
-El script `/home/techtrafo/backup.sh` (versionado en `scripts/backup.sh`) hace:
-dump DB → snapshot .env → guarda local en `/home/techtrafo/backups/` → copia al
-NAS `\\Nasr24\home\Repositorios\techtrafo` (via SSH key) → retención 30 días.
+`scripts/tt-backup.sh` (en el repo, copia ejecutable en `/home/techtrafo/techtrafo/scripts/`)
+hace en una corrida: **dump DB + snapshot .env + zip del código (git archive)** →
+guarda local en `/home/techtrafo/backups/{db,env,code}/` → copia espejo al NAS →
+retención 30 días en ambos destinos.
+
+> Consolida los 2 scripts previos: `backup.sh` (DB+env, eliminado) y el viejo
+> `tt-backup.sh` que respaldaba solo código al **NAS1821 retirado**.
 
 Ejecutar manualmente:
 ```bash
-plink -ssh -pw "techtrafo$" techtrafo@192.168.0.23 'bash /home/techtrafo/backup.sh'
+plink -ssh -pw "techtrafo$" techtrafo@192.168.0.23 \
+  'bash /home/techtrafo/techtrafo/scripts/tt-backup.sh'
+# opcional: pasar un label para el zip de código
+#   ... 'bash .../tt-backup.sh mi-label'
 ```
 
 ### Pendiente: automatizar con cron (tarea #45)
-Para correrlo diario a las 02:00, agregar al crontab de `techtrafo` en `.23`:
+Para correrlo diario a las 02:00, agregar al crontab de `techtrafo` en `.23` (`crontab -e`):
 ```cron
-0 2 * * * /home/techtrafo/backup.sh >> /home/techtrafo/backups/backup.log 2>&1
+0 2 * * * /home/techtrafo/techtrafo/scripts/tt-backup.sh >> /home/techtrafo/backups/backup.log 2>&1
 ```
-(comando: `crontab -e` en la PC `.23`)
 
-> El script depende de la SSH key `/home/techtrafo/.ssh/id_ed25519` que ya está
-> autorizada en el NAS (`~/.ssh/authorized_keys` de pbaquerizo). Si se regenera
-> el NAS, hay que volver a autorizar esa key.
+> Depende de la SSH key `/home/techtrafo/.ssh/id_ed25519` autorizada en el NAS
+> (`~/.ssh/authorized_keys` de pbaquerizo). Si se regenera el NAS, reautorizar esa key.
 
 ---
 
