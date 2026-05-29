@@ -27,7 +27,10 @@ REPO_DIR="/home/techtrafo/techtrafo"
 LOCAL_ROOT="/home/techtrafo/backups"
 NAS_USER="pbaquerizo"
 NAS_HOST="192.168.0.116"
-NAS_ROOT="/volume1/homes/pbaquerizo/Repositorios/techtrafo"
+# Backups (db/env/code) van a una carpeta SEPARADA del mirror de codigo.
+NAS_ROOT="/volume1/homes/pbaquerizo/Repositorios/techtrafo-backups"
+# Mirror del codigo: espejo de origin/main (lo que ve \\Nasr24\homes\...\techtrafo).
+NAS_MIRROR="/volume1/homes/pbaquerizo/Repositorios/techtrafo"
 SSH_KEY="/home/techtrafo/.ssh/id_ed25519"
 SSH_OPTS="-q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i $SSH_KEY"
 RETENTION_DAYS=30
@@ -89,6 +92,19 @@ for sub in db env code; do
     || NAS_OK=1
 done
 [ "$NAS_OK" -eq 0 ] && echo "   OK copiado al NAS (db/env/code)" || echo "   ERROR copiando al NAS (local quedo OK)"
+
+# ─── 4b. Sincronizar el MIRROR del codigo (espejo de origin/main) ───
+# Mantiene \\Nasr24\homes\pbaquerizo\Repositorios\techtrafo identico al repo.
+# Usa origin/main si hay conexion; si no, HEAD local.
+echo "-> Sincronizando mirror de codigo en ${NAS_MIRROR}..."
+if git -C "$REPO_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  REF="HEAD"
+  git -C "$REPO_DIR" fetch -q origin main 2>/dev/null && REF="origin/main"
+  ssh $SSH_OPTS "${NAS_USER}@${NAS_HOST}" "mkdir -p '${NAS_MIRROR}'" 2>/dev/null
+  git -C "$REPO_DIR" archive "$REF" \
+    | ssh $SSH_OPTS "${NAS_USER}@${NAS_HOST}" "tar -C '${NAS_MIRROR}' -xf -" 2>/dev/null \
+    && echo "   OK mirror sincronizado ($REF)" || echo "   WARN no se pudo sincronizar mirror"
+fi
 
 # ─── 5. Retencion ───
 echo "-> Retencion ${RETENTION_DAYS} dias (local + NAS)..."
