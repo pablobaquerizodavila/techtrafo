@@ -200,45 +200,6 @@ export function ClienteForm({ initial, onSubmit, onCancel }: Props) {
         </div>
       </div>
 
-      <div className="rounded-md border p-4">
-        <div className="mb-3 flex items-center space-x-2">
-          <input
-            id="credito_habilitado"
-            type="checkbox"
-            checked={creditoHabilitado}
-            onChange={(e) => setCreditoHabilitado(e.target.checked)}
-            className="h-4 w-4"
-          />
-          <Label htmlFor="credito_habilitado" className="cursor-pointer">
-            Habilitar credito
-          </Label>
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="limite_credito">Limite de credito ($)</Label>
-            <Input
-              id="limite_credito"
-              type="number"
-              step="0.01"
-              min="0"
-              value={limiteCredito}
-              onChange={(e) => setLimiteCredito(Number(e.target.value))}
-              disabled={!creditoHabilitado}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="plazo_credito_dias">Plazo (dias)</Label>
-            <Input
-              id="plazo_credito_dias"
-              type="number"
-              min="0"
-              value={plazoCreditoDias}
-              onChange={(e) => setPlazoCreditoDias(Number(e.target.value))}
-              disabled={!creditoHabilitado}
-            />
-          </div>
-        </div>
-      </div>
 
       <div className="space-y-2">
         <Label htmlFor="notas">Notas internas</Label>
