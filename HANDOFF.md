@@ -1,6 +1,31 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-24 · v0.14.0 · módulo de compras (proveedores + SCs + OCs + recepciones con efecto a bodega + actualización automática de costos)**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-29 · v0.14.0 + restauración completa post-cambio de NAS**.
+
+> 📄 **Ver también [`ACCESO-Y-BACKUPS.md`](ACCESO-Y-BACKUPS.md)** — guía de hosts, credenciales, ubicación de backups y recuperación desde PC nueva.
+
+---
+
+## 0. Estado al cierre 2026-05-29 (leer primero)
+
+**Todo operativo tras el cambio de NAS** (ver §2 para la topología nueva):
+- ✅ Panel TECHTRAFO + sitios públicos (techtrafo.com, medicvip.org, siscormed.com) con HTTPS Let's Encrypt
+- ✅ Email saliente: MailPlus en NAS nuevo con DKIM/SPF/DMARC en 4 dominios. Cuenta `techtrafonotif@techtrafo.com` (pass en `.env` y en ACCESO-Y-BACKUPS.md). `notif-worker SMTP OK`.
+- ✅ NAS accesible **solo por LAN** `https://192.168.0.116:5001` (warning self-signed esperado, Pablo eligió aceptarlo — NO exponerlo a dominio)
+- ✅ Reverse proxy ahora es un container `web-nginx` en la PC `.23` (la VM `.7` se perdió con el NAS viejo, NO reconstruir esa VM)
+- ❌ **Netvoice** (`eneural.org` / `panel.eneural.org` / SIP) sigue CAÍDO — su VM se perdió, reconstrucción pendiente (backlog #36)
+
+**Backlog priorizado (15 tareas, ver tracker o fin de este doc)**:
+- **P1 cierre**: send-as `notificaciones@` en MailPlus (#31) · versionar stack web-public en git (#32) · CHANGELOG (#33) · test email e2e (#34)
+- **P2**: containers n8n/openclaw (#35) · prueba e2e con data real (#42) · umbrales reales de OC (#43) · monitor SSL (#44) · backup automático cron (#45)
+- **P3 panel**: form manual SC/OC (#37) · PDF de OC (#38) · margen mínimo (#39) · portal proveedor (#40) · no conformidades (#41)
+- **P4**: reconstruir Netvoice (#36)
+
+**Gotchas nuevos aprendidos esta jornada** (ver §9):
+- `docker restart` NO recarga `.env` → usar `docker compose up -d --force-recreate <svc>`
+- DKIM en Synology MailPlus: la UI engaña, hay que configurar rspamd manualmente (claves en `/var/packages/MailPlus-Server/var/lib/rspamd/dkim/`)
+- nodemailer AUTH LOGIN requiere `SMTP_USER` con `@dominio` completo (Python smtplib acepta solo el username)
+- Cuando algo "no aparece" en el panel tras un cambio → **primero probar incógnito/Ctrl+Shift+R** (suele ser cache del browser, no bug del server)
 
 ---
 
