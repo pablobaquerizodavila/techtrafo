@@ -1,6 +1,6 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-29 · v0.14.0 + restauración completa post-cambio de NAS + sesión de configuración PC nueva**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-29 · v0.14.0 + mejoras formularios registro y clientes**.
 
 > 📄 **Ver también [`ACCESO-Y-BACKUPS.md`](ACCESO-Y-BACKUPS.md)** — guía de hosts, credenciales, ubicación de backups y recuperación desde PC nueva.
 
@@ -54,7 +54,13 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 - ⚠️ El stack `web-public` (web-nginx + web-php) que armé en `.23` el 2026-05-27 quedó **REDUNDANTE** — el NAT del router va a `.7`, no a `.23`. No recibe tráfico. Decidir si retirarlo o dejarlo standby.
 - ✅ **Netvoice OPERATIVO** otra vez (eneural.org / panel.eneural.org sirven desde `.7`).
 
-**Pendiente inmediato (sesión 2026-05-29 PC nueva)**:
+**Trabajado en sesión 2026-05-29**:
+- ✅ **Migration 022**: columna `nombre_usuario VARCHAR(50) UNIQUE NOT NULL` en `core.usuarios`
+- ✅ **Registro de usuarios**: nuevo campo "Nombre de usuario" (mínimo 3 chars, alfanumérico + puntos/guiones) — el email ya no es el identificador visible
+- ✅ **Formulario clientes**: quitada sección "Habilitar crédito"; campos dirección fiscal, ciudad, provincia, país, teléfono, email ahora son obligatorios; provincia es dropdown con las 24 provincias de Ecuador; sitio web acepta cualquier dominio (sin validación URL estricta); país default = Ecuador
+- ✅ **PC nueva configurada**: plink en `C:\Program Files\PuTTY\plink.exe`, hostkey server `.23` = `ssh-ed25519 255 SHA256:tjQeyEAeaOk0T9XLKPOCKIrdqeQsyrMNsY+inkj8e60`, git credenciales GitHub OK
+
+**Pendiente inmediato**:
 - ⚠️ **README.md desactualizado** — dice v0.13.0, hay que actualizarlo a v0.14.0 (módulo Compras)
 - ⚠️ **Backup automático cron (#45)** — `scripts/backup.sh` existe pero no está configurado como cron en PC `.23`
 
@@ -71,8 +77,10 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 - Cuando algo "no aparece" en el panel tras un cambio → **primero probar incógnito/Ctrl+Shift+R** (suele ser cache del browser, no bug del server)
 
 **Configuración PC nueva (2026-05-29)**:
-- Repo clonado en `C:\Users\pablo\techtrafo\` (dentro queda subcarpeta `Userspablotechtrafo\` con el `.git`)
-- Backup destino NAS confirmado: `\\Nasr24\homes\pbaquerizo\Repositorios\techtrafo` (SMB) = `/volume1/homes/pbaquerizo/Repositorios/techtrafo/` (SSH)
+- Repo clonado en `C:\Users\pablo\techtrafo\Userspablotechtrafo\` (ahí está el `.git`)
+- plink/pscp en `C:\Program Files\PuTTY\` — usar siempre con `-hostkey "ssh-ed25519 255 SHA256:tjQeyEAeaOk0T9XLKPOCKIrdqeQsyrMNsY+inkj8e60"` para el server `.23`
+- Credenciales GitHub configuradas en GCM (cuenta `pablobaquerizodavila`)
+- Backup destino NAS: `\\Nasr24\homes\pbaquerizo\Repositorios\techtrafo` (robocopy /MIR /XD .git)
 - Claude opera vía plink/pscp — NO generar comandos para copiar/pegar
 
 ---
