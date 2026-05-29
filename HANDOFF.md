@@ -1,6 +1,6 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-29 · v0.14.0 + restauración completa post-cambio de NAS**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-29 · v0.14.0 + restauración completa post-cambio de NAS + sesión de configuración PC nueva**.
 
 > 📄 **Ver también [`ACCESO-Y-BACKUPS.md`](ACCESO-Y-BACKUPS.md)** — guía de hosts, credenciales, ubicación de backups y recuperación desde PC nueva.
 
@@ -15,6 +15,10 @@
 - ✅ Reverse proxy ahora es un container `web-nginx` en la PC `.23` (la VM `.7` se perdió con el NAS viejo, NO reconstruir esa VM)
 - ❌ **Netvoice** (`eneural.org` / `panel.eneural.org` / SIP) sigue CAÍDO — su VM se perdió, reconstrucción pendiente (backlog #36)
 
+**Pendiente inmediato (sesión 2026-05-29 PC nueva)**:
+- ⚠️ **README.md desactualizado** — dice v0.13.0, hay que actualizarlo a v0.14.0 (módulo Compras)
+- ⚠️ **Backup automático cron (#45)** — `scripts/backup.sh` existe pero no está configurado como cron en PC `.23`
+
 **Backlog priorizado (15 tareas, ver tracker o fin de este doc)**:
 - **P1 cierre**: send-as `notificaciones@` en MailPlus (#31) · versionar stack web-public en git (#32) · CHANGELOG (#33) · test email e2e (#34)
 - **P2**: containers n8n/openclaw (#35) · prueba e2e con data real (#42) · umbrales reales de OC (#43) · monitor SSL (#44) · backup automático cron (#45)
@@ -26,6 +30,11 @@
 - DKIM en Synology MailPlus: la UI engaña, hay que configurar rspamd manualmente (claves en `/var/packages/MailPlus-Server/var/lib/rspamd/dkim/`)
 - nodemailer AUTH LOGIN requiere `SMTP_USER` con `@dominio` completo (Python smtplib acepta solo el username)
 - Cuando algo "no aparece" en el panel tras un cambio → **primero probar incógnito/Ctrl+Shift+R** (suele ser cache del browser, no bug del server)
+
+**Configuración PC nueva (2026-05-29)**:
+- Repo clonado en `C:\Users\pablo\techtrafo\` (dentro queda subcarpeta `Userspablotechtrafo\` con el `.git`)
+- Backup destino NAS confirmado: `\\Nasr24\homes\pbaquerizo\Repositorios\techtrafo` (SMB) = `/volume1/homes/pbaquerizo/Repositorios/techtrafo/` (SSH)
+- Claude opera vía plink/pscp — NO generar comandos para copiar/pegar
 
 ---
 
