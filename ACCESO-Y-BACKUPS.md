@@ -73,13 +73,20 @@ El HANDOFF.md y este documento viven dentro del repo.
 ## 4. Ubicación de los BACKUPS
 
 ### 4.1 Backups del panel TECHTRAFO (DB + .env)
-**Ruta**: `/home/techtrafo/backups/` en la PC `.23`
+**Doble destino** (redundancia):
+1. **Local PC `.23`**: `/home/techtrafo/backups/`
+2. **NAS** (copia espejo): `/volume1/homes/pbaquerizo/Repositorios/techtrafo/`
+   = ruta SMB `\\Nasr24\home\Repositorios\techtrafo`
 
 Cada backup es un par de archivos con timestamp:
 - `techtrafo-db-YYYYMMDD-HHMMSS.sql.gz` → dump completo de PostgreSQL (gzip)
 - `techtrafo-env-YYYYMMDD-HHMMSS.env` → snapshot del `.env` del panel (credenciales)
 
-Son **manuales** (se generan al cerrar cada hito). Ver §6 para automatizarlos.
+**Cómo se generan**: script `/home/techtrafo/backup.sh` (versionado en el repo como `scripts/backup.sh`). Hace dump DB + .env, lo guarda local, lo copia al NAS via SSH key, y aplica retención de 30 días en ambos lados. Ejecutar con:
+```bash
+plink -ssh -pw "techtrafo$" techtrafo@192.168.0.23 'bash /home/techtrafo/backup.sh'
+```
+> Hoy es manual. Para automatizarlo, agregar cron diario (ver §6, tarea #45).
 
 Backup destacado: `techtrafo-db-20260526-151950-pre-wipe-clientes.sql.gz` (antes del wipe de clientes ficticios).
 
@@ -142,21 +149,27 @@ docker exec web-nginx nginx -s reload
 
 ---
 
-## 6. Backup manual ad-hoc (comando completo)
+## 6. Backup (script automatizado)
 
-Para generar un backup ahora mismo (DB + env) desde plink:
+El script `/home/techtrafo/backup.sh` (versionado en `scripts/backup.sh`) hace:
+dump DB → snapshot .env → guarda local en `/home/techtrafo/backups/` → copia al
+NAS `\\Nasr24\home\Repositorios\techtrafo` (via SSH key) → retención 30 días.
+
+Ejecutar manualmente:
 ```bash
-plink -ssh -pw "techtrafo$" techtrafo@192.168.0.23 \
-  'cd /home/techtrafo/backups && STAMP=$(date +%Y%m%d-%H%M%S) && \
-   docker exec techtrafo-postgres pg_dump -U techtrafo_admin --clean --if-exists --no-owner techtrafo | gzip > techtrafo-db-${STAMP}.sql.gz && \
-   cp /opt/techtrafo/.env techtrafo-env-${STAMP}.env'
+plink -ssh -pw "techtrafo$" techtrafo@192.168.0.23 'bash /home/techtrafo/backup.sh'
 ```
 
-### Pendiente: automatizar (tarea #45)
-Hoy los backups son manuales. Recomendado agregar cron diario en la PC `.23`:
+### Pendiente: automatizar con cron (tarea #45)
+Para correrlo diario a las 02:00, agregar al crontab de `techtrafo` en `.23`:
 ```cron
-0 2 * * * cd /home/techtrafo/backups && STAMP=$(date +\%Y\%m\%d-\%H\%M\%S) && docker exec techtrafo-postgres pg_dump -U techtrafo_admin --clean --if-exists --no-owner techtrafo | gzip > techtrafo-db-${STAMP}.sql.gz && cp /opt/techtrafo/.env techtrafo-env-${STAMP}.env && find . -name "techtrafo-db-*.sql.gz" -mtime +30 -delete
+0 2 * * * /home/techtrafo/backup.sh >> /home/techtrafo/backups/backup.log 2>&1
 ```
+(comando: `crontab -e` en la PC `.23`)
+
+> El script depende de la SSH key `/home/techtrafo/.ssh/id_ed25519` que ya está
+> autorizada en el NAS (`~/.ssh/authorized_keys` de pbaquerizo). Si se regenera
+> el NAS, hay que volver a autorizar esa key.
 
 ---
 
