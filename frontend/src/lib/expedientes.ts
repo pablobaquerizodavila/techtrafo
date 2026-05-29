@@ -306,7 +306,13 @@ export function puedeActuarEnHito(
     case "reintentar":
     case "reabrir_anterior":
     case "escalar":
-      return hito.responsable_id !== null && hito.responsable_id === user.id;
+      // Si el hito tiene responsable asignado → solo ese usuario.
+      // Si no hay responsable (hito auto-arrancado por el pipeline) →
+      // el rol aprobador designado puede actuar.
+      if (hito.responsable_id !== null) {
+        return hito.responsable_id === user.id;
+      }
+      return hito.rol_aprobador_id !== null && user.rol_id === hito.rol_aprobador_id;
     case "editar_sla":
       return false;
     default:

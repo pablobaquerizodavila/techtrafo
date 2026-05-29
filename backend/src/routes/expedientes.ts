@@ -124,8 +124,13 @@ function puedeActuarEnHito(
     case "reintentar":
     case "reabrir_anterior":
     case "escalar":
-      // El responsable del hito rechazado (o el que lo era al momento del rechazo)
-      return hito.responsable_id !== null && hito.responsable_id === user.id;
+      // Si el hito tiene responsable asignado → solo ese usuario.
+      // Si no hay responsable (hito auto-arrancado por el pipeline) →
+      // el rol aprobador designado puede actuar.
+      if (hito.responsable_id !== null) {
+        return hito.responsable_id === user.id;
+      }
+      return hito.rol_aprobador_id !== null && user.rol_id === hito.rol_aprobador_id;
     case "editar_sla":
       // Solo override
       return false;
@@ -718,7 +723,7 @@ router.post("/:id/hitos/:hitoId/rechazar", requirePermission("expedientes", "apr
 // las fechas de aprobacion/fin. Util cuando el motivo del rechazo se
 // resolvio y se va a reagendar la actividad (ej. visita tecnica).
 // ===================================================================
-router.post("/:id/hitos/:hitoId/reintentar", requirePermission("expedientes", "write"), async (req, res) => {
+router.post("/:id/hitos/:hitoId/reintentar", requirePermission("expedientes", "aprobar"), async (req, res) => {
   const id = Number(req.params.id);
   const hitoId = Number(req.params.hitoId);
   if (!Number.isInteger(id) || !Number.isInteger(hitoId)) {
@@ -767,7 +772,7 @@ const reabrirAnteriorSchema = z.object({
   hito_anterior_id: z.number().int().positive(),
 });
 
-router.post("/:id/hitos/:hitoId/reabrir-anterior", requirePermission("expedientes", "write"), async (req, res) => {
+router.post("/:id/hitos/:hitoId/reabrir-anterior", requirePermission("expedientes", "aprobar"), async (req, res) => {
   const id = Number(req.params.id);
   const hitoId = Number(req.params.hitoId);
   if (!Number.isInteger(id) || !Number.isInteger(hitoId)) {
@@ -835,7 +840,7 @@ const escalarSchema = z.object({
   rol_destino_id: z.number().int().positive().optional().nullable(),
 });
 
-router.post("/:id/hitos/:hitoId/escalar", requirePermission("expedientes", "write"), async (req, res) => {
+router.post("/:id/hitos/:hitoId/escalar", requirePermission("expedientes", "aprobar"), async (req, res) => {
   const id = Number(req.params.id);
   const hitoId = Number(req.params.hitoId);
   if (!Number.isInteger(id) || !Number.isInteger(hitoId)) {
