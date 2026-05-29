@@ -85,7 +85,7 @@ router.get("/usuarios", requirePermission("admin", "usuarios"), async (req, res)
       skip: (page - 1) * limit,
       take: limit,
       select: {
-        id: true, email: true, nombres: true, apellidos: true,
+        id: true, email: true, nombre_usuario: true, nombres: true, apellidos: true,
         telefono: true, telefono_solicitud: true,
         rol_id: true, activo: true, ultimo_login: true,
         estado_aprobacion: true, aprobado_por: true, fecha_aprobacion: true,
@@ -108,7 +108,7 @@ router.get("/usuarios/pendientes", requirePermission("admin", "usuarios"), async
     where: { estado_aprobacion: "pendiente", activo: true },
     orderBy: { created_at: "asc" },
     select: {
-      id: true, email: true, nombres: true, apellidos: true,
+      id: true, email: true, nombre_usuario: true, nombres: true, apellidos: true,
       telefono_solicitud: true, created_at: true,
     },
   });
@@ -163,7 +163,7 @@ router.post("/usuarios/:id/aprobar", requirePermission("admin", "usuarios"), asy
   const updated = await prisma.usuarios.findUnique({
     where: { id },
     select: {
-      id: true, email: true, nombres: true, apellidos: true,
+      id: true, email: true, nombre_usuario: true, nombres: true, apellidos: true,
       estado_aprobacion: true, fecha_aprobacion: true, rol_id: true,
       roles: { select: { id: true, nombre: true } },
     },
@@ -310,7 +310,7 @@ router.patch("/usuarios/:id", requirePermission("admin", "usuarios"), async (req
   const updated = await prisma.usuarios.findUnique({
     where: { id },
     select: {
-      id: true, email: true, nombres: true, apellidos: true,
+      id: true, email: true, nombre_usuario: true, nombres: true, apellidos: true,
       telefono: true, rol_id: true, activo: true,
       estado_aprobacion: true,
       roles: { select: { id: true, nombre: true, es_super_admin: true } },

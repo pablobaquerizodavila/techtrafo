@@ -11,6 +11,7 @@ import { ApiError } from "@/lib/api";
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [nombreUsuario, setNombreUsuario] = useState("");
   const [nombres, setNombres] = useState("");
   const [apellidos, setApellidos] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -25,9 +26,17 @@ export default function RegisterPage() {
       setError("La contraseña debe tener al menos 8 caracteres");
       return;
     }
+    if (nombreUsuario.length < 3) {
+      setError("El nombre de usuario debe tener al menos 3 caracteres");
+      return;
+    }
+    if (!/^[a-zA-Z0-9_.-]+$/.test(nombreUsuario)) {
+      setError("El nombre de usuario solo puede contener letras, números, puntos, guiones y guiones bajos");
+      return;
+    }
     setLoading(true);
     try {
-      await register({ email, password, nombres, apellidos, telefono: telefono || undefined });
+      await register({ email, password, nombre_usuario: nombreUsuario, nombres, apellidos, telefono: telefono || undefined });
       setSubmitted(true);
     } catch (err) {
       if (err instanceof ApiError && err.status === 400) setError("Revisá los datos ingresados");
@@ -68,6 +77,10 @@ export default function RegisterPage() {
             <Input id="apellidos" value={apellidos} onChange={(e) => setApellidos(e.target.value)} required maxLength={100} className="h-10 border-glass bg-glass" />
           </Field>
         </div>
+        <Field label="Nombre de usuario" required htmlFor="nombre_usuario">
+          <Input id="nombre_usuario" value={nombreUsuario} onChange={(e) => setNombreUsuario(e.target.value)} required minLength={3} maxLength={50} placeholder="ej: juan.perez" autoComplete="username" className="h-10 border-glass bg-glass" />
+          <p className="mt-1 font-mono text-[10px] text-muted-foreground">Letras, números, puntos, guiones y guiones bajos. Mínimo 3 caracteres.</p>
+        </Field>
         <Field label="Email" required htmlFor="email">
           <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" className="h-10 border-glass bg-glass" />
         </Field>

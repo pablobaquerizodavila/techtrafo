@@ -6,6 +6,7 @@ import { AUTH_COOKIE_NAME, verifyToken } from "./jwt";
 export interface AuthUser {
   id: string;
   email: string;
+  nombre_usuario: string;
   nombres: string;
   apellidos: string;
   rol_id: number | null;
@@ -74,6 +75,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   req.user = {
     id: usuario.id,
     email: usuario.email,
+    nombre_usuario: usuario.nombre_usuario ?? "",
     nombres: usuario.nombres,
     apellidos: usuario.apellidos,
     rol_id: usuario.rol_id ?? null,

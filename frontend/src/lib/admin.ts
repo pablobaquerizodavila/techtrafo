@@ -5,6 +5,7 @@ export type EstadoAprobacion = "pendiente" | "aprobado" | "rechazado";
 export interface UsuarioAdmin {
   id: string;
   email: string;
+  nombre_usuario: string;
   nombres: string;
   apellidos: string;
   telefono: string | null;
@@ -22,6 +23,7 @@ export interface UsuarioAdmin {
 export interface UsuarioPendiente {
   id: string;
   email: string;
+  nombre_usuario: string;
   nombres: string;
   apellidos: string;
   telefono_solicitud: string | null;

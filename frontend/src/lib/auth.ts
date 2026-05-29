@@ -3,6 +3,7 @@ import { api } from "./api";
 export interface AuthUser {
   id: string;
   email: string;
+  nombre_usuario: string;
   nombres: string;
   apellidos: string;
   rol_id: number | null;
@@ -36,6 +37,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 export interface RegisterPayload {
   email: string;
   password: string;
+  nombre_usuario: string;
   nombres: string;
   apellidos: string;
   telefono?: string;

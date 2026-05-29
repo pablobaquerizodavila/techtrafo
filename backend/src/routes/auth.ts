@@ -18,6 +18,7 @@ const loginSchema = z.object({
 const registerSchema = z.object({
   email: z.string().email().max(255),
   password: z.string().min(8, "Minimo 8 caracteres"),
+  nombre_usuario: z.string().min(3, "Mínimo 3 caracteres").max(50).regex(/^[a-zA-Z0-9_.-]+$/, "Solo letras, números, puntos, guiones y guiones bajos"),
   nombres: z.string().min(1).max(100),
   apellidos: z.string().min(1).max(100),
   telefono: z.string().max(20).optional().nullable(),
@@ -43,10 +44,12 @@ router.post("/register", registerLimiter, async (req, res) => {
     res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
     return;
   }
-  const { email, password, nombres, apellidos, telefono } = parsed.data;
+  const { email, password, nombre_usuario, nombres, apellidos, telefono } = parsed.data;
 
   try {
-    const existing = await prisma.usuarios.findUnique({ where: { email } });
+    const existing = await prisma.usuarios.findFirst({
+      where: { OR: [{ email }, { nombre_usuario }] },
+    });
     if (existing) {
       // Mismo mensaje generico para no permitir enumeration
       res.status(202).json({ status: "submitted" });
@@ -57,6 +60,7 @@ router.post("/register", registerLimiter, async (req, res) => {
       data: {
         email,
         password_hash,
+        nombre_usuario,
         nombres,
         apellidos,
         telefono_solicitud: telefono ?? null,
@@ -139,6 +143,7 @@ router.post("/login", loginLimiter, async (req, res) => {
     user: {
       id: usuario.id,
       email: usuario.email,
+      nombre_usuario: usuario.nombre_usuario,
       nombres: usuario.nombres,
       apellidos: usuario.apellidos,
       rol_id: usuario.rol_id,
