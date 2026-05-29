@@ -14,6 +14,14 @@ import {
 } from "@/components/ui/select";
 import { Cliente, ClienteInput, TipoPersona, Segmento, Sector } from "@/lib/clientes";
 
+const PROVINCIAS_EC = [
+  "Azuay", "Bolívar", "Cañar", "Carchi", "Chimborazo", "Cotopaxi",
+  "El Oro", "Esmeraldas", "Galápagos", "Guayas", "Imbabura", "Loja",
+  "Los Ríos", "Manabí", "Morona Santiago", "Napo", "Orellana", "Pastaza",
+  "Pichincha", "Santa Elena", "Santo Domingo de los Tsáchilas",
+  "Sucumbíos", "Tungurahua", "Zamora Chinchipe",
+];
+
 interface Props {
   initial?: Cliente | null;
   onSubmit: (data: ClienteInput) => Promise<void>;
@@ -46,6 +54,7 @@ export function ClienteForm({ initial, onSubmit, onCancel }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!provincia) { setError("Seleccioná una provincia"); return; }
     setSubmitting(true);
 
     const payload: ClienteInput = {
@@ -53,12 +62,12 @@ export function ClienteForm({ initial, onSubmit, onCancel }: Props) {
       razon_social: razonSocial.trim(),
       nombre_comercial: nombreComercial.trim() || null,
       ruc_cedula: rucCedula.trim(),
-      direccion_fiscal: direccionFiscal.trim() || null,
-      ciudad: ciudad.trim() || null,
-      provincia: provincia.trim() || null,
-      pais: pais.trim() || "Ecuador",
-      telefono: telefono.trim() || null,
-      email: email.trim() || null,
+      direccion_fiscal: direccionFiscal.trim(),
+      ciudad: ciudad.trim(),
+      provincia: provincia,
+      pais: pais.trim(),
+      telefono: telefono.trim(),
+      email: email.trim(),
       sitio_web: sitioWeb.trim() || null,
       segmento: segmento || null,
       sector: sector || null,
@@ -161,38 +170,48 @@ export function ClienteForm({ initial, onSubmit, onCancel }: Props) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="direccion_fiscal">Direccion fiscal</Label>
+        <Label htmlFor="direccion_fiscal">Direccion fiscal *</Label>
         <Textarea
           id="direccion_fiscal"
           value={direccionFiscal}
           onChange={(e) => setDireccionFiscal(e.target.value)}
           rows={2}
+          required
         />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="space-y-2">
-          <Label htmlFor="ciudad">Ciudad</Label>
-          <Input id="ciudad" value={ciudad} onChange={(e) => setCiudad(e.target.value)} />
+          <Label htmlFor="ciudad">Ciudad *</Label>
+          <Input id="ciudad" value={ciudad} onChange={(e) => setCiudad(e.target.value)} required />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="provincia">Provincia</Label>
-          <Input id="provincia" value={provincia} onChange={(e) => setProvincia(e.target.value)} />
+          <Label htmlFor="provincia">Provincia *</Label>
+          <Select value={provincia || ""} onValueChange={(v) => setProvincia(v)}>
+            <SelectTrigger id="provincia">
+              <SelectValue placeholder="Seleccionar..." />
+            </SelectTrigger>
+            <SelectContent>
+              {PROVINCIAS_EC.map((p) => (
+                <SelectItem key={p} value={p}>{p}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="pais">Pais</Label>
-          <Input id="pais" value={pais} onChange={(e) => setPais(e.target.value)} />
+          <Label htmlFor="pais">Pais *</Label>
+          <Input id="pais" value={pais} onChange={(e) => setPais(e.target.value)} required />
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="space-y-2">
-          <Label htmlFor="telefono">Telefono</Label>
-          <Input id="telefono" value={telefono} onChange={(e) => setTelefono(e.target.value)} maxLength={20} />
+          <Label htmlFor="telefono">Telefono *</Label>
+          <Input id="telefono" value={telefono} onChange={(e) => setTelefono(e.target.value)} maxLength={20} required />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={255} />
+          <Label htmlFor="email">Email *</Label>
+          <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={255} required />
         </div>
         <div className="space-y-2">
           <Label htmlFor="sitio_web">Sitio web</Label>
