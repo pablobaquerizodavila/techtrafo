@@ -17,6 +17,7 @@ import { Toaster, toast } from "sonner";
 import { PageHeader, HeaderActionGhost } from "@/components/page-header";
 import { Panel } from "@/components/panel";
 import { getCotizacion, Cotizacion } from "@/lib/cotizaciones";
+import { getExpediente } from "@/lib/expedientes";
 import {
   CondicionDisparo,
   ContratoCreateInput,
@@ -47,7 +48,11 @@ function nuevoPago(numero: number): PagoForm {
 export default function NuevoContratoPage() {
   const router = useRouter();
   const params = useSearchParams();
-  const cotizacionId = params.get("cotizacion") ? Number(params.get("cotizacion")) : null;
+  // Se puede llegar por ?cotizacion=<id> (desde la cotización) o por
+  // ?expediente_id=<id> (desde el expediente); en este último resolvemos
+  // la cotización aprobada del expediente.
+  const cotizacionParam = params.get("cotizacion") ? Number(params.get("cotizacion")) : null;
+  const expedienteParam = params.get("expediente_id") ? Number(params.get("expediente_id")) : null;
 
   const [cotizacion, setCotizacion] = useState<Cotizacion | null>(null);
   const [loadingCot, setLoadingCot] = useState(true);
@@ -64,16 +69,45 @@ export default function NuevoContratoPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!cotizacionId) {
-      setErrorCot("Falta el parámetro ?cotizacion=<id>");
-      setLoadingCot(false);
-      return;
-    }
-    getCotizacion(cotizacionId)
-      .then((r) => {
+    let cancelled = false;
+    async function resolver() {
+      setLoadingCot(true);
+      setErrorCot(null);
+
+      // 1) Determinar el id de la cotización: directo o vía expediente.
+      let cotId = cotizacionParam;
+      if (!cotId && expedienteParam) {
+        try {
+          const r = await getExpediente(expedienteParam);
+          const cot = r.data.cotizaciones;
+          if (!cot) {
+            if (!cancelled) {
+              setErrorCot("Este expediente todavía no tiene una cotización. Primero emití y aprobá la cotización para poder generar el contrato.");
+              setLoadingCot(false);
+            }
+            return;
+          }
+          cotId = cot.id;
+        } catch {
+          if (!cancelled) { setErrorCot("No se pudo cargar el expediente"); setLoadingCot(false); }
+          return;
+        }
+      }
+      if (!cotId) {
+        if (!cancelled) {
+          setErrorCot("Falta el parámetro ?cotizacion=<id> o ?expediente_id=<id>");
+          setLoadingCot(false);
+        }
+        return;
+      }
+
+      // 2) Cargar la cotización y validar que esté aprobada.
+      try {
+        const r = await getCotizacion(cotId);
         const c = r.data;
+        if (cancelled) return;
         if (c.estado !== "aprobada") {
-          setErrorCot(`La cotización ${c.codigo} está en estado "${c.estado}" — solo se puede convertir cuando está aprobada`);
+          setErrorCot(`La cotización ${c.codigo} está en estado "${c.estado}" — solo se puede convertir en contrato cuando está aprobada`);
         } else {
           setCotizacion(c);
           setMontoTotal(Number(c.total));
@@ -83,10 +117,15 @@ export default function NuevoContratoPage() {
             { _tempId: crypto.randomUUID(), numero: 2, tipo: "saldo", descripcion: "50% saldo contra entrega", condicion_disparo: "al_entregar", fecha_esperada: null, monto_porcentaje: 50, monto_estipulado: Number(c.total) - mitad },
           ]);
         }
-      })
-      .catch(() => setErrorCot("No se pudo cargar la cotización"))
-      .finally(() => setLoadingCot(false));
-  }, [cotizacionId]);
+      } catch {
+        if (!cancelled) setErrorCot("No se pudo cargar la cotización");
+      } finally {
+        if (!cancelled) setLoadingCot(false);
+      }
+    }
+    resolver();
+    return () => { cancelled = true; };
+  }, [cotizacionParam, expedienteParam]);
 
   function updatePago<K extends keyof PagoForm>(idx: number, key: K, value: PagoForm[K]) {
     setPagos((prev) => {
