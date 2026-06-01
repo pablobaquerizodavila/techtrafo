@@ -130,4 +130,62 @@ router.get("/actividad-reciente", async (_req, res) => {
   });
 });
 
+// ===================================================================
+// GET /api/dashboard/procesos-en-riesgo
+//   Etapas (hitos) en curso cuyo tiempo transcurrido alcanzó >= 80% de
+//   su SLA y siguen sin resolver. Una fila por etapa, orden desc por %.
+//   El frontend colorea: 80-89 amarillo, 90-99 naranja, 100+ rojo.
+// ===================================================================
+interface ProcesoRiesgoRow {
+  expediente_id: string;
+  expediente_codigo: string;
+  cliente_nombre: string | null;
+  hito_id: string;
+  hito_codigo: string;
+  hito_nombre: string;
+  sla_horas: number;
+  horas_transcurridas: number;
+  porcentaje: number;
+}
+
+router.get("/procesos-en-riesgo", async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 20, 100);
+  const rows = await prisma.$queryRaw<ProcesoRiesgoRow[]>`
+    SELECT
+      eh.expediente_id::TEXT       AS expediente_id,
+      e.codigo                     AS expediente_codigo,
+      c.razon_social               AS cliente_nombre,
+      eh.id::TEXT                  AS hito_id,
+      eh.codigo                    AS hito_codigo,
+      eh.nombre                    AS hito_nombre,
+      eh.sla_horas::INT            AS sla_horas,
+      (EXTRACT(EPOCH FROM (NOW() - eh.fecha_inicio)) / 3600.0)::FLOAT                 AS horas_transcurridas,
+      (EXTRACT(EPOCH FROM (NOW() - eh.fecha_inicio)) / 3600.0 / eh.sla_horas * 100)::FLOAT AS porcentaje
+    FROM comercial.expediente_hitos eh
+    JOIN comercial.expedientes e ON e.id = eh.expediente_id
+    JOIN comercial.clientes c    ON c.id = e.cliente_id
+    WHERE eh.estado = 'en_curso'
+      AND eh.sla_horas IS NOT NULL AND eh.sla_horas > 0
+      AND eh.fecha_inicio IS NOT NULL
+      AND e.estado = 'activo'
+      AND (EXTRACT(EPOCH FROM (NOW() - eh.fecha_inicio)) / 3600.0 / eh.sla_horas) >= 0.80
+    ORDER BY porcentaje DESC
+    LIMIT ${limit}
+  `;
+
+  res.json({
+    data: rows.map((r) => ({
+      expediente_id: Number(r.expediente_id),
+      expediente_codigo: r.expediente_codigo,
+      cliente_nombre: r.cliente_nombre,
+      hito_id: Number(r.hito_id),
+      hito_codigo: r.hito_codigo,
+      hito_nombre: r.hito_nombre,
+      sla_horas: r.sla_horas,
+      horas_transcurridas: Math.round(r.horas_transcurridas * 10) / 10,
+      porcentaje: Math.round(r.porcentaje),
+    })),
+  });
+});
+
 export default router;

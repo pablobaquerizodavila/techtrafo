@@ -11,6 +11,7 @@ import { SessionExpiredButton } from "../session-expired-button";
 import { LiveTime, LiveDate } from "@/components/live-datetime";
 import { SystemHealthCard } from "@/components/system-health-card";
 import { RecentActivityCard } from "@/components/recent-activity-card";
+import { ProcesosRiesgoCard } from "@/components/procesos-riesgo-card";
 
 interface AuthMeResponse {
   user: {
@@ -345,6 +346,9 @@ export default async function DashboardPage() {
             )}
           </Panel>
         </section>
+
+        {/* ───── Etapas en riesgo por tiempo (SLA) ───── */}
+        <ProcesosRiesgoCard />
 
         {/* ───── Módulos secundarios ───── */}
         <Panel
