@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { withAppUser } from "../db/withAppUser";
 import { requireAuth, requirePermission } from "../auth/middleware";
+import { renderClausulas } from "../services/plantilla-vars";
 
 const router = Router();
 router.use(requireAuth);
@@ -37,6 +38,8 @@ const createSchema = z.object({
   plan_pago_tipo: planPagoTipoEnum.default("anticipo_y_saldo"),
   observaciones: z.string().optional().nullable(),
   notas_internas: z.string().optional().nullable(),
+  clausulas: z.string().optional().nullable(),          // texto con variables {{...}}, se snapshotea
+  plantilla_id: z.number().int().positive().optional().nullable(), // referencia (no persistida)
   pagos: z.array(pagoSchema).optional().default([]),
 });
 
@@ -203,6 +206,33 @@ router.post("/", requirePermission("contratos", "write"), async (req, res) => {
       const year = fechaFirma.getFullYear();
       const codigo = await generarCodigoContrato(tx, year);
 
+      // Snapshot de clausulas: renderiza las variables {{...}} con datos
+      // reales del cliente/contrato al momento de firmar (integridad legal).
+      let clausulasRender: string | null = null;
+      if (d.clausulas) {
+        const cli = await tx.clientes.findUnique({
+          where: { id: cotizacion.cliente_id },
+          select: {
+            razon_social: true, ruc_cedula: true,
+            rep_legal_nombres: true, rep_legal_apellidos: true,
+            rep_legal_cedula: true, rep_legal_cargo: true,
+          },
+        });
+        const repNombre = [cli?.rep_legal_nombres, cli?.rep_legal_apellidos].filter(Boolean).join(" ").trim();
+        clausulasRender = renderClausulas(d.clausulas, {
+          cliente_razon_social: cli?.razon_social,
+          cliente_ruc: cli?.ruc_cedula,
+          representante_legal_nombre: repNombre || null,
+          representante_legal_cedula: cli?.rep_legal_cedula,
+          representante_legal_cargo: cli?.rep_legal_cargo,
+          contrato_codigo: codigo,
+          cotizacion_codigo: cotizacion.codigo,
+          monto_total: `USD ${Number(d.monto_total).toFixed(2)}`,
+          fecha_firma: fechaFirma.toISOString().split("T")[0],
+          plazo_entrega: fechaFin ? fechaFin.toISOString().split("T")[0] : null,
+        });
+      }
+
       // Crear contrato + pagos en una operacion
       const nuevoContrato = await tx.contratos.create({
         data: {
@@ -217,6 +247,7 @@ router.post("/", requirePermission("contratos", "write"), async (req, res) => {
           plan_pago_tipo: d.plan_pago_tipo,
           observaciones: d.observaciones ?? null,
           notas_internas: d.notas_internas ?? null,
+          clausulas: clausulasRender,
           firmado_por: userId,
           creado_por: userId,
           actualizado_por: userId,

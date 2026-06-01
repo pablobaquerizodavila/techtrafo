@@ -170,6 +170,7 @@ export function renderCotizacion(doc: Doc, cot: DataCotizacion, nivel: Nivel): v
 export interface DataContrato {
   codigo: string; fecha_firma: Date | string | null; estado: string;
   monto_total: string; observaciones: string | null; notas_internas: string | null;
+  clausulas?: string | null;
   clientes: {
     razon_social: string; ruc_cedula: string; direccion_fiscal: string | null;
     rep_legal_nombres?: string | null; rep_legal_apellidos?: string | null;
@@ -219,6 +220,10 @@ export function renderContrato(doc: Doc, c: DataContrato, nivel: Nivel): void {
     tablaSimple(doc, cols, c.contrato_pagos);
   }
 
+  if (c.clausulas && c.clausulas.trim()) {
+    titulo(doc, "Cláusulas y condiciones");
+    parrafo(doc, c.clausulas.trim());
+  }
   if (c.observaciones) {
     titulo(doc, "Observaciones");
     parrafo(doc, c.observaciones);
