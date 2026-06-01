@@ -1,6 +1,6 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-05-29 · v0.14.0 + mejoras formularios registro y clientes**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-06-01 · accesos cliente al portal + fix crash API + hardening + correo a mailcow**.
 
 > 📄 **Ver también [`ACCESO-Y-BACKUPS.md`](ACCESO-Y-BACKUPS.md)** — guía de hosts, credenciales, ubicación de backups y recuperación desde PC nueva.
 
@@ -41,7 +41,25 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 
 ---
 
-## 0. Estado al cierre 2026-05-29 (leer primero)
+## 0. Estado al cierre 2026-06-01 (leer primero)
+
+**Sesión 2026-06-01 — accesos de cliente al portal, fix de crash del API, hardening y cutover de correo a mailcow.**
+
+- ✅ **Accesos al portal por cliente** (commit `87a0de5`). En `/clientes` (alta y edición) se crean/gestionan logins rol `cliente` que ven los expedientes del cliente. Backend: 5 endpoints `/api/clientes/:id/accesos[...]` en `clientes.ts`. Frontend: `cliente-accesos.tsx` (gestión en edición) + sección "Acceso al portal" en `cliente-form.tsx` (alta con 1er acceso opcional) + helpers en `lib/clientes.ts`. Multi-acceso por cliente; el admin define la pass; email de login separado del email general del cliente.
+- ✅ **Login super_admin restaurado**. La cuenta `pablobaquerizodavila@gmail.com` (rol `presidencia`, `es_super_admin=true`) no podía entrar porque **el proceso del API estaba caído**, NO por la contraseña. Pass reseteada a una temporal → **Pablo debe cambiarla al entrar**. Nota: NO existe un rol literal `super_admin`; es la columna booleana `core.roles.es_super_admin` (solo `presidencia` la tiene en true).
+- ✅ **Bug de crash del API corregido** (commit `9a3945a`) — causa raíz del login caído. Dos `select` Prisma pedían `items.codigo` y `lotes.codigo` (campos inexistentes; los reales son `codigo_interno` y `numero_lote`). Sin try/catch, la unhandled rejection MATABA el proceso Node entero → panel inaccesible. Archivos: `cotizacion-plantillas.ts` GET /:id, `recepciones.ts` GET /:id.
+- ✅ **Red de seguridad anti-crash** (commit `ee8a608`). `server.ts` ahora tiene `process.on("unhandledRejection")` y `process.on("uncaughtException")` que loguean y mantienen el proceso vivo. Antes no había (solo SIGTERM/SIGINT) y ts-node-dev no revive al hijo, por eso un solo bug tumbaba todo el panel.
+- ✅ **Correo migrado de MailPlus a mailcow** (commit `280d318`). El panel envía notificaciones por la VM mailcow `192.168.0.3:465` (SMTPS) autenticando como `noreply@techtrafo.com` (el buzón `techtrafonotif@` NO existe en mailcow). Config SMTP en `/opt/techtrafo/.env` (backup `/opt/techtrafo/.env.bak-mailcow-20260601`). Tras editar ese `.env`: `cd infrastructure/docker && docker compose up -d --force-recreate api grafana` (usar los nombres de SERVICIO `api`/`grafana`, no los `container_name`; `docker restart` NO relee `.env`). Verificado end-to-end: DKIM/SPF/DMARC = pass, llega al inbox de Gmail. Se conecta por IP LAN `.3` y no por `mail.techtrafo.com` porque **mailcow es una VM SOBRE el propio Synology** (`.116` hostea el VMM; la VM es `.3`) y el endpoint público `:465` lo fronta el Synology con su cert `pbaquerizo.synology.me`; al ser IP privada, `services/email.ts` desactiva la verificación de cert. Detalle en memoria `project-mailcow-migration`.
+- ✅ Health-check del dashboard: label "SMTP MailPlus (NAS)" → "SMTP mailcow"; comentarios de `email.ts` actualizados.
+
+**Pendientes abiertos al cierre:**
+- Pablo debe **cambiar su contraseña temporal** del panel.
+- Tarea #34: test e2e real (emitir cotización y confirmar arribo del correo), ahora contra mailcow.
+- El fronting público de mailcow / mover los puertos de correo del Synology a la VM es scope de la **sesión mailcow**, no del panel. El panel no depende de ese camino público (va directo a la VM por LAN).
+
+---
+
+## 0b. Estado al cierre 2026-05-29 (sesión anterior)
 
 **Todo operativo tras el cambio de NAS** (ver §2 para la topología nueva):
 - ✅ Panel TECHTRAFO + sitios públicos (techtrafo.com, medicvip.org, siscormed.com) con HTTPS Let's Encrypt
