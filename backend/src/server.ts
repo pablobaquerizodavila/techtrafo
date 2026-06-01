@@ -146,3 +146,29 @@ async function shutdown(signal: string) {
 
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
+
+// -------------------------------------------------------------------
+// Red de seguridad a nivel proceso (hardening #51)
+// -------------------------------------------------------------------
+// Una ruta async que lanza (p.ej. una query Prisma con un campo
+// inexistente, sin try/catch) produce una promesa rechazada sin manejar.
+// El error-handler de Express de arriba NO la atrapa, y el comportamiento
+// por defecto de Node es MATAR el proceso. En este deploy ts-node-dev no
+// revive al hijo, asi que un solo bug tumbaria TODO el API.
+//   Caso real 2026-06-01: "Unknown field codigo on model items" dejo el
+//   panel caido y bloqueo el login de presidencia.
+// Preferimos disponibilidad: logueamos el error (queda en `docker logs`
+// para diagnosticar) y mantenemos el proceso vivo; solo se rompe la
+// request culpable, no el panel entero.
+process.on("unhandledRejection", (reason) => {
+  const errorId = Math.random().toString(36).slice(2, 10);
+  console.error(`[unhandledRejection ${errorId}]`, reason);
+});
+
+process.on("uncaughtException", (err) => {
+  const errorId = Math.random().toString(36).slice(2, 10);
+  console.error(`[uncaughtException ${errorId}]`, err);
+  // No matamos el proceso aposta (ver nota arriba). Si el estado quedara
+  // corrupto, GET /api/system/health deberia reflejarlo para que el
+  // monitor recree el container.
+});
