@@ -10,8 +10,13 @@
  * info de otros clientes, productividad de técnicos, reprocesos.
  */
 import { Router, Request, Response, NextFunction } from "express";
+import { z } from "zod";
 import { prisma } from "../db/client";
+import { withAppUser } from "../db/withAppUser";
 import { requireAuth } from "../auth/middleware";
+import { crearDocumento, enviarPDF, resolverNivel } from "../services/pdf/base";
+import { renderCotizacion, DataCotizacion } from "../services/pdf/documentos";
+import { notificarResolucionHito } from "../services/notificaciones";
 
 const router = Router();
 router.use(requireAuth);
@@ -185,6 +190,168 @@ router.get("/mis-transformadores", requireClienteId, async (req, res) => {
     },
   });
   res.json({ data });
+});
+
+// ===================================================================
+// Aprobación de cotización POR EL CLIENTE (gate hito "aprobacion_cliente")
+//
+// Solo se habilita cuando la cotizacion del expediente esta en estado
+// 'enviada'. Toda mutacion valida propiedad (cotizacion_id + cliente_id) y
+// el estado server-side; el gating del frontend es solo UX.
+// ===================================================================
+const GATE_HITO = "aprobacion_cliente";
+const rechazarSchema = z.object({ motivo: z.string().min(1).max(2000) });
+
+/**
+ * Devuelve el expediente del cliente autenticado que referencia esta
+ * cotizacion (doble filtro cotizacion_id + cliente_id), con el estado de la
+ * cotizacion y el hito gate. null si la cotizacion no le pertenece.
+ */
+async function expedienteDeCotizacionDelCliente(cotId: number, clienteId: number) {
+  return prisma.expedientes.findFirst({
+    where: { cotizacion_id: cotId, cliente_id: clienteId },
+    select: {
+      id: true,
+      cotizaciones: { select: { id: true, codigo: true, estado: true } },
+      expediente_hitos: {
+        where: { codigo: GATE_HITO },
+        select: { id: true, estado: true },
+      },
+    },
+  });
+}
+
+// -------------------------------------------------------------------
+// GET /api/portal/cotizacion/:id/pdf  -> PDF nivel cliente (sin costos internos)
+// -------------------------------------------------------------------
+router.get("/cotizacion/:id/pdf", requireClienteId, async (req, res) => {
+  const id = Number(req.params.id);
+  const clienteId = req.user!.cliente_id!;
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+
+  const owns = await expedienteDeCotizacionDelCliente(id, clienteId);
+  if (!owns) { res.status(404).json({ error: "not_found" }); return; }
+
+  const cot = await prisma.cotizaciones.findUnique({
+    where: { id },
+    include: {
+      clientes: true,
+      cotizacion_lineas: { orderBy: { orden: "asc" } },
+      cotizacion_revisiones: { orderBy: { revision: "desc" } },
+    },
+  });
+  if (!cot) { res.status(404).json({ error: "not_found" }); return; }
+  // No exponer borradores internos al cliente.
+  if (cot.estado === "borrador") { res.status(403).json({ error: "cotizacion_no_disponible" }); return; }
+
+  // Nivel SIEMPRE cliente: resolverNivel fuerza max 2 para rol "cliente".
+  const { nivel } = resolverNivel(2, req.user!.rol_nombre, false);
+  const doc = crearDocumento({
+    documento: "COTIZACIÓN", codigo: cot.codigo ?? `COT-${id}`,
+    fecha: cot.fecha_emision ?? new Date(), nivel, subtitulo: "Documento comercial",
+  });
+  renderCotizacion(doc, cot as unknown as DataCotizacion, nivel);
+  enviarPDF(doc, res, `${cot.codigo ?? id}-N${nivel}`);
+});
+
+// -------------------------------------------------------------------
+// POST /api/portal/cotizacion/:id/aprobar
+// -------------------------------------------------------------------
+router.post("/cotizacion/:id/aprobar", requireClienteId, async (req, res) => {
+  const id = Number(req.params.id);
+  const clienteId = req.user!.cliente_id!;
+  const userId = req.user!.id;
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+
+  const exp = await expedienteDeCotizacionDelCliente(id, clienteId);
+  if (!exp || !exp.cotizaciones) { res.status(404).json({ error: "not_found" }); return; }
+  if (exp.cotizaciones.estado !== "enviada") {
+    res.status(409).json({ error: "cotizacion_no_enviada", estado: exp.cotizaciones.estado });
+    return;
+  }
+  const hito = exp.expediente_hitos[0];
+  if (!hito || hito.estado !== "en_curso") {
+    res.status(409).json({ error: "hito_no_en_aprobacion" });
+    return;
+  }
+  const expId = Number(exp.id);
+
+  await withAppUser(userId, async (tx) => {
+    await tx.$executeRaw`
+      UPDATE comercial.cotizaciones
+         SET estado = 'aprobada', aprobada_por = ${userId}::uuid,
+             fecha_aprobacion = NOW(), actualizado_por = ${userId}::uuid
+       WHERE id = ${id}
+    `;
+    await tx.$executeRaw`
+      UPDATE comercial.expediente_hitos
+         SET estado = 'completado', fecha_fin = NOW(),
+             aprobado_por = ${userId}::uuid, fecha_aprobacion = NOW(),
+             actualizado_por = ${userId}::uuid
+       WHERE expediente_id = ${expId} AND codigo = ${GATE_HITO} AND estado = 'en_curso'
+    `;
+    // Activar el siguiente hito en orden (mismo patron que expedientes.ts)
+    await tx.$executeRaw`
+      UPDATE comercial.expediente_hitos
+         SET estado = 'en_curso', fecha_inicio = NOW(), actualizado_por = ${userId}::uuid
+       WHERE expediente_id = ${expId}
+         AND estado = 'no_iniciado'
+         AND orden = (
+           SELECT MIN(orden) FROM comercial.expediente_hitos
+            WHERE expediente_id = ${expId} AND estado = 'no_iniciado'
+         )
+    `;
+  });
+
+  // Notificar al ejecutivo del expediente (best-effort)
+  void notificarResolucionHito(Number(hito.id), true, null).catch((e) =>
+    console.error("[notif] portal aprobar cotizacion fallo:", e),
+  );
+  res.json({ status: "aprobada" });
+});
+
+// -------------------------------------------------------------------
+// POST /api/portal/cotizacion/:id/rechazar  (body: { motivo })
+// -------------------------------------------------------------------
+router.post("/cotizacion/:id/rechazar", requireClienteId, async (req, res) => {
+  const id = Number(req.params.id);
+  const clienteId = req.user!.cliente_id!;
+  const userId = req.user!.id;
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+  const parsed = rechazarSchema.safeParse(req.body ?? {});
+  if (!parsed.success) { res.status(400).json({ error: "invalid_payload" }); return; }
+  const motivo = parsed.data.motivo;
+
+  const exp = await expedienteDeCotizacionDelCliente(id, clienteId);
+  if (!exp || !exp.cotizaciones) { res.status(404).json({ error: "not_found" }); return; }
+  if (exp.cotizaciones.estado !== "enviada") {
+    res.status(409).json({ error: "cotizacion_no_enviada", estado: exp.cotizaciones.estado });
+    return;
+  }
+  const hito = exp.expediente_hitos[0];
+  if (!hito || hito.estado !== "en_curso") {
+    res.status(409).json({ error: "hito_no_en_aprobacion" });
+    return;
+  }
+
+  await withAppUser(userId, async (tx) => {
+    const cot = await tx.cotizaciones.findUnique({ where: { id }, select: { notas_internas: true } });
+    const fecha = new Date().toISOString().split("T")[0];
+    const entrada = `[RECHAZADA-CLIENTE ${fecha}] ${motivo}`;
+    const notasNueva = `${entrada}\n${cot?.notas_internas ?? ""}`.trim();
+    await tx.$executeRaw`
+      UPDATE comercial.cotizaciones
+         SET estado = 'rechazada', notas_internas = ${notasNueva},
+             actualizado_por = ${userId}::uuid
+       WHERE id = ${id}
+    `;
+    // El hito gate queda en_curso (en espera de una cotizacion corregida).
+  });
+
+  void notificarResolucionHito(Number(hito.id), false, motivo).catch((e) =>
+    console.error("[notif] portal rechazar cotizacion fallo:", e),
+  );
+  res.json({ status: "rechazada" });
 });
 
 export default router;

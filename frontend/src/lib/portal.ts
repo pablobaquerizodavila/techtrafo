@@ -83,5 +83,20 @@ export const getMiExpediente = (id: number) =>
 export const getPortalResumen = () =>
   api.get<{ data: PortalResumen }>(`/api/portal/resumen`);
 
+// -------------------------------------------------------------------
+// Aprobación de cotización por el cliente
+// -------------------------------------------------------------------
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
+
+/** URL del PDF (nivel cliente) de la cotización; abrir con window.open (cookie auto). */
+export const verCotizacionPdfUrl = (cotId: number) =>
+  `${API_BASE}/api/portal/cotizacion/${cotId}/pdf`;
+
+export const aprobarCotizacion = (cotId: number) =>
+  api.post<{ status: string }>(`/api/portal/cotizacion/${cotId}/aprobar`);
+
+export const rechazarCotizacion = (cotId: number, motivo: string) =>
+  api.post<{ status: string }>(`/api/portal/cotizacion/${cotId}/rechazar`, { motivo });
+
 export const listMisTransformadores = () =>
   api.get<{ data: Array<PortalTransformador & { tension_primaria_kv: string | number | null; tension_secundaria_v: number | null; anio_fabricacion: number | null; ubicacion_actual: string | null; estado: string; _count: { ot: number } }> }>(`/api/portal/mis-transformadores`);

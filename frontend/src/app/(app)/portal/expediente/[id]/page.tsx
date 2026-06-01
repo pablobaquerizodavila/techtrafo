@@ -5,8 +5,9 @@ import { ChevronLeft, CheckCircle2, Clock, Circle, Zap, Calendar, FileText, File
 import { Badge } from "@/components/ui/badge";
 import { PageHeader, HeaderActionGhost } from "@/components/page-header";
 import { Panel } from "@/components/panel";
-import { PortalExpedienteDetalle, getMiExpediente } from "@/lib/portal";
+import { PortalExpedienteDetalle, getMiExpediente, verCotizacionPdfUrl } from "@/lib/portal";
 import { ApiError } from "@/lib/api";
+import { CotizacionApproval } from "./cotizacion-approval";
 
 interface PageProps { params: Promise<{ id: string }> }
 
@@ -53,6 +54,13 @@ export default function MiExpedienteDetallePage({ params }: PageProps) {
 
   const tipoLabel = (exp.tipo_servicio_confirmado ?? exp.tipo_servicio_estimado ?? "—")
     .replace(/^./, (c) => c.toUpperCase());
+
+  // Gate de aprobación: el hito "aprobacion_cliente" está en curso Y la
+  // cotización fue enviada al cliente. Solo entonces mostramos las acciones.
+  const gateAprobacion = exp.expediente_hitos.some(
+    (h) => h.codigo === "aprobacion_cliente" && h.estado === "en_curso",
+  );
+  const mostrarAprobacion = gateAprobacion && exp.cotizaciones?.estado === "enviada";
 
   return (
     <div>
@@ -112,6 +120,11 @@ export default function MiExpedienteDetallePage({ params }: PageProps) {
             {exp.portal_meta.completados} de {exp.portal_meta.total} etapas completadas
           </p>
         </section>
+
+        {/* Acción requerida: aprobar / rechazar / ver la cotización */}
+        {mostrarAprobacion && exp.cotizaciones && (
+          <CotizacionApproval cotizacion={exp.cotizaciones} onDone={load} />
+        )}
 
         {/* Info equipo */}
         {exp.transformadores && (
@@ -188,7 +201,18 @@ export default function MiExpedienteDetallePage({ params }: PageProps) {
                     Emitida {new Date(exp.cotizaciones.fecha_emision).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil" })}
                   </p>
                   <p className="mt-2 text-right font-mono text-lg font-semibold tabular-nums text-copper">USD {Number(exp.cotizaciones.total).toFixed(2)}</p>
-                  <Badge variant="outline" className="mt-1 capitalize">{exp.cotizaciones.estado}</Badge>
+                  <div className="mt-1 flex items-center justify-between">
+                    <Badge variant="outline" className="capitalize">{exp.cotizaciones.estado}</Badge>
+                    {exp.cotizaciones.estado !== "borrador" && (
+                      <button
+                        type="button"
+                        onClick={() => window.open(verCotizacionPdfUrl(exp.cotizaciones!.id), "_blank", "noopener,noreferrer")}
+                        className="inline-flex items-center gap-1 rounded-md border border-glass px-2 py-1 text-[11px] text-copper hover:bg-glass-elev"
+                      >
+                        <FileText className="h-3.5 w-3.5" /> Ver PDF
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
               {exp.contratos && (
