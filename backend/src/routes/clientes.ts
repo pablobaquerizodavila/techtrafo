@@ -17,8 +17,9 @@ const tipoPersonaEnum = z.enum(["natural", "juridica"]);
 const segmentoEnum = z.enum(["industrial", "distribuidora", "constructora", "otro"]);
 const sectorEnum = z.enum(["privado", "publico"]);
 const estadoEnum = z.enum(["activo", "inactivo", "bloqueado", "archivado"]);
+const cargoRepEnum = z.enum(["Gerente General", "Presidente", "Apoderado"]);
 
-const clienteCreateSchema = z.object({
+const clienteBaseSchema = z.object({
   tipo_persona: tipoPersonaEnum,
   razon_social: z.string().min(1).max(200),
   nombre_comercial: z.string().max(200).optional().nullable(),
@@ -36,9 +37,34 @@ const clienteCreateSchema = z.object({
   limite_credito: z.number().nonnegative().optional().default(0),
   plazo_credito_dias: z.number().int().min(0).optional().default(0),
   notas: z.string().optional().nullable(),
+  rep_legal_nombres: z.string().max(100).optional().nullable(),
+  rep_legal_apellidos: z.string().max(100).optional().nullable(),
+  rep_legal_cedula: z.string().max(13).optional().nullable(),
+  rep_legal_cargo: cargoRepEnum.optional().nullable(),
 });
 
-const clienteUpdateSchema = clienteCreateSchema.partial().extend({
+/** El representante legal es obligatorio para personas juridicas. */
+function repLegalIncompleto(d: {
+  rep_legal_nombres?: string | null;
+  rep_legal_apellidos?: string | null;
+  rep_legal_cedula?: string | null;
+  rep_legal_cargo?: string | null;
+}): boolean {
+  return !d.rep_legal_nombres?.trim() || !d.rep_legal_apellidos?.trim()
+    || !d.rep_legal_cedula?.trim() || !d.rep_legal_cargo;
+}
+
+const clienteCreateSchema = clienteBaseSchema.superRefine((data, ctx) => {
+  if (data.tipo_persona === "juridica" && repLegalIncompleto(data)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["rep_legal_nombres"],
+      message: "representante_legal_requerido",
+    });
+  }
+});
+
+const clienteUpdateSchema = clienteBaseSchema.partial().extend({
   estado: estadoEnum.optional(),
 });
 
@@ -183,6 +209,28 @@ router.patch("/:id", requirePermission("clientes", "write"), async (req, res) =>
     return;
   }
   const userId = req.user!.id;
+  const data = parsed.data;
+
+  // Si el cliente resultante es juridico, el representante legal es obligatorio.
+  const existing = await prisma.clientes.findUnique({
+    where: { id },
+    select: {
+      tipo_persona: true,
+      rep_legal_nombres: true, rep_legal_apellidos: true,
+      rep_legal_cedula: true, rep_legal_cargo: true,
+    },
+  });
+  if (!existing) { res.status(404).json({ error: "not_found" }); return; }
+  const tipoEfectivo = data.tipo_persona ?? existing.tipo_persona;
+  if (tipoEfectivo === "juridica" && repLegalIncompleto({
+    rep_legal_nombres: data.rep_legal_nombres ?? existing.rep_legal_nombres,
+    rep_legal_apellidos: data.rep_legal_apellidos ?? existing.rep_legal_apellidos,
+    rep_legal_cedula: data.rep_legal_cedula ?? existing.rep_legal_cedula,
+    rep_legal_cargo: data.rep_legal_cargo ?? existing.rep_legal_cargo,
+  })) {
+    res.status(400).json({ error: "representante_legal_requerido" });
+    return;
+  }
 
   try {
     const cliente = await withAppUser(userId, (tx) =>

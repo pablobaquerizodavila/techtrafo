@@ -170,7 +170,11 @@ export function renderCotizacion(doc: Doc, cot: DataCotizacion, nivel: Nivel): v
 export interface DataContrato {
   codigo: string; fecha_firma: Date | string | null; estado: string;
   monto_total: string; observaciones: string | null; notas_internas: string | null;
-  clientes: { razon_social: string; ruc_cedula: string; direccion_fiscal: string | null };
+  clientes: {
+    razon_social: string; ruc_cedula: string; direccion_fiscal: string | null;
+    rep_legal_nombres?: string | null; rep_legal_apellidos?: string | null;
+    rep_legal_cedula?: string | null; rep_legal_cargo?: string | null;
+  };
   cotizaciones?: { codigo: string; total: string } | null;
   contrato_pagos?: Array<{
     numero: number; concepto: string; monto: string; fecha_vencimiento: Date | string;
@@ -180,14 +184,24 @@ export interface DataContrato {
 
 export function renderContrato(doc: Doc, c: DataContrato, nivel: Nivel): void {
   titulo(doc, "Partes del contrato");
-  bloqueDatos(doc, [
+  const partes: FilaDato[] = [
     { label: "Cliente", valor: c.clientes.razon_social },
     { label: "RUC / cédula", valor: c.clientes.ruc_cedula },
     { label: "Dirección", valor: c.clientes.direccion_fiscal },
+  ];
+  const repNombre = [c.clientes.rep_legal_nombres, c.clientes.rep_legal_apellidos]
+    .filter(Boolean).join(" ").trim();
+  if (repNombre) {
+    partes.push({ label: "Representante legal", valor: repNombre });
+    if (c.clientes.rep_legal_cedula) partes.push({ label: "Cédula rep.", valor: c.clientes.rep_legal_cedula });
+    if (c.clientes.rep_legal_cargo) partes.push({ label: "Cargo", valor: c.clientes.rep_legal_cargo });
+  }
+  partes.push(
     { label: "Cotización base", valor: c.cotizaciones?.codigo ?? "—" },
     { label: "Fecha de firma", valor: fmtDate(c.fecha_firma) },
     { label: "Estado", valor: c.estado.toUpperCase() },
-  ]);
+  );
+  bloqueDatos(doc, partes);
 
   totalDestacado(doc, "MONTO TOTAL", fmtMoney(c.monto_total));
 

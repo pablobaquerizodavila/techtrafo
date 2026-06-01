@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Cliente, ClienteInput, TipoPersona, Segmento, Sector, crearAcceso } from "@/lib/clientes";
+import { Cliente, ClienteInput, TipoPersona, Segmento, Sector, CargoRepLegal, crearAcceso } from "@/lib/clientes";
 import { ClienteAccesos } from "./cliente-accesos";
 import { ApiError } from "@/lib/api";
 
@@ -51,6 +51,10 @@ export function ClienteForm({ initial, onSubmit, onCancel }: Props) {
   );
   const [plazoCreditoDias, setPlazoCreditoDias] = useState(initial?.plazo_credito_dias ?? 0);
   const [notas, setNotas] = useState(initial?.notas ?? "");
+  const [repNombres, setRepNombres] = useState(initial?.rep_legal_nombres ?? "");
+  const [repApellidos, setRepApellidos] = useState(initial?.rep_legal_apellidos ?? "");
+  const [repCedula, setRepCedula] = useState(initial?.rep_legal_cedula ?? "");
+  const [repCargo, setRepCargo] = useState<CargoRepLegal | "">(initial?.rep_legal_cargo ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,6 +69,10 @@ export function ClienteForm({ initial, onSubmit, onCancel }: Props) {
     e.preventDefault();
     setError(null);
     if (!provincia) { setError("Seleccioná una provincia"); return; }
+    if (tipoPersona === "juridica" && (!repNombres.trim() || !repApellidos.trim() || !repCedula.trim() || !repCargo)) {
+      setError("Para persona jurídica, completá el representante legal: nombres, apellidos, cédula y cargo");
+      return;
+    }
     // Validar acceso inicial si está activado (solo alta)
     if (!initial && crearAccesoInicial) {
       if (!accEmail.trim() || !accNombres.trim() || !accApellidos.trim() || accPassword.length < 8) {
@@ -92,6 +100,10 @@ export function ClienteForm({ initial, onSubmit, onCancel }: Props) {
       limite_credito: Number(limiteCredito) || 0,
       plazo_credito_dias: Number(plazoCreditoDias) || 0,
       notas: notas.trim() || null,
+      rep_legal_nombres: repNombres.trim() || null,
+      rep_legal_apellidos: repApellidos.trim() || null,
+      rep_legal_cedula: repCedula.trim() || null,
+      rep_legal_cargo: repCargo || null,
     };
 
     try {
@@ -257,6 +269,49 @@ export function ClienteForm({ initial, onSubmit, onCancel }: Props) {
         </div>
       </div>
 
+
+      {/* ─── Representante legal ─── */}
+      <div className="space-y-3 rounded-lg border border-glass bg-glass/40 p-3">
+        <div>
+          <p className="text-sm font-medium">
+            Representante legal{tipoPersona === "juridica" && <span className="ml-1 text-copper">*</span>}
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            Quien firma por el cliente en el contrato.{" "}
+            {tipoPersona === "juridica" ? "Obligatorio para persona jurídica." : "Opcional para persona natural."}
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="rep_nombres">Nombres</Label>
+            <Input id="rep_nombres" value={repNombres} onChange={(e) => setRepNombres(e.target.value)} maxLength={100} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="rep_apellidos">Apellidos</Label>
+            <Input id="rep_apellidos" value={repApellidos} onChange={(e) => setRepApellidos(e.target.value)} maxLength={100} />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="rep_cedula">Cédula del representante</Label>
+            <Input id="rep_cedula" value={repCedula} onChange={(e) => setRepCedula(e.target.value)} maxLength={13} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="rep_cargo">Cargo</Label>
+            <Select value={repCargo || "_"} onValueChange={(v) => setRepCargo(v === "_" ? "" : (v as CargoRepLegal))}>
+              <SelectTrigger id="rep_cargo">
+                <SelectValue placeholder="Seleccionar..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_">Sin definir</SelectItem>
+                <SelectItem value="Gerente General">Gerente General</SelectItem>
+                <SelectItem value="Presidente">Presidente</SelectItem>
+                <SelectItem value="Apoderado">Apoderado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
 
       <div className="space-y-2">
         <Label htmlFor="notas">Notas internas</Label>

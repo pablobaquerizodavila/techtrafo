@@ -4,6 +4,7 @@ export type TipoPersona = "natural" | "juridica";
 export type Segmento = "industrial" | "distribuidora" | "constructora" | "otro";
 export type Sector = "privado" | "publico";
 export type EstadoCliente = "activo" | "inactivo" | "bloqueado" | "archivado";
+export type CargoRepLegal = "Gerente General" | "Presidente" | "Apoderado";
 
 export interface Cliente {
   id: number;
@@ -25,6 +26,10 @@ export interface Cliente {
   plazo_credito_dias: number;
   estado: EstadoCliente;
   notas: string | null;
+  rep_legal_nombres: string | null;
+  rep_legal_apellidos: string | null;
+  rep_legal_cedula: string | null;
+  rep_legal_cargo: CargoRepLegal | null;
   created_at: string;
   updated_at: string;
 }
