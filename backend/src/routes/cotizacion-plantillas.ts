@@ -98,7 +98,7 @@ router.get("/:id", requirePermission("cotizaciones", "read"), async (req, res) =
     include: {
       plantilla_componentes: {
         orderBy: { orden: "asc" },
-        include: { items: { select: { id: true, codigo: true, nombre: true } } },
+        include: { items: { select: { id: true, codigo_interno: true, nombre: true } } },
       },
     },
   });

@@ -96,7 +96,7 @@ router.get("/:id", requirePermission("compras", "read"), async (req, res) => {
             include: { items: { select: { id: true, codigo_interno: true, nombre: true } } },
           },
           ubicaciones: { select: { id: true, codigo: true, nombre: true } },
-          lotes: { select: { id: true, codigo: true } },
+          lotes: { select: { id: true, numero_lote: true } },
         },
       },
       usuarios_recepciones_creado_porTousuarios: { select: { id: true, nombre_completo: true } },
