@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db/client";
 import { withAppUser } from "../db/withAppUser";
 import { requireAuth, requirePermission } from "../auth/middleware";
+import { hashPassword } from "../auth/password";
 
 const router = Router();
 
@@ -299,6 +300,176 @@ router.delete("/:id/permanente", requirePermission("clientes", "delete"), async 
       res.status(404).json({ error: "not_found" });
       return;
     }
+    throw err;
+  }
+});
+
+// ===================================================================
+// ACCESOS AL PORTAL — usuarios (rol "cliente") vinculados a un cliente
+// Un cliente puede tener N accesos. Cada uno es un usuario con rol
+// cliente, estado_aprobacion='aprobado' (lo crea el admin) y cliente_id
+// apuntando al cliente. Ven sus expedientes vía /api/portal/*.
+// ===================================================================
+
+const accesoCreateSchema = z.object({
+  email: z.string().email().max(255),
+  nombres: z.string().min(1).max(100),
+  apellidos: z.string().min(1).max(100),
+  password: z.string().min(8).max(100),
+});
+
+// Genera un nombre_usuario único a partir del email (parte local sanitizada).
+async function generarNombreUsuario(email: string): Promise<string> {
+  const base = email.split("@")[0].toLowerCase().replace(/[^a-z0-9._-]/g, "").slice(0, 40) || "cliente";
+  let candidato = base;
+  let n = 1;
+  // Reintenta con sufijo hasta encontrar uno libre
+  while (await prisma.usuarios.findFirst({ where: { nombre_usuario: candidato }, select: { id: true } })) {
+    candidato = `${base}${n}`.slice(0, 50);
+    n += 1;
+    if (n > 9999) { candidato = `${base}${Date.now()}`.slice(0, 50); break; }
+  }
+  return candidato;
+}
+
+async function getRolClienteId(): Promise<number | null> {
+  const rol = await prisma.roles.findFirst({ where: { nombre: "cliente" }, select: { id: true } });
+  return rol?.id ?? null;
+}
+
+// -------------------------------------------------------------------
+// GET /api/clientes/:id/accesos  -  lista de accesos del cliente
+// -------------------------------------------------------------------
+router.get("/:id/accesos", requirePermission("clientes", "read"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+  const data = await prisma.usuarios.findMany({
+    where: { cliente_id: id },
+    orderBy: { created_at: "asc" },
+    select: {
+      id: true, email: true, nombre_usuario: true, nombres: true, apellidos: true,
+      activo: true, estado_aprobacion: true, ultimo_login: true, created_at: true,
+    },
+  });
+  res.json({ data });
+});
+
+// -------------------------------------------------------------------
+// POST /api/clientes/:id/accesos  -  crear acceso al portal
+// -------------------------------------------------------------------
+router.post("/:id/accesos", requirePermission("clientes", "write"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+  const parsed = accesoCreateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  const { email, nombres, apellidos, password } = parsed.data;
+
+  // Validar cliente
+  const cliente = await prisma.clientes.findUnique({ where: { id }, select: { id: true } });
+  if (!cliente) { res.status(404).json({ error: "cliente_not_found" }); return; }
+
+  // Email único global
+  const existeEmail = await prisma.usuarios.findUnique({ where: { email }, select: { id: true } });
+  if (existeEmail) { res.status(409).json({ error: "email_duplicado" }); return; }
+
+  const rolClienteId = await getRolClienteId();
+  if (!rolClienteId) { res.status(500).json({ error: "rol_cliente_no_existe" }); return; }
+
+  const nombre_usuario = await generarNombreUsuario(email);
+  const password_hash = await hashPassword(password);
+
+  try {
+    const nuevo = await withAppUser(req.user!.id, (tx) =>
+      tx.usuarios.create({
+        data: {
+          email,
+          password_hash,
+          nombre_usuario,
+          nombres,
+          apellidos,
+          rol_id: rolClienteId,
+          cliente_id: id,
+          activo: true,
+          estado_aprobacion: "aprobado",
+          aprobado_por: req.user!.id,
+          fecha_aprobacion: new Date(),
+        },
+        select: {
+          id: true, email: true, nombre_usuario: true, nombres: true, apellidos: true,
+          activo: true, estado_aprobacion: true, created_at: true,
+        },
+      }),
+    );
+    res.status(201).json({ data: nuevo });
+  } catch (err) {
+    if (isUniqueViolation(err)) { res.status(409).json({ error: "email_o_usuario_duplicado" }); return; }
+    throw err;
+  }
+});
+
+// -------------------------------------------------------------------
+// PATCH /api/clientes/:id/accesos/:userId/password  -  reset password
+// -------------------------------------------------------------------
+router.patch("/:id/accesos/:userId/password", requirePermission("clientes", "write"), async (req, res) => {
+  const id = Number(req.params.id);
+  const userId = req.params.userId;
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+  const pw = z.object({ password: z.string().min(8).max(100) }).safeParse(req.body);
+  if (!pw.success) { res.status(400).json({ error: "password_invalida" }); return; }
+
+  // Asegurar que el usuario pertenece a este cliente
+  const u = await prisma.usuarios.findFirst({ where: { id: userId, cliente_id: id }, select: { id: true } });
+  if (!u) { res.status(404).json({ error: "acceso_not_found" }); return; }
+
+  const password_hash = await hashPassword(pw.data.password);
+  // token_version+1 fuerza logout en todos sus dispositivos
+  await prisma.$executeRaw`
+    UPDATE core.usuarios
+       SET password_hash = ${password_hash}, token_version = token_version + 1, updated_at = NOW()
+     WHERE id = ${userId}::uuid`;
+  res.json({ status: "password_reset" });
+});
+
+// -------------------------------------------------------------------
+// PATCH /api/clientes/:id/accesos/:userId  -  activar / desactivar
+// -------------------------------------------------------------------
+router.patch("/:id/accesos/:userId", requirePermission("clientes", "write"), async (req, res) => {
+  const id = Number(req.params.id);
+  const userId = req.params.userId;
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+  const body = z.object({ activo: z.boolean() }).safeParse(req.body);
+  if (!body.success) { res.status(400).json({ error: "invalid_payload" }); return; }
+
+  const u = await prisma.usuarios.findFirst({ where: { id: userId, cliente_id: id }, select: { id: true } });
+  if (!u) { res.status(404).json({ error: "acceso_not_found" }); return; }
+
+  await prisma.$executeRaw`
+    UPDATE core.usuarios SET activo = ${body.data.activo}, token_version = token_version + 1, updated_at = NOW()
+     WHERE id = ${userId}::uuid`;
+  res.json({ status: body.data.activo ? "activado" : "desactivado" });
+});
+
+// -------------------------------------------------------------------
+// DELETE /api/clientes/:id/accesos/:userId  -  revocar acceso (hard delete)
+// El usuario solo tiene rol cliente (no crea registros de negocio), por
+// eso es seguro borrarlo. Si tuviera historial, el FK lo impediría.
+// -------------------------------------------------------------------
+router.delete("/:id/accesos/:userId", requirePermission("clientes", "write"), async (req, res) => {
+  const id = Number(req.params.id);
+  const userId = req.params.userId;
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+
+  const u = await prisma.usuarios.findFirst({ where: { id: userId, cliente_id: id }, select: { id: true } });
+  if (!u) { res.status(404).json({ error: "acceso_not_found" }); return; }
+
+  try {
+    await prisma.usuarios.delete({ where: { id: userId } });
+    res.status(204).end();
+  } catch (err) {
+    if (isUniqueViolation(err)) { res.status(409).json({ error: "acceso_con_historial" }); return; }
     throw err;
   }
 });

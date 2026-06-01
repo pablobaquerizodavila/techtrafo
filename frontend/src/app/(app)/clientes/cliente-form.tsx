@@ -12,7 +12,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Cliente, ClienteInput, TipoPersona, Segmento, Sector } from "@/lib/clientes";
+import { Cliente, ClienteInput, TipoPersona, Segmento, Sector, crearAcceso } from "@/lib/clientes";
+import { ClienteAccesos } from "./cliente-accesos";
+import { ApiError } from "@/lib/api";
 
 const PROVINCIAS_EC = [
   "Azuay", "Bolívar", "Cañar", "Carchi", "Chimborazo", "Cotopaxi",
@@ -24,7 +26,8 @@ const PROVINCIAS_EC = [
 
 interface Props {
   initial?: Cliente | null;
-  onSubmit: (data: ClienteInput) => Promise<void>;
+  // Devuelve el cliente creado/actualizado (con id) para poder crear su acceso.
+  onSubmit: (data: ClienteInput) => Promise<Cliente | void>;
   onCancel: () => void;
 }
 
@@ -51,10 +54,24 @@ export function ClienteForm({ initial, onSubmit, onCancel }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Acceso inicial al portal (solo en alta). En edición se gestiona con <ClienteAccesos>.
+  const [crearAccesoInicial, setCrearAccesoInicial] = useState(false);
+  const [accEmail, setAccEmail] = useState("");
+  const [accNombres, setAccNombres] = useState("");
+  const [accApellidos, setAccApellidos] = useState("");
+  const [accPassword, setAccPassword] = useState("");
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     if (!provincia) { setError("Seleccioná una provincia"); return; }
+    // Validar acceso inicial si está activado (solo alta)
+    if (!initial && crearAccesoInicial) {
+      if (!accEmail.trim() || !accNombres.trim() || !accApellidos.trim() || accPassword.length < 8) {
+        setError("Para crear el acceso: completá email, nombre, apellido y una contraseña de 8+ caracteres");
+        return;
+      }
+    }
     setSubmitting(true);
 
     const payload: ClienteInput = {
@@ -78,7 +95,28 @@ export function ClienteForm({ initial, onSubmit, onCancel }: Props) {
     };
 
     try {
-      await onSubmit(payload);
+      const cliente = await onSubmit(payload);
+      // En alta, si se pidió acceso inicial, crearlo contra el cliente recién creado.
+      if (!initial && crearAccesoInicial && cliente && "id" in cliente) {
+        try {
+          await crearAcceso(cliente.id, {
+            email: accEmail.trim(),
+            nombres: accNombres.trim(),
+            apellidos: accApellidos.trim(),
+            password: accPassword,
+          });
+        } catch (accErr) {
+          const code = accErr instanceof ApiError ? (accErr.body as { error?: string })?.error : null;
+          setError(
+            code === "email_duplicado" || code === "email_o_usuario_duplicado"
+              ? "Cliente creado, pero el email del acceso ya está en uso. Agregá el acceso desde Editar."
+              : "Cliente creado, pero falló crear el acceso. Agregalo desde Editar.",
+          );
+          setSubmitting(false);
+          return; // no relanzar ni cerrar: el cliente sí se creó, mostramos el aviso
+        }
+      }
+      onCancel(); // éxito total → cerrar el dialog
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error guardando";
       setError(msg);
@@ -224,6 +262,55 @@ export function ClienteForm({ initial, onSubmit, onCancel }: Props) {
         <Label htmlFor="notas">Notas internas</Label>
         <Textarea id="notas" value={notas} onChange={(e) => setNotas(e.target.value)} rows={3} />
       </div>
+
+      {/* ─── Acceso al portal ─── */}
+      {initial ? (
+        // Edición: gestión completa de accesos (varios)
+        <ClienteAccesos clienteId={initial.id} />
+      ) : (
+        // Alta: opción de crear un acceso inicial
+        <div className="space-y-2 rounded-lg border border-glass bg-glass/40 p-3">
+          <label className="flex cursor-pointer items-start gap-2">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={crearAccesoInicial}
+              onChange={(e) => setCrearAccesoInicial(e.target.checked)}
+            />
+            <span>
+              <span className="block text-sm font-medium">Crear acceso al portal</span>
+              <span className="block text-[11px] text-muted-foreground">
+                El cliente podrá entrar a ver sus expedientes. Podés agregar más accesos después desde Editar.
+              </span>
+            </span>
+          </label>
+
+          {crearAccesoInicial && (
+            <div className="space-y-2 rounded-md border border-copper/30 bg-copper/[0.04] p-2.5">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label className="text-[11px]">Nombres</Label>
+                  <Input className="h-8 text-sm" value={accNombres} onChange={(e) => setAccNombres(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px]">Apellidos</Label>
+                  <Input className="h-8 text-sm" value={accApellidos} onChange={(e) => setAccApellidos(e.target.value)} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label className="text-[11px]">Email de login</Label>
+                  <Input className="h-8 text-sm" type="email" value={accEmail} onChange={(e) => setAccEmail(e.target.value)} placeholder="persona@empresa.com" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px]">Contraseña (8+ caracteres)</Label>
+                  <Input className="h-8 text-sm" type="text" value={accPassword} onChange={(e) => setAccPassword(e.target.value)} />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {error && (
         <p className="text-sm text-destructive" role="alert">

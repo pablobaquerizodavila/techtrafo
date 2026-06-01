@@ -100,12 +100,14 @@ export default function ClientesPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT));
 
-  async function handleCreate(payload: Parameters<typeof createCliente>[0]) {
+  // Devuelve el cliente creado (para que el form pueda crear su acceso inicial).
+  // NO cierra el dialog: el form lo cierra tras completar todo (cliente + acceso).
+  async function handleCreate(payload: Parameters<typeof createCliente>[0]): Promise<Cliente> {
     try {
-      await createCliente(payload);
+      const res = await createCliente(payload);
       toast.success("Cliente creado");
-      setDialog({ kind: "closed" });
       load();
+      return res.data;
     } catch (err) {
       const msg = err instanceof ApiError && err.status === 409 ? "Ya existe un cliente con ese RUC/Cédula" : "Error creando cliente";
       toast.error(msg);
@@ -113,12 +115,12 @@ export default function ClientesPage() {
     }
   }
 
-  async function handleUpdate(id: number, payload: Parameters<typeof updateCliente>[1]) {
+  async function handleUpdate(id: number, payload: Parameters<typeof updateCliente>[1]): Promise<Cliente> {
     try {
-      await updateCliente(id, payload);
+      const res = await updateCliente(id, payload);
       toast.success("Cliente actualizado");
-      setDialog({ kind: "closed" });
       load();
+      return res.data;
     } catch (err) {
       const msg = err instanceof ApiError && err.status === 409 ? "Ya existe un cliente con ese RUC/Cédula" : "Error actualizando cliente";
       toast.error(msg);
@@ -335,7 +337,7 @@ export default function ClientesPage() {
       </div>
 
       <Dialog open={dialog.kind !== "closed"} onOpenChange={(open) => !open && setDialog({ kind: "closed" })}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{dialog.kind === "edit" ? "Editar cliente" : "Nuevo cliente"}</DialogTitle>
             <DialogDescription>
@@ -350,10 +352,9 @@ export default function ClientesPage() {
               onCancel={() => setDialog({ kind: "closed" })}
               onSubmit={async (payload) => {
                 if (dialog.kind === "edit") {
-                  await handleUpdate(dialog.cliente.id, payload);
-                } else {
-                  await handleCreate(payload);
+                  return handleUpdate(dialog.cliente.id, payload);
                 }
+                return handleCreate(payload);
               }}
             />
           )}

@@ -99,3 +99,45 @@ export interface ClienteDependencias {
   garantias: number;
   usuarios_portal: number;
 }
+
+// -------------------------------------------------------------------
+// Accesos al portal — logins de cliente (rol "cliente")
+// -------------------------------------------------------------------
+export interface AccesoCliente {
+  id: string;
+  email: string;
+  nombre_usuario: string;
+  nombres: string;
+  apellidos: string;
+  activo: boolean;
+  estado_aprobacion: "pendiente" | "aprobado" | "rechazado";
+  ultimo_login: string | null;
+  created_at: string;
+}
+
+export interface AccesoCreateInput {
+  email: string;
+  nombres: string;
+  apellidos: string;
+  password: string;
+}
+
+export async function listAccesos(clienteId: number): Promise<{ data: AccesoCliente[] }> {
+  return api.get(`/api/clientes/${clienteId}/accesos`);
+}
+
+export async function crearAcceso(clienteId: number, payload: AccesoCreateInput): Promise<{ data: AccesoCliente }> {
+  return api.post(`/api/clientes/${clienteId}/accesos`, payload);
+}
+
+export async function resetPasswordAcceso(clienteId: number, userId: string, password: string): Promise<void> {
+  await api.patch(`/api/clientes/${clienteId}/accesos/${userId}/password`, { password });
+}
+
+export async function toggleAcceso(clienteId: number, userId: string, activo: boolean): Promise<void> {
+  await api.patch(`/api/clientes/${clienteId}/accesos/${userId}`, { activo });
+}
+
+export async function deleteAcceso(clienteId: number, userId: string): Promise<void> {
+  await api.delete(`/api/clientes/${clienteId}/accesos/${userId}`);
+}
