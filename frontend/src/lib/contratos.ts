@@ -71,6 +71,8 @@ export interface ContratoCreateInput {
   plan_pago_tipo?: PlanPagoTipo;
   observaciones?: string | null;
   notas_internas?: string | null;
+  clausulas?: string | null;
+  plantilla_id?: number | null;
   pagos?: PagoInput[];
 }
 

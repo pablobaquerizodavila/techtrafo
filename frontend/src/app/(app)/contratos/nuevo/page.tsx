@@ -18,6 +18,7 @@ import { PageHeader, HeaderActionGhost } from "@/components/page-header";
 import { Panel } from "@/components/panel";
 import { getCotizacion, Cotizacion } from "@/lib/cotizaciones";
 import { getExpediente } from "@/lib/expedientes";
+import { ContratoPlantilla, listContratoPlantillas, getContratoPlantilla } from "@/lib/contrato-plantillas";
 import {
   CondicionDisparo,
   ContratoCreateInput,
@@ -66,6 +67,9 @@ export default function NuevoContratoPage() {
   const [observaciones, setObservaciones] = useState("");
   const [notasInternas, setNotasInternas] = useState("");
   const [pagos, setPagos] = useState<PagoForm[]>([nuevoPago(1), nuevoPago(2)]);
+  const [plantillas, setPlantillas] = useState<ContratoPlantilla[]>([]);
+  const [plantillaId, setPlantillaId] = useState<number | null>(null);
+  const [clausulas, setClausulas] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -127,6 +131,37 @@ export default function NuevoContratoPage() {
     return () => { cancelled = true; };
   }, [cotizacionParam, expedienteParam]);
 
+  useEffect(() => {
+    listContratoPlantillas({ activo: true }).then((r) => setPlantillas(r.data)).catch(() => {});
+  }, []);
+
+  async function aplicarPlantilla(id: number) {
+    setPlantillaId(id);
+    try {
+      const { data: p } = await getContratoPlantilla(id);
+      setClausulas(p.clausulas ?? "");
+      setPlanPagoTipo(p.plan_pago_tipo as PlanPagoTipo);
+      if (p.pagos && p.pagos.length > 0) {
+        setPagos(p.pagos.map((pg, i) => {
+          const pct = pg.monto_porcentaje == null ? null : Number(pg.monto_porcentaje);
+          return {
+            _tempId: crypto.randomUUID(),
+            numero: i + 1,
+            tipo: pg.tipo,
+            descripcion: pg.descripcion ?? "",
+            condicion_disparo: pg.condicion_disparo,
+            fecha_esperada: null,
+            monto_porcentaje: pct,
+            monto_estipulado: pct != null ? Math.round(montoTotal * pct) / 100 : 0,
+          };
+        }));
+      }
+      toast.success(`Plantilla "${p.nombre}" aplicada`);
+    } catch {
+      toast.error("No se pudo cargar la plantilla");
+    }
+  }
+
   function updatePago<K extends keyof PagoForm>(idx: number, key: K, value: PagoForm[K]) {
     setPagos((prev) => {
       const next = [...prev];
@@ -155,6 +190,8 @@ export default function NuevoContratoPage() {
       plan_pago_tipo: planPagoTipo,
       observaciones: observaciones.trim() || null,
       notas_internas: notasInternas.trim() || null,
+      clausulas: clausulas.trim() || null,
+      plantilla_id: plantillaId,
       pagos: pagos.map((p) => ({
         numero: p.numero,
         tipo: p.tipo,
@@ -226,6 +263,31 @@ export default function NuevoContratoPage() {
       />
 
       <form onSubmit={handleSubmit} className="space-y-6 pt-6">
+        {/* Plantilla */}
+        <Panel title="Plantilla de contrato" subtitle="Opcional — pre-rellena cláusulas y plan de pago. Podés editarlas antes de crear.">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <FormField label="Aplicar plantilla" htmlFor="plantilla">
+              <Select
+                value={plantillaId ? String(plantillaId) : "_"}
+                onValueChange={(v) => { if (v === "_") { setPlantillaId(null); } else { aplicarPlantilla(Number(v)); } }}
+              >
+                <SelectTrigger id="plantilla" className="h-10 border-glass bg-glass"><SelectValue placeholder="Sin plantilla" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_">Sin plantilla</SelectItem>
+                  {plantillas.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.nombre}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </FormField>
+          </div>
+          <div className="mt-5">
+            <FormField label="Cláusulas (las variables se rellenan al crear el contrato)" htmlFor="clausulas">
+              <Textarea id="clausulas" rows={8} value={clausulas} onChange={(e) => setClausulas(e.target.value)}
+                placeholder="Elegí una plantilla o escribí las cláusulas. Variables: {{cliente_razon_social}}, {{representante_legal_nombre}}, {{monto_total}}, {{fecha_firma}}…"
+                className="border-glass bg-glass font-mono text-[13px] leading-relaxed" />
+            </FormField>
+          </div>
+        </Panel>
+
         {/* Fechas */}
         <Panel title="Fechas del contrato" icon={<FileSignature className="h-3.5 w-3.5" />}>
           <div className="grid grid-cols-1 gap-5 md:grid-cols-3">

@@ -152,6 +152,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                       <NavLink href="/admin/roles" icon={<KeySquare className="h-4 w-4" />}>Roles y permisos</NavLink>
                       <NavLink href="/admin/hito-plantillas" icon={<FolderOpen className="h-4 w-4" />}>Hitos del catálogo</NavLink>
                       <NavLink href="/admin/cotizacion-plantillas" icon={<FileText className="h-4 w-4" />}>Plantillas cotización</NavLink>
+                      <NavLink href="/admin/contrato-plantillas" icon={<FileSignature className="h-4 w-4" />}>Plantillas contrato</NavLink>
                     </>
                   )}
                   {puedeVerProveedores && !puedeVerCompras && (
