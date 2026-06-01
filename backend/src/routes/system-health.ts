@@ -8,7 +8,7 @@
  *  - influxdb (HTTP /health)
  *  - grafana  (HTTP /api/health)
  *  - web      (TCP connect al frontend container)
- *  - smtp NAS (transport.verify via services/email.verifyEmailConfig)
+ *  - smtp mailcow (transport.verify via services/email.verifyEmailConfig)
  *  - nginx VM 192.168.0.7 (HEAD https://panel.techtrafo.com)
  *
  * Devuelve {summary, checks, timestamp}. Cada check trae latency_ms.
@@ -122,10 +122,10 @@ async function checkSMTP(): Promise<HealthCheck> {
   try {
     const { value, ms } = await timed(() => withTimeout(verifyEmailConfig(), 4000, "smtp"));
     return value.ok
-      ? { name: "SMTP MailPlus (NAS)", category: "mail", status: "up", latency_ms: ms, message: value.message }
-      : { name: "SMTP MailPlus (NAS)", category: "mail", status: "degraded", latency_ms: ms, message: value.message };
+      ? { name: "SMTP mailcow", category: "mail", status: "up", latency_ms: ms, message: value.message }
+      : { name: "SMTP mailcow", category: "mail", status: "degraded", latency_ms: ms, message: value.message };
   } catch (e) {
-    return { name: "SMTP MailPlus (NAS)", category: "mail", status: "down", latency_ms: 0, message: (e as Error).message };
+    return { name: "SMTP mailcow", category: "mail", status: "down", latency_ms: 0, message: (e as Error).message };
   }
 }
 

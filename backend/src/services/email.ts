@@ -1,8 +1,8 @@
 /**
  * Servicio de email (4.D).
  *
- * Usa nodemailer con SMTP de Synology MailPlus (o cualquier otro que se
- * configure por .env). Si SMTP_HOST esta vacio, queda en modo dry-run:
+ * Usa nodemailer con SMTP de mailcow (VM 192.168.0.3, o cualquier otro que
+ * se configure por .env). Si SMTP_HOST esta vacio, queda en modo dry-run:
  * loguea el mail por consola y reporta éxito sin enviar nada.
  *
  * El transporter se crea una sola vez (lazy) y se reusa.
@@ -39,7 +39,8 @@ function getTransporter(): Transporter | null {
     return null;
   }
   if (cached) return cached;
-  // TLS: solo aceptar cert autofirmado contra hosts LAN (Synology MailPlus).
+  // TLS: solo aceptar cert no-validado contra hosts LAN (mailcow .3, cuyo
+  // cert LE es para mail.eneural.org y no matchea la IP privada).
   // Contra cualquier host externo (gmail/sendgrid/ses), exigir cert valido
   // para evitar MITM por config heredada.
   const isLanHost = /^192\.168\.\d+\.\d+$/.test(env.SMTP_HOST) ||
