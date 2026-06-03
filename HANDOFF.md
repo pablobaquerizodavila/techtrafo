@@ -45,17 +45,6 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 
 **Sesión 2026-06-01 — accesos de cliente al portal, fix de crash del API, hardening, cutover de correo a mailcow, aprobación de cotización desde el portal, representante legal del cliente, plantillas de contrato y card de "etapas en riesgo (SLA)" en el dashboard.**
 
-> 🌐 **INFRAESTRUCTURA DE HOSTING — VERIFICADA EN VIVO 2026-06-01** (esto CORRIGE lo que dicen §0b y §2 más abajo, que están desactualizados):
-> - **IP pública única `186.101.238.135`** (ISP netlife.ec). TODOS los dominios resuelven ahí: `panel/api/portal.techtrafo.com`, `techtrafo.com`, `medicvip.org`, `siscormed.com`, `mail.techtrafo.com`.
-> - **El edge web es el contenedor `web-nginx` en la PC `.23`** (escucha 80/443, TLS Let's Encrypt/certbot) — **NO la VM `.7`**. Enruta (vhosts en `web-nginx`):
->   - `panel.techtrafo.com` y `portal.techtrafo.com` → `techtrafo-web:3002`
->   - `api.techtrafo.com` → `techtrafo-api:3000`
->   - `techtrafo.com` / `medicvip.org` / `siscormed.com` → **sitios estáticos servidos LOCAL en `.23`** (`/var/www/sites/*`, con `web-php`) — NO proxeados al NAS.
-> - **App (`.23`, Docker Compose):** `techtrafo-web` :3002 · `techtrafo-api` :3000 · `postgres` (5432 localhost) · `redis` · `influxdb` (SCADA) · `mosquitto` (MQTT) · `grafana` :3001 · `techtrafo-nginx` :8080 (solo proxy a Grafana) · `simulador` · **`web-nginx` + `web-php`** (edge web público).
-> - **Correo:** VM mailcow `192.168.0.3` SOBRE el Synology NAS `.116` (ver bullet de mailcow en §0).
-> - **NAS `192.168.0.116`:** host del VMM (mailcow + VMs Netvoice + Home Assistant) y destino de backups.
-> - ⚠️ Lo único NO verificable desde `.23`: a qué IP apunta el NAT 80/443 del router. La evidencia (certs LE válidos + `web-nginx` sirviendo 307 correcto) indica que **el NAT va a `.23`**, no a `.7`. → El stack `web-public` de `.23` que §0b llamaba "REDUNDANTE" es en realidad **el edge VIVO**.
-
 - ✅ **Accesos al portal por cliente** (commit `87a0de5`). En `/clientes` (alta y edición) se crean/gestionan logins rol `cliente` que ven los expedientes del cliente. Backend: 5 endpoints `/api/clientes/:id/accesos[...]` en `clientes.ts`. Frontend: `cliente-accesos.tsx` (gestión en edición) + sección "Acceso al portal" en `cliente-form.tsx` (alta con 1er acceso opcional) + helpers en `lib/clientes.ts`. Multi-acceso por cliente; el admin define la pass; email de login separado del email general del cliente.
 - ✅ **Login super_admin restaurado**. La cuenta `pablobaquerizodavila@gmail.com` (rol `presidencia`, `es_super_admin=true`) no podía entrar porque **el proceso del API estaba caído**, NO por la contraseña. Pass reseteada a una temporal → **Pablo debe cambiarla al entrar**. Nota: NO existe un rol literal `super_admin`; es la columna booleana `core.roles.es_super_admin` (solo `presidencia` la tiene en true).
 - ✅ **Bug de crash del API corregido** (commit `9a3945a`) — causa raíz del login caído. Dos `select` Prisma pedían `items.codigo` y `lotes.codigo` (campos inexistentes; los reales son `codigo_interno` y `numero_lote`). Sin try/catch, la unhandled rejection MATABA el proceso Node entero → panel inaccesible. Archivos: `cotizacion-plantillas.ts` GET /:id, `recepciones.ts` GET /:id.
@@ -67,6 +56,8 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 - ✅ **Representante legal del cliente** (commit `a217fce`, migration 023). 4 columnas en `comercial.clientes` (`rep_legal_nombres/apellidos/cedula/cargo`); cargo = Gerente General/Presidente/Apoderado. **Obligatorios si `tipo_persona='juridica'`** (zod superRefine en create + guard en PATCH leyendo el cliente existente). Sección en `cliente-form.tsx`. Se imprime en el PDF del contrato (`renderContrato`, bloque "Partes del contrato"). Recordar: tras tocar `schema.prisma` correr `docker exec techtrafo-api npx prisma generate`.
 - ✅ **Plantillas de contrato** (commits `dafa5fc` backend + `b453a26` frontend, migration 024). Tablas `comercial.contrato_plantillas` + `contrato_plantilla_pagos` (preset en %) + `contratos.clausulas` (snapshot). Cláusulas con variables `{{...}}` → motor `backend/src/services/plantilla-vars.ts`. Ruta `contrato-plantillas.ts` (CRUD, solo roles override). Admin en `/admin/contrato-plantillas` (link en nav, `layout.tsx`). Selector en `/contratos/nuevo` pre-rellena cláusulas + plan de pagos; al crear, el backend renderiza variables con datos reales (incl. rep legal) y **snapshotea** en `contratos.clausulas`; el PDF imprime "Cláusulas y condiciones". Plantilla demo `PLT-CONTRATO-STD` (id 1) sembrada.
 - ✅ **Card "Etapas en riesgo por tiempo"** en el dashboard (commit `eeaa1b9`). `GET /api/dashboard/procesos-en-riesgo`: hitos `en_curso` con `>=80%` del SLA consumido (`(now-fecha_inicio)/sla_horas`), sin resolver, orden desc, una fila por etapa. Colores 80-89 amarillo / 90-99 naranja / 100+ rojo. Componente `components/procesos-riesgo-card.tsx`, insertado en `dashboard/page.tsx`.
+
+- 🌐 **Infra de hosting CONFIRMADA 2026-06-01 (por fingerprint de cert TLS):** el edge público de `techtrafo.com/medicvip/siscormed/panel/api` ES la **VM `.7`** (NAT 80/443 → `.7`), tal como dicen §2/§3 — **NO `.23`**. Prueba: el cert que sirve `panel.techtrafo.com` públicamente (Let's Encrypt issuer **E7**, fingerprint `A8:7E…`) es DISTINTO al de `web-nginx` en `.23` (issuer **E8**, `A0:C2…`) → son servidores TLS distintos; el público es `.7`, que proxea panel/api a `.23:3002`/`:3000` y los sitios al NAS. El stack `web-public` de `.23` SÍ es redundante (no recibe el NAT). ⚠️ Durante esta misma sesión llegué a la conclusión ERRÓNEA de que el edge era `.23` (me basé en que `.23` podía servir + un 307 que en realidad venía relayado por `.7`); el test de cert lo desmintió. **Para verificar el edge real siempre comparar el fingerprint del cert público vs el local, no solo el código HTTP.**
 
 **Pendientes abiertos al cierre:**
 - Pablo debe **cambiar su contraseña temporal** del panel.
@@ -83,10 +74,11 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 - ✅ Panel TECHTRAFO + sitios públicos (techtrafo.com, medicvip.org, siscormed.com) con HTTPS Let's Encrypt
 - ✅ Email saliente: MailPlus en NAS nuevo con DKIM/SPF/DMARC en 4 dominios. Cuenta `techtrafonotif@techtrafo.com` (pass en `.env` y en ACCESO-Y-BACKUPS.md). `notif-worker SMTP OK`.
 - ✅ NAS accesible **solo por LAN** `https://192.168.0.116:5001` (warning self-signed esperado, Pablo eligió aceptarlo — NO exponerlo a dominio)
-- ✅ **VM `.7` voip-panel-01 RECONSTRUIDA y VIVA** (reconstruida 2026-05-28). Credencial: `pbaquerizo` / `Groundunder8299` (SIN el `$`). ⚠️ **[CORREGIDO 2026-06-01]** `.7` ya **NO es el edge** de los dominios techtrafo/medicvip/siscormed — eso lo hace `web-nginx` en `.23` (ver bloque "INFRAESTRUCTURA DE HOSTING — VERIFICADA" al inicio de §0). `.7` queda asociado a Netvoice. ~~Routing `.7` → NAS Web Station; sitio techtrafo en `/volume2/web/...`~~ es histórico/no vigente: los sitios se sirven local en `.23` (`/var/www/sites/*`).
+- ✅ **VM `.7` voip-panel-01 RECONSTRUIDA y VIVA** (Pablo la reconstruyó en otra sesión, 2026-05-28). Es el **reverse proxy central** (nginx 1.18, vhost `/etc/nginx/sites-enabled/netvoice`). Credencial: `pbaquerizo` / `Groundunder8299` (SIN el `$`). Routing real:
+  - `techtrafo.com` / `medicvip.org` / `siscormed.com` → proxy_pass → **NAS `192.168.0.116`** (Web Station). El sitio techtrafo vive en `/volume2/web/techtrafo/app.jsx` en el NAS — EDITAR AHÍ, no en `.23`.
   - `panel.techtrafo.com` → proxy → `.23:3002` · `api.techtrafo.com` → proxy → `.23:3000`
   - `eneural.org` / `panel.eneural.org` → Netvoice (frontend en `.7` + Asterisk `192.168.0.161:8088`)
-- ⚠️ ~~El stack `web-public` de `.23` quedó REDUNDANTE; el NAT va a `.7`~~ → **[CORREGIDO 2026-06-01, verificado en vivo: ES FALSO. `web-nginx` en `.23` es el edge VIVO que sirve TODOS los dominios. Ver el bloque "INFRAESTRUCTURA DE HOSTING — VERIFICADA" al inicio de §0.]**
+- ⚠️ El stack `web-public` (web-nginx + web-php) que armé en `.23` el 2026-05-27 quedó **REDUNDANTE** — el NAT del router va a `.7`, no a `.23`. No recibe tráfico. Decidir si retirarlo o dejarlo standby.
 - ✅ **Netvoice OPERATIVO** otra vez (eneural.org / panel.eneural.org sirven desde `.7`).
 
 **Trabajado en sesión 2026-05-29**:
@@ -158,7 +150,7 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 
 ## 2. Topología real (actualizada 2026-05-27 tras cambio de NAS)
 
-> ⚠️ **HISTÓRICO — corregido 2026-06-01**: se cambió el NAS Synology y temporalmente la VM `.7` quedó caída; durante esa ventana se armó un stack reverse-proxy en `.23` (`web-public`). Se creyó luego que la VM `.7` reconstruida (2026-05-28) había vuelto a ser el edge con el NAT, pero la **verificación en vivo del 2026-06-01 lo DESMINTIÓ**: el edge en producción es **`web-public`/`web-nginx` en `.23`** (sirve panel/api/portal + sitios estáticos local; ver bloque verificado al inicio de §0). La VM `.7` queda asociada a Netvoice (operativo). Lo único sin confirmar: la IP exacta del NAT del router (evidencia → `.23`).
+> ⚠️ **HISTÓRICO 2026-05-27 → 2026-05-29 (corregido)**: se cambió el NAS Synology y temporalmente la VM `.7` quedó caída. Durante esa ventana se armó un stack reverse-proxy de respaldo en `.23` (`web-public`). PERO Pablo **reconstruyó la VM `.7` voip-panel-01** en otra sesión (2026-05-28) y ESA es la que está en producción ahora: es el reverse proxy central que recibe el NAT del router y enruta a NAS/`.23`/Netvoice (ver §0). El stack `web-public` de `.23` quedó redundante. La VM `.7` ya NO está en el NAS viejo — corre en hardware independiente. **Netvoice está operativo de nuevo.**
 
 ### Red física — DOS routers en serie
 
@@ -184,15 +176,15 @@ Router TP-Link AX6600 Wi-Fi 6   ← ROUTER REAL DE LA RED
 
 | Service Name | Puerto ext | Destino LAN | Estado |
 |---|---|---|---|
-| HTTP | 80 | `192.168.0.23` (`web-nginx`) | ✅ [CORREGIDO 2026-06-01] el edge es `web-nginx` en `.23`, NO `.7` |
-| HTTPS | 443 | `192.168.0.23` (`web-nginx`) | ✅ sirve panel/api/portal + sitios estáticos; TLS Let's Encrypt |
+| HTTP | 80 | `192.168.0.7` (VM reverse proxy) | ✅ OK — todo entra por `.7` |
+| HTTPS | 443 | `192.168.0.7` | ✅ OK — `.7` enruta a NAS/`.23`/Netvoice |
 | MailPlus-SMTP | 25 | `192.168.0.116` (NAS) | ✅ OK |
 | MailPlus-IMAP | 993 | `192.168.0.116` | ✅ OK |
 | MailPlus-STARTTLS | 587 | `192.168.0.116` | ✅ OK |
 | MailPlus-SMTPS | 465 | `192.168.0.116` | ✅ OK |
 | Netvoice-SIP | 5060/UDP | `192.168.0.161` (Asterisk) | ✅ Netvoice operativo |
 
-> ⚠️ **[CORREGIDO 2026-06-01 — verificado en vivo; esta sección §2 quedó desactualizada]** El edge web de techtrafo/medicvip/siscormed es **`web-nginx` en `.23`** (escucha 80/443, TLS Let's Encrypt): sirve `panel/api/portal` (proxy a los containers) y los sitios estáticos LOCAL en `/var/www/sites`. La afirmación previa (NAT → `.7`, `web-public` redundante, sitios servidos desde el NAS) quedó **DESMENTIDA**. Lo único sin confirmar: a qué IP apunta el NAT del router (la evidencia → `.23`). Mapa completo y vigente: bloque "INFRAESTRUCTURA DE HOSTING — VERIFICADA" al inicio de §0.
+> ⚠️ El NAT 80/443 va a la **VM `.7`** (nginx reverse proxy central), NO a `.23` como decía la versión anterior de este doc. `.7` hace el fan-out a NAS (sitios), `.23` (panel/api) y Netvoice. El stack `web-public` de `.23` quedó redundante.
 
 ### Servicios públicos
 
@@ -271,7 +263,7 @@ Volúmenes Docker importantes:
 | Host | Usuario | Password | Para qué |
 |---|---|---|---|
 | `192.168.0.23` (PC Ubuntu, Docker host) | `techtrafo` | `techtrafo$` | Operar contenedores, editar archivos del repo |
-| `192.168.0.7` (VM nginx, voip-panel-01) | `pbaquerizo` | `Groundunder8299` ⚠️ SIN `$` | ✅ VIVA. ⚠️ **[CORREGIDO 2026-06-01]** NO es el edge de techtrafo/medicvip/siscormed (eso lo hace `web-nginx` en `.23`); queda asociada a Netvoice. Los sitios se sirven local en `.23` (`/var/www/sites/*`), no desde el NAS. |
+| `192.168.0.7` (VM nginx, voip-panel-01) | `pbaquerizo` | `Groundunder8299` ⚠️ SIN `$` | ✅ **VIVA — reverse proxy central** + Netvoice. Reconstruida 2026-05-28. vhost en `/etc/nginx/sites-enabled/netvoice` (todos los dominios). El sitio `techtrafo.com` lo proxea al NAS (`/volume2/web/techtrafo/` — EDITAR AHÍ). |
 | `192.168.0.116` o `.88` (NAS Synology nuevo, hostname `Nasr24`) | `pbaquerizo` | `Groundunder8299*` | Admin DSM (`:5001` HTTPS), SSH, MailPlus. ⚠️ password termina con `*` no `$`. Sudo requiere password. `synowebapi` / `synopkg` requieren path absoluto `/usr/syno/bin/` |
 | `192.168.0.116` (NAS Synology) | `pbaquerizo` | `Groundunder8299*` | Inspeccionar/operar Synology, configurar MailPlus |
 | PostgreSQL en container | `techtrafo_admin` | `Cambiar_Esta_Password_Segura_2026` | Consultas DB directas |
