@@ -158,7 +158,7 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 
 ## 2. Topología real (actualizada 2026-05-27 tras cambio de NAS)
 
-> ⚠️ **HISTÓRICO 2026-05-27 → 2026-05-29 (corregido)**: se cambió el NAS Synology y temporalmente la VM `.7` quedó caída. Durante esa ventana se armó un stack reverse-proxy de respaldo en `.23` (`web-public`). PERO Pablo **reconstruyó la VM `.7` voip-panel-01** en otra sesión (2026-05-28) y ESA es la que está en producción ahora: es el reverse proxy central que recibe el NAT del router y enruta a NAS/`.23`/Netvoice (ver §0). El stack `web-public` de `.23` quedó redundante. La VM `.7` ya NO está en el NAS viejo — corre en hardware independiente. **Netvoice está operativo de nuevo.**
+> ⚠️ **HISTÓRICO — corregido 2026-06-01**: se cambió el NAS Synology y temporalmente la VM `.7` quedó caída; durante esa ventana se armó un stack reverse-proxy en `.23` (`web-public`). Se creyó luego que la VM `.7` reconstruida (2026-05-28) había vuelto a ser el edge con el NAT, pero la **verificación en vivo del 2026-06-01 lo DESMINTIÓ**: el edge en producción es **`web-public`/`web-nginx` en `.23`** (sirve panel/api/portal + sitios estáticos local; ver bloque verificado al inicio de §0). La VM `.7` queda asociada a Netvoice (operativo). Lo único sin confirmar: la IP exacta del NAT del router (evidencia → `.23`).
 
 ### Red física — DOS routers en serie
 
