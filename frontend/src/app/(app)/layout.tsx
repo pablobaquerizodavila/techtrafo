@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import {
-  Bell, Boxes, ClipboardList, FileSignature, FileText, Factory, FolderOpen,
+  Bell, Boxes, BookOpen, ClipboardList, FileSignature, FileText, Factory, FolderOpen,
   Gauge, KeySquare, LayoutDashboard, PackageCheck, Search, Shield, ShoppingCart,
   Truck, Users, UsersRound, Wallet, Coins, AlertTriangle, Zap,
 } from "lucide-react";
@@ -169,6 +169,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                   )}
                 </NavGroup>
               )}
+
+              <NavGroup label="Ayuda">
+                <NavLink href="/manual" icon={<BookOpen className="h-4 w-4" />}>Manual de procesos</NavLink>
+              </NavGroup>
             </>
           )}
         </nav>
