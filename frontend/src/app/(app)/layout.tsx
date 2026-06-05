@@ -3,7 +3,7 @@ import Link from "next/link";
 import {
   Bell, Boxes, ClipboardList, FileSignature, FileText, Factory, FolderOpen,
   Gauge, KeySquare, LayoutDashboard, PackageCheck, Search, Shield, ShoppingCart,
-  Truck, Users, UsersRound, Zap,
+  Truck, Users, UsersRound, Wallet, Coins, AlertTriangle, Zap,
 } from "lucide-react";
 import { LogoutButton } from "./logout-button";
 import { NotifLink } from "./notif-link";
@@ -61,6 +61,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const puedeVerOT = hasPerm(user, "ot", "read");
   const puedeVerCompras = hasPerm(user, "compras", "read");
   const puedeVerProveedores = hasPerm(user, "proveedores", "read") || puedeVerCompras;
+  const puedeVerFinanzas = hasPerm(user, "finanzas", "read");
   const esCliente = user?.rol_nombre === "cliente" && user.cliente_id !== null;
 
   return (
@@ -139,6 +140,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                   <NavSubLink href="/compras/ordenes-compra" icon={<FileText className="h-3 w-3" />}>Órdenes de compra</NavSubLink>
                   <NavSubLink href="/compras/recepciones" icon={<PackageCheck className="h-3 w-3" />}>Recepciones</NavSubLink>
                   <NavSubLink href="/admin/proveedores" icon={<Truck className="h-3 w-3" />}>Proveedores</NavSubLink>
+                </NavGroup>
+              )}
+
+              {puedeVerFinanzas && (
+                <NavGroup label="Finanzas">
+                  <NavLink href="/finanzas" icon={<Wallet className="h-4 w-4" />}>Resumen</NavLink>
+                  <NavSubLink href="/finanzas/cartera" icon={<AlertTriangle className="h-3 w-3" />}>Cartera vencida</NavSubLink>
+                  <NavSubLink href="/finanzas/cobros" icon={<Coins className="h-3 w-3" />}>Cobros</NavSubLink>
                 </NavGroup>
               )}
 

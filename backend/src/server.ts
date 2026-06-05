@@ -34,6 +34,7 @@ import recepcionesRouter from "./routes/recepciones";
 import comprasDashboardRouter from "./routes/compras-dashboard";
 import systemHealthRouter from "./routes/system-health";
 import dashboardRouter from "./routes/dashboard";
+import finanzasRouter from "./routes/finanzas";
 import { prisma } from "./db/client";
 import { csrfProtection } from "./auth/csrf";
 import { startNotificacionesWorker, stopNotificacionesWorker } from "./workers/notificaciones-worker";
@@ -106,6 +107,7 @@ app.use("/api/recepciones", recepcionesRouter);
 app.use("/api/compras-dashboard", comprasDashboardRouter);
 app.use("/api/system", systemHealthRouter);
 app.use("/api/dashboard", dashboardRouter);
+app.use("/api/finanzas", finanzasRouter);
 
 // 404 fallback
 app.use((_req, res) => {
