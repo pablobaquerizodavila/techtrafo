@@ -583,38 +583,29 @@ router.patch("/:id/pagos/:pagoId", requirePermission("contratos", "cobrar"), asy
       const existing = await tx.contrato_pagos.findUnique({ where: { id: pagoId } });
       if (!existing || Number(existing.contrato_id) !== id) throw new Error("not_found");
 
-      // Aplicar updates uno por uno usando SQL directo para evitar tema UUID
-      if (d.descripcion !== undefined) {
-        await tx.$executeRaw`UPDATE comercial.contrato_pagos SET descripcion = ${d.descripcion} WHERE id = ${pagoId}`;
-      }
-      if (d.condicion_disparo !== undefined) {
-        await tx.$executeRaw`UPDATE comercial.contrato_pagos SET condicion_disparo = ${d.condicion_disparo} WHERE id = ${pagoId}`;
-      }
-      if (d.fecha_esperada !== undefined) {
-        await tx.$executeRaw`UPDATE comercial.contrato_pagos SET fecha_esperada = ${d.fecha_esperada ? new Date(d.fecha_esperada) : null} WHERE id = ${pagoId}`;
-      }
-      if (d.monto_porcentaje !== undefined) {
-        await tx.$executeRaw`UPDATE comercial.contrato_pagos SET monto_porcentaje = ${d.monto_porcentaje} WHERE id = ${pagoId}`;
-      }
-      if (d.monto_estipulado !== undefined) {
-        await tx.$executeRaw`UPDATE comercial.contrato_pagos SET monto_estipulado = ${d.monto_estipulado} WHERE id = ${pagoId}`;
-      }
-      if (d.monto_pagado !== undefined) {
-        await tx.$executeRaw`UPDATE comercial.contrato_pagos SET monto_pagado = ${d.monto_pagado} WHERE id = ${pagoId}`;
-      }
-      if (d.fecha_pagado !== undefined) {
-        await tx.$executeRaw`UPDATE comercial.contrato_pagos SET fecha_pagado = ${d.fecha_pagado ? new Date(d.fecha_pagado) : null} WHERE id = ${pagoId}`;
-      }
-      if (d.referencia_pago !== undefined) {
-        await tx.$executeRaw`UPDATE comercial.contrato_pagos SET referencia_pago = ${d.referencia_pago} WHERE id = ${pagoId}`;
-      }
-      if (d.estado !== undefined) {
-        await tx.$executeRaw`UPDATE comercial.contrato_pagos SET estado = ${d.estado} WHERE id = ${pagoId}`;
-      }
-      if (d.observaciones !== undefined) {
-        await tx.$executeRaw`UPDATE comercial.contrato_pagos SET observaciones = ${d.observaciones} WHERE id = ${pagoId}`;
-      }
-      await tx.$executeRaw`UPDATE comercial.contrato_pagos SET actualizado_por = ${userId}::uuid WHERE id = ${pagoId}`;
+      // UN solo UPDATE con todos los campos (el provisto o el valor actual).
+      // Asi el CHECK del DB (ej. estado='pagado' => monto_pagado=estipulado)
+      // se evalua sobre el estado FINAL consistente. Hacerlo campo por campo
+      // violaba el check en estados intermedios (al reversar: poner
+      // monto_pagado=0 mientras estado seguia 'pagado').
+      const montoPct = d.monto_porcentaje !== undefined
+        ? d.monto_porcentaje
+        : (existing.monto_porcentaje === null ? null : Number(existing.monto_porcentaje));
+      await tx.$executeRaw`
+        UPDATE comercial.contrato_pagos
+           SET descripcion       = ${d.descripcion !== undefined ? d.descripcion : existing.descripcion},
+               condicion_disparo = ${d.condicion_disparo !== undefined ? d.condicion_disparo : existing.condicion_disparo},
+               fecha_esperada    = ${d.fecha_esperada !== undefined ? (d.fecha_esperada ? new Date(d.fecha_esperada) : null) : existing.fecha_esperada},
+               monto_porcentaje  = ${montoPct},
+               monto_estipulado  = ${d.monto_estipulado !== undefined ? d.monto_estipulado : Number(existing.monto_estipulado)},
+               monto_pagado      = ${d.monto_pagado !== undefined ? d.monto_pagado : Number(existing.monto_pagado)},
+               fecha_pagado      = ${d.fecha_pagado !== undefined ? (d.fecha_pagado ? new Date(d.fecha_pagado) : null) : existing.fecha_pagado},
+               referencia_pago   = ${d.referencia_pago !== undefined ? d.referencia_pago : existing.referencia_pago},
+               estado            = ${d.estado !== undefined ? d.estado : existing.estado},
+               observaciones     = ${d.observaciones !== undefined ? d.observaciones : existing.observaciones},
+               actualizado_por   = ${userId}::uuid
+         WHERE id = ${pagoId}
+      `;
 
       return tx.contrato_pagos.findUnique({ where: { id: pagoId } });
     });
