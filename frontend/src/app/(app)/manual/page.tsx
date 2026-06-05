@@ -3,13 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BookOpen, Download, Workflow, Users, Network, ShieldCheck, Eye, EyeOff,
-  GitBranch, ArrowRight, UserCheck, Filter,
+  GitBranch, ArrowRight, UserCheck, Filter, FileWarning,
 } from "lucide-react";
 import { PageHeader, HeaderActionPrimary, HeaderActionGhost } from "@/components/page-header";
 import { Panel } from "@/components/panel";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Manual, MiRol, ManualEtapa, getManual, descargarManualPdf, etapaEsDelRol } from "@/lib/manual";
+import {
+  Manual, MiRol, ManualEtapa, DriftReport,
+  getManual, getManualDrift, descargarManualPdf, etapaEsDelRol,
+} from "@/lib/manual";
 import { ApiError } from "@/lib/api";
 
 export default function ManualPage() {
@@ -19,6 +22,7 @@ export default function ManualPage() {
   const [error, setError] = useState<string | null>(null);
   const [bajando, setBajando] = useState(false);
   const [soloMiRol, setSoloMiRol] = useState(false);
+  const [drift, setDrift] = useState<DriftReport | null>(null);
 
   useEffect(() => {
     getManual()
@@ -26,6 +30,12 @@ export default function ManualPage() {
       .catch((e) => setError(e instanceof ApiError ? `Error ${e.status}` : "No se pudo cargar el manual"))
       .finally(() => setLoading(false));
   }, []);
+
+  // Drift: solo para roles con acceso total (el backend devuelve 403 al resto).
+  useEffect(() => {
+    if (!miRol?.accesoTotal) return;
+    getManualDrift().then((r) => setDrift(r.data)).catch(() => {});
+  }, [miRol?.accesoTotal]);
 
   async function bajarPdf() {
     setBajando(true);
@@ -100,6 +110,9 @@ export default function ManualPage() {
               </div>
             </div>
           )}
+
+          {/* Aviso de drift (solo admins) */}
+          {drift?.hayDrift && <DriftNotice drift={drift} />}
 
           {/* Resumen ejecutivo */}
           <Panel title="Resumen ejecutivo" icon={<BookOpen className="h-4 w-4" />}>
@@ -293,6 +306,36 @@ function Campo({ label, value }: { label: string; value: string }) {
     <div className="flex gap-2 text-[11px]">
       <span className="shrink-0 font-mono uppercase tracking-wider text-muted-foreground/70">{label}:</span>
       <span className="text-foreground/85">{value}</span>
+    </div>
+  );
+}
+
+/* ------------- Aviso de drift (lo que falta documentar, solo admins) -------- */
+function DriftNotice({ drift }: { drift: DriftReport }) {
+  const filas: [string, string[]][] = [
+    ["Hitos sin documentar", drift.hitosSinNarrativa],
+    ["Narrativa de hitos inexistentes (quitar)", drift.narrativaHitoHuerfana],
+    ["Roles sin documentar", drift.rolesSinNarrativa],
+    ["Narrativa de roles inexistentes (quitar)", drift.narrativaRolHuerfana],
+    ["Permisos sin etiqueta", drift.permisosSinLabel],
+  ].filter(([, v]) => v.length > 0) as [string, string[]][];
+
+  return (
+    <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.06] px-4 py-3">
+      <div className="flex items-center gap-2 text-sm font-medium text-amber-300">
+        <FileWarning className="h-4 w-4" />
+        {drift.total} {drift.total === 1 ? "elemento del sistema" : "elementos del sistema"} sin reflejar en el manual
+      </div>
+      <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+        {filas.map(([label, items]) => (
+          <li key={label}>
+            {label}: <span className="text-foreground/80">{items.join(", ")}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-[11px] text-muted-foreground">
+        Ejecutá el skill <code className="rounded bg-glass px-1 py-0.5 font-mono text-[10px]">/manual-doc</code> (o pedímelo) para documentarlos y mantener el manual al día.
+      </p>
     </div>
   );
 }

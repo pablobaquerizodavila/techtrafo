@@ -28,7 +28,20 @@ export interface Manual {
 }
 export interface MiRol { rol_nombre: string | null; accesoTotal: boolean }
 
+export interface DriftReport {
+  hayDrift: boolean;
+  total: number;
+  hitosSinNarrativa: string[];
+  narrativaHitoHuerfana: string[];
+  rolesSinNarrativa: string[];
+  narrativaRolHuerfana: string[];
+  permisosSinLabel: string[];
+}
+
 export const getManual = () => api.get<{ data: Manual; miRol: MiRol }>("/api/manual");
+
+/** Solo para usuarios con acceso total (el backend devuelve 403 al resto). */
+export const getManualDrift = () => api.get<{ data: DriftReport }>("/api/manual/drift");
 
 /** True si la etapa la ejecuta/aprueba el rol indicado. */
 export function etapaEsDelRol(etapa: ManualEtapa, rolNombre: string | null): boolean {
