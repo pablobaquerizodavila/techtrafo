@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, DollarSign, Pause, Play, CheckCircle2, Ban, FileSignature } from "lucide-react";
+import { ChevronLeft, DollarSign, Pause, Play, CheckCircle2, Ban, FileSignature, Pencil, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -57,7 +57,7 @@ export default function ContratoDetallePage({ params }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [cobroDialog, setCobroDialog] = useState<{ open: boolean; pago: ContratoPago | null }>({ open: false, pago: null });
+  const [cobroDialog, setCobroDialog] = useState<{ open: boolean; pago: ContratoPago | null; modo: "registrar" | "editar" }>({ open: false, pago: null, modo: "registrar" });
   const [cobroMonto, setCobroMonto] = useState(0);
   const [cobroFecha, setCobroFecha] = useState("");
   const [cobroReferencia, setCobroReferencia] = useState("");
@@ -86,24 +86,55 @@ export default function ContratoDetallePage({ params }: PageProps) {
     setCobroMonto(Number(pago.monto_estipulado) - Number(pago.monto_pagado));
     setCobroFecha(new Date().toISOString().split("T")[0]);
     setCobroReferencia("");
-    setCobroDialog({ open: true, pago });
+    setCobroDialog({ open: true, pago, modo: "registrar" });
+  }
+
+  function abrirEditarCobro(pago: ContratoPago) {
+    setCobroMonto(Number(pago.monto_pagado));
+    setCobroFecha(pago.fecha_pagado?.split("T")[0] ?? new Date().toISOString().split("T")[0]);
+    setCobroReferencia(pago.referencia_pago ?? "");
+    setCobroDialog({ open: true, pago, modo: "editar" });
+  }
+
+  async function reversarCobro(pago: ContratoPago) {
+    if (!contrato) return;
+    const motivo = window.prompt(`Reversar el cobro #${pago.numero} (vuelve a pendiente, pagado $0). Motivo (obligatorio):`);
+    if (motivo === null) return;
+    if (!motivo.trim()) { toast.error("El motivo es obligatorio para reversar"); return; }
+    const nota = `[REVERSADO ${new Date().toISOString().split("T")[0]}] ${motivo.trim()}`;
+    try {
+      await updatePago(contrato.id, pago.id, {
+        monto_pagado: 0,
+        fecha_pagado: null,
+        referencia_pago: null,
+        estado: "pendiente",
+        observaciones: pago.observaciones ? `${nota}\n${pago.observaciones}` : nota,
+      });
+      toast.success("Cobro reversado");
+      load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error");
+    }
   }
 
   async function registrarCobro() {
     if (!contrato || !cobroDialog.pago) return;
     const pago = cobroDialog.pago;
-    const nuevoTotalPagado = Number(pago.monto_pagado) + cobroMonto;
-    const nuevoEstado = nuevoTotalPagado >= Number(pago.monto_estipulado) ? "pagado" : "parcial";
+    const estipulado = Number(pago.monto_estipulado);
+    // En "editar" el monto es el TOTAL pagado; en "registrar" se SUMA al ya pagado.
+    const totalRaw = cobroDialog.modo === "editar" ? cobroMonto : Number(pago.monto_pagado) + cobroMonto;
+    const total = Math.min(Math.max(totalRaw, 0), estipulado);
+    const nuevoEstado = total >= estipulado ? "pagado" : total > 0 ? "parcial" : "pendiente";
 
     try {
       await updatePago(contrato.id, pago.id, {
-        monto_pagado: Math.min(nuevoTotalPagado, Number(pago.monto_estipulado)),
-        fecha_pagado: cobroFecha,
+        monto_pagado: total,
+        fecha_pagado: total > 0 ? cobroFecha : null,
         referencia_pago: cobroReferencia.trim() || null,
         estado: nuevoEstado,
       });
-      toast.success("Cobro registrado");
-      setCobroDialog({ open: false, pago: null });
+      toast.success(cobroDialog.modo === "editar" ? "Cobro actualizado" : "Cobro registrado");
+      setCobroDialog({ open: false, pago: null, modo: "registrar" });
       load();
     } catch (err) {
       toast.error(err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error");
@@ -160,6 +191,7 @@ export default function ContratoDetallePage({ params }: PageProps) {
 
   const transiciones = transicionesPosiblesContrato(contrato.estado);
   const editable = contrato.estado === "vigente";
+  const puedeAjustar = contrato.estado === "vigente" || contrato.estado === "completado";
   const totalPagado = contrato.resumen_pagos?.total_pagado ?? 0;
   const saldoPendiente = contrato.resumen_pagos?.saldo_pendiente ?? 0;
   const pctPagado = Number(contrato.monto_total) > 0 ? (totalPagado / Number(contrato.monto_total)) * 100 : 0;
@@ -277,11 +309,23 @@ export default function ContratoDetallePage({ params }: PageProps) {
                       </TableCell>
                       <TableCell><Badge variant={estadoPagoVariant(p.estado)}>{p.estado}</Badge></TableCell>
                       <TableCell className="text-right">
-                        {editable && pendiente > 0 && p.estado !== "cancelado" && (
-                          <button type="button" onClick={() => abrirCobro(p)} className="inline-flex items-center gap-1 rounded-md border border-copper/30 bg-copper/10 px-2 py-1 text-[11px] font-medium text-copper transition hover:bg-copper/15">
-                            <DollarSign className="h-3 w-3" /> Cobrar
-                          </button>
-                        )}
+                        <div className="flex items-center justify-end gap-1">
+                          {editable && pendiente > 0 && p.estado !== "cancelado" && (
+                            <button type="button" onClick={() => abrirCobro(p)} title="Registrar cobro" className="inline-flex items-center gap-1 rounded-md border border-copper/30 bg-copper/10 px-2 py-1 text-[11px] font-medium text-copper transition hover:bg-copper/15">
+                              <DollarSign className="h-3 w-3" /> Cobrar
+                            </button>
+                          )}
+                          {puedeAjustar && Number(p.monto_pagado) > 0 && (
+                            <>
+                              <button type="button" onClick={() => abrirEditarCobro(p)} title="Editar cobro" className="rounded-md p-1.5 text-muted-foreground transition hover:bg-glass-elev hover:text-copper">
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              <button type="button" onClick={() => reversarCobro(p)} title="Reversar cobro" className="rounded-md p-1.5 text-muted-foreground transition hover:bg-rose-500/10 hover:text-rose-400">
+                                <RotateCcw className="h-3.5 w-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -293,10 +337,10 @@ export default function ContratoDetallePage({ params }: PageProps) {
       </div>
 
       {/* Dialog de cobro */}
-      <Dialog open={cobroDialog.open} onOpenChange={(open) => !open && setCobroDialog({ open: false, pago: null })}>
+      <Dialog open={cobroDialog.open} onOpenChange={(open) => !open && setCobroDialog({ open: false, pago: null, modo: "registrar" })}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Registrar cobro</DialogTitle>
+            <DialogTitle>{cobroDialog.modo === "editar" ? "Editar cobro" : "Registrar cobro"}</DialogTitle>
             <DialogDescription>
               Pago #{cobroDialog.pago?.numero} · estipulado ${cobroDialog.pago && Number(cobroDialog.pago.monto_estipulado).toFixed(2)}
               {cobroDialog.pago && Number(cobroDialog.pago.monto_pagado) > 0 && ` · ya pagado $${Number(cobroDialog.pago.monto_pagado).toFixed(2)}`}
@@ -304,8 +348,9 @@ export default function ContratoDetallePage({ params }: PageProps) {
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label htmlFor="cobro_monto">Monto a cobrar ($)</Label>
-              <Input id="cobro_monto" type="number" step="0.01" min="0" max={cobroDialog.pago ? Number(cobroDialog.pago.monto_estipulado) - Number(cobroDialog.pago.monto_pagado) : 0} value={cobroMonto} onChange={(e) => setCobroMonto(Number(e.target.value))} />
+              <Label htmlFor="cobro_monto">{cobroDialog.modo === "editar" ? "Monto pagado total ($)" : "Monto a cobrar ($)"}</Label>
+              <Input id="cobro_monto" type="number" step="0.01" min="0" max={cobroDialog.pago ? (cobroDialog.modo === "editar" ? Number(cobroDialog.pago.monto_estipulado) : Number(cobroDialog.pago.monto_estipulado) - Number(cobroDialog.pago.monto_pagado)) : 0} value={cobroMonto} onChange={(e) => setCobroMonto(Number(e.target.value))} />
+              {cobroDialog.modo === "editar" && <p className="text-[11px] text-muted-foreground">Poné el total efectivamente pagado de esta cuota (0 = equivale a reversar).</p>}
             </div>
             <div className="space-y-1">
               <Label htmlFor="cobro_fecha">Fecha</Label>
@@ -317,8 +362,8 @@ export default function ContratoDetallePage({ params }: PageProps) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCobroDialog({ open: false, pago: null })}>Cancelar</Button>
-            <Button onClick={registrarCobro} disabled={cobroMonto <= 0}>Registrar cobro</Button>
+            <Button variant="outline" onClick={() => setCobroDialog({ open: false, pago: null, modo: "registrar" })}>Cancelar</Button>
+            <Button onClick={registrarCobro} disabled={cobroMonto < 0 || (cobroDialog.modo === "registrar" && cobroMonto <= 0)}>{cobroDialog.modo === "editar" ? "Guardar" : "Registrar cobro"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
