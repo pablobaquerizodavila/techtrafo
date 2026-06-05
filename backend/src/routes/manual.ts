@@ -16,9 +16,17 @@ import { enviarPDF } from "../services/pdf/base";
 const router = Router();
 router.use(requireAuth);
 
-router.get("/", async (_req, res) => {
+router.get("/", async (req, res) => {
   const manual = await armarManual();
-  res.json({ data: manual });
+  const u = req.user;
+  const accesoTotal = !!u?.es_super_admin || u?.permisos?.all === true;
+  res.json({
+    data: manual,
+    miRol: {
+      rol_nombre: u?.rol_nombre ?? null,
+      accesoTotal,
+    },
+  });
 });
 
 router.get("/pdf", async (_req, res) => {

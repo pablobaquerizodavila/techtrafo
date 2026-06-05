@@ -22,6 +22,10 @@ export interface ManualEtapa {
   pantalla: string;
   dispara: string;
   descripcion?: string;
+  /** Nombres tecnicos de los roles que ejecutan/aprueban (para vista "mi rol"). */
+  roles: string[];
+  /** Solo en el nodo sintetico de produccion: las ramas por tipo de servicio. */
+  ramas?: { tipo: string; pasos: string[] }[];
 }
 export interface ManualProceso { clave: string; titulo: string; resumen: string; etapas: ManualEtapa[] }
 export interface ManualRol { nombre: string; etiqueta: string; funcion: string; accesos: string[] }
@@ -83,6 +87,8 @@ export async function armarManual(): Promise<Manual> {
 
   const etapaDe = (h: HitoRow): ManualEtapa => {
     const n = HITO_NARRATIVA[h.codigo];
+    const roles = new Set<string>(n?.roles ?? []);
+    if (h.requiere_aprobacion && h.rol_aprobador) roles.add(h.rol_aprobador);
     return {
       orden: String(h.orden),
       codigo: h.codigo,
@@ -95,6 +101,7 @@ export async function armarManual(): Promise<Manual> {
       pantalla: n?.pantalla ?? "—",
       dispara: n?.dispara ?? "—",
       descripcion: n?.descripcion,
+      roles: Array.from(roles),
     };
   };
 
@@ -122,6 +129,8 @@ export async function armarManual(): Promise<Manual> {
         pantalla: "Ordenes de trabajo (OT) / Dashboard planta",
         dispara: "Pruebas finales QA",
         descripcion: `La ruta depende del tipo de servicio. ${detalle}.`,
+        roles: ["jefe_planta", "tecnico_planta", "coordinador_tecnico"],
+        ramas: Object.entries(porTipo).map(([tipo, pasos]) => ({ tipo, pasos })),
       });
     }
   }
@@ -147,6 +156,7 @@ export async function armarManual(): Promise<Manual> {
       pantalla: e.pantalla,
       dispara: e.dispara ?? "—",
       descripcion: e.descripcion,
+      roles: e.roles ?? [],
     })),
   }));
 

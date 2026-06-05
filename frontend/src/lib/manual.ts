@@ -14,6 +14,8 @@ export interface ManualEtapa {
   pantalla: string;
   dispara: string;
   descripcion?: string;
+  roles: string[];
+  ramas?: { tipo: string; pasos: string[] }[];
 }
 export interface ManualProceso { clave: string; titulo: string; resumen: string; etapas: ManualEtapa[] }
 export interface ManualRol { nombre: string; etiqueta: string; funcion: string; accesos: string[] }
@@ -24,8 +26,14 @@ export interface Manual {
   procesos: ManualProceso[];
   roles: ManualRol[];
 }
+export interface MiRol { rol_nombre: string | null; accesoTotal: boolean }
 
-export const getManual = () => api.get<{ data: Manual }>("/api/manual");
+export const getManual = () => api.get<{ data: Manual; miRol: MiRol }>("/api/manual");
+
+/** True si la etapa la ejecuta/aprueba el rol indicado. */
+export function etapaEsDelRol(etapa: ManualEtapa, rolNombre: string | null): boolean {
+  return !!rolNombre && etapa.roles.includes(rolNombre);
+}
 
 /** Descarga el PDF del manual (fetch con cookie de sesion -> blob -> download). */
 export async function descargarManualPdf(): Promise<void> {
