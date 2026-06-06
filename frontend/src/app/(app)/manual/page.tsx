@@ -199,15 +199,21 @@ function PipelineDiagram({ etapas, rolNombre, filtrar }: { etapas: ManualEtapa[]
         const last = i === etapas.length - 1;
         return (
           <div key={i} className={`flex gap-4 transition-opacity ${dim ? "opacity-30" : ""}`}>
-            {/* Columna del conector */}
+            {/* Columna del conector — rombo en los gates (decisión) */}
             <div className="flex flex-col items-center">
-              <div
-                className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border font-mono text-xs ${
-                  mine ? "border-copper bg-copper/15 text-copper" : "border-glass-mid bg-glass text-muted-foreground"
-                }`}
-              >
-                {e.ramas ? <GitBranch className="h-4 w-4" /> : e.orden}
-              </div>
+              {e.ramas ? (
+                <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border ${mine ? "border-copper bg-copper/15 text-copper" : "border-glass-mid bg-glass text-muted-foreground"}`}>
+                  <GitBranch className="h-4 w-4" />
+                </div>
+              ) : e.aprueba ? (
+                <div className={`grid h-7 w-7 shrink-0 rotate-45 place-items-center rounded-[4px] border ${mine ? "border-copper bg-copper/15" : "border-amber-400/70 bg-amber-400/10"}`}>
+                  <span className={`-rotate-45 font-mono text-[10px] ${mine ? "text-copper" : "text-amber-300"}`}>{e.orden}</span>
+                </div>
+              ) : (
+                <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border font-mono text-xs ${mine ? "border-copper bg-copper/15 text-copper" : "border-glass-mid bg-glass text-muted-foreground"}`}>
+                  {e.orden}
+                </div>
+              )}
               {!last && <div className="my-1 w-px flex-1 bg-glass-mid" />}
             </div>
             {/* Contenido */}
@@ -216,8 +222,8 @@ function PipelineDiagram({ etapas, rolNombre, filtrar }: { etapas: ManualEtapa[]
                 <span className={`text-sm ${mine ? "font-semibold text-copper" : "font-medium"}`}>{e.nombre}</span>
                 {mine && <Badge variant="warning">Tu rol</Badge>}
                 {e.aprueba && (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] text-amber-300">
-                    ⟂ aprueba {e.aprueba}
+                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-amber-300">
+                    ◇ decisión
                   </span>
                 )}
                 {e.sla && e.sla !== "—" && (
@@ -229,6 +235,15 @@ function PipelineDiagram({ etapas, rolNombre, filtrar }: { etapas: ManualEtapa[]
                   <EyeOff className="h-3.5 w-3.5 text-muted-foreground/40" />
                 )}
               </div>
+              {/* Gate: lenguaje de decisión */}
+              {e.aprueba && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  ¿Aprueba <span className="text-amber-300">{e.aprueba}</span>?{" "}
+                  <span className="text-green-400">Sí → continúa</span>
+                  {" · "}
+                  <span className="text-rose-400">No → se corrige</span>
+                </p>
+              )}
               {/* Bifurcación de producción */}
               {e.ramas && (
                 <div className="mt-2 grid gap-2 sm:grid-cols-3">
