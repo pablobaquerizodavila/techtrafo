@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import {
   Bell, Boxes, BookOpen, ClipboardList, FileSignature, FileText, Factory, FolderOpen,
-  Gauge, KeySquare, LayoutDashboard, PackageCheck, Search, Shield, ShoppingCart,
+  Gauge, KeySquare, LayoutDashboard, PackageCheck, Search, Shield, ShoppingCart, SlidersHorizontal,
   Truck, Users, UsersRound, Wallet, Coins, AlertTriangle, Zap,
 } from "lucide-react";
 import { LogoutButton } from "./logout-button";
@@ -57,6 +57,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await fetchMe();
   const puedeAdminUsuarios = hasPerm(user, "admin", "usuarios");
   const puedeAdminRoles = user?.es_super_admin ?? false;
+  const puedeConfigMargen = (user?.es_super_admin ?? false) || ["presidencia", "gerencia_general"].includes(user?.rol_nombre ?? "");
   const puedeVerExpedientes = hasPerm(user, "expedientes", "read");
   const puedeVerOT = hasPerm(user, "ot", "read");
   const puedeVerCompras = hasPerm(user, "compras", "read");
@@ -163,6 +164,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                       <NavLink href="/admin/cotizacion-plantillas" icon={<FileText className="h-4 w-4" />}>Plantillas cotización</NavLink>
                       <NavLink href="/admin/contrato-plantillas" icon={<FileSignature className="h-4 w-4" />}>Plantillas contrato</NavLink>
                     </>
+                  )}
+                  {puedeConfigMargen && (
+                    <NavLink href="/admin/config-margen" icon={<SlidersHorizontal className="h-4 w-4" />}>Márgenes mínimos</NavLink>
                   )}
                   {puedeVerProveedores && !puedeVerCompras && (
                     <NavLink href="/admin/proveedores" icon={<Truck className="h-4 w-4" />}>Proveedores</NavLink>
