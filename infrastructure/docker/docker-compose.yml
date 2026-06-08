@@ -76,14 +76,17 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_INSTALL_PLUGINS: "grafana-clock-panel,grafana-piechart-panel"
       GF_SERVER_ROOT_URL: "http://192.168.0.23:3001"
-      # SMTP para Grafana Alerting (FASE 8). Reusa la cuenta MailPlus de Synology.
+      # SMTP para Grafana Alerting (FASE 8). Usa mailcow VM (.3) vía hostname.
+      # extra_hosts resuelve mail.eneural.org → 192.168.0.3 dentro del container,
+      # lo que permite verificar el cert Let's Encrypt (CN=mail.eneural.org) sin
+      # skip_verify. Fix auditoria B-3.
       GF_SMTP_ENABLED: "true"
-      GF_SMTP_HOST: ${SMTP_HOST}:${SMTP_PORT}
+      GF_SMTP_HOST: "mail.eneural.org:465"   # hardcoded: extra_hosts resuelve a .3 internamente
       GF_SMTP_USER: ${SMTP_USER}
       GF_SMTP_PASSWORD: ${SMTP_PASS}
       GF_SMTP_FROM_ADDRESS: ${SMTP_FROM_ADDRESS:-notificaciones@medicvip.org}
       GF_SMTP_FROM_NAME: TECHTRAFO Alerting
-      GF_SMTP_SKIP_VERIFY: "true"
+      GF_SMTP_SKIP_VERIFY: "false"           # cert válido: Let's Encrypt CN=mail.eneural.org
       # Pass-through para resolver ${GRAFANA_DB_PASSWORD} en provisioning/datasources/postgres.yaml
       # Fix H4 auditoria: usar grafana_ro (SELECT-only en comercial/posventa/produccion)
       # en lugar de techtrafo_admin (DB superuser). Migration 017 crea el rol.
@@ -100,6 +103,8 @@ services:
       - techtrafo_net
     ports:
       - "3001:3000"
+    extra_hosts:
+      - "mail.eneural.org:192.168.0.3"   # B-3: resuelve mailcow por hostname para verificación TLS
     depends_on:
       postgres:
         condition: service_healthy
