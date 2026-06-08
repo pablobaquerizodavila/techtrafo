@@ -157,7 +157,7 @@ services:
     networks:
       - techtrafo_net
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"   # hardening B-1: solo loopback; .7 llega via techtrafo-nginx:8080
     depends_on:
       postgres:
         condition: service_healthy
@@ -178,7 +178,7 @@ services:
     networks:
       - techtrafo_net
     ports:
-      - "3002:3002"
+      - "127.0.0.1:3002:3002"   # hardening B-1: solo loopback; .7 llega via techtrafo-nginx:8080
     depends_on:
       - api
 
