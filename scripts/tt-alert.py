@@ -15,6 +15,7 @@ import smtplib
 import ssl
 import sys
 import os
+import ipaddress
 from email.mime.text import MIMEText
 
 ENV_FILE = os.environ.get("ALERT_ENV_FILE", "/opt/techtrafo/.env")
@@ -47,11 +48,20 @@ msg["Subject"] = subject
 msg["From"]    = from_addr
 msg["To"]      = to_addr
 
-# TLS sin verificacion de hostname: conectamos por IP LAN .3,
-# CN del cert es mail.eneural.org (mismatch de hostname esperado).
+# TLS: politica igual a email.ts — solo deshabilitar verificacion para hosts
+# LAN (IPs privadas). Si SMTP_HOST es externo, exigir cert valido para evitar
+# MITM. Hoy conectamos a mailcow en 192.168.0.3 (LAN) → skip verificacion.
+def _is_lan_host(h: str) -> bool:
+    """True si h es una IP privada RFC-1918/RFC-4193."""
+    try:
+        return ipaddress.ip_address(h).is_private
+    except ValueError:
+        return False   # hostname (no IP) → tratar como externo
+
+lan = _is_lan_host(host)
 ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-ctx.check_hostname = False
-ctx.verify_mode    = ssl.CERT_NONE
+ctx.check_hostname = not lan
+ctx.verify_mode    = ssl.CERT_NONE if lan else ssl.CERT_REQUIRED
 
 try:
     with smtplib.SMTP_SSL(host, port, context=ctx) as s:
