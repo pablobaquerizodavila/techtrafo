@@ -7,7 +7,7 @@ import { requireAuth, requirePermission } from "../auth/middleware";
 import { enviarEmailLimiter } from "../auth/rate-limit";
 import { crearDocumento, resolverNivel } from "../services/pdf/base";
 import { DataInformeTecnico, renderInformeTecnico } from "../services/pdf/documentos";
-import { sendEmail } from "../services/email";
+import { sendEmail, escapeHtmlMultiline } from "../services/email";
 
 const router = Router();
 router.use(requireAuth);
@@ -239,7 +239,7 @@ router.post("/:id/enviar-email", enviarEmailLimiter, requirePermission("expedien
   const cliente = inf.expedientes.clientes?.razon_social ?? "—";
   const subject = asunto?.trim() || `[TECHTRAFO] Informe técnico ${inf.numero}`;
   const cuerpoTexto = (mensaje?.trim() || `Adjuntamos el informe técnico ${inf.numero} para el expediente ${inf.expedientes.codigo} (${cliente}).\n\nSaludos cordiales,\nEquipo técnico TECHTRAFO`);
-  const cuerpoHtml = `<p>${cuerpoTexto.replace(/\n/g, "<br>")}</p>`;
+  const cuerpoHtml = `<p>${escapeHtmlMultiline(cuerpoTexto)}</p>`;
 
   try {
     const result = await sendEmail({

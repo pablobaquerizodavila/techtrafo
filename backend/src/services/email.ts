@@ -99,14 +99,38 @@ export async function verifyEmailConfig(): Promise<{ ok: boolean; message: strin
 // Templates HTML basicos
 // ===================================================================
 
+/**
+ * Escapa una cadena para interpolarla de forma segura en HTML (fix auditoria
+ * M-1: las plantillas inyectaban motivo/mensaje/nombres sin escapar, lo que
+ * permitia HTML/XSS en el cliente de correo del destinatario). Aplicar a TODO
+ * valor dinamico que se interpola en el cuerpo HTML. El parametro `body` que
+ * recibe `layout` es HTML ya construido por las plantillas (de confianza): sus
+ * variables se escapan en cada plantilla, no aca.
+ */
+export function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+/** Escapa y convierte saltos de linea en <br> (para texto multilinea). */
+export function escapeHtmlMultiline(value: unknown): string {
+  return escapeHtml(value).replace(/\n/g, "<br>");
+}
+
 function layout(titulo: string, body: string, ctaUrl?: string, ctaLabel?: string): string {
+  const t = escapeHtml(titulo);
+  const url = ctaUrl ? escapeHtml(ctaUrl) : undefined;
+  const label = escapeHtml(ctaLabel ?? "Ver en el panel");
   return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>${titulo}</title></head>
+<html><head><meta charset="utf-8"><title>${t}</title></head>
 <body style="font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:24px;">
   <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;padding:24px;border:1px solid #e5e7eb;">
-    <h2 style="color:#0f172a;margin:0 0 16px 0;">${titulo}</h2>
+    <h2 style="color:#0f172a;margin:0 0 16px 0;">${t}</h2>
     ${body}
-    ${ctaUrl ? `<p style="margin-top:24px;"><a href="${ctaUrl}" style="display:inline-block;padding:10px 20px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;">${ctaLabel ?? "Ver en el panel"}</a></p>` : ""}
+    ${url ? `<p style="margin-top:24px;"><a href="${url}" style="display:inline-block;padding:10px 20px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;">${label}</a></p>` : ""}
     <hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb;">
     <p style="font-size:12px;color:#64748b;margin:0;">TECHTRAFO · este es un mensaje automatico. No respondas a este correo.</p>
   </div>
@@ -127,8 +151,8 @@ export function templateHitoEstancado(c: ExpedienteContextoEmail & { horas: numb
     "Hito estancado",
     `<p>El siguiente hito superó su SLA y requiere atención inmediata:</p>
      <ul>
-       <li><strong>Expediente:</strong> ${c.expediente_codigo} (${c.cliente_nombre})</li>
-       <li><strong>Hito:</strong> ${c.hito_nombre}</li>
+       <li><strong>Expediente:</strong> ${escapeHtml(c.expediente_codigo)} (${escapeHtml(c.cliente_nombre)})</li>
+       <li><strong>Hito:</strong> ${escapeHtml(c.hito_nombre)}</li>
        <li><strong>Tiempo transcurrido:</strong> ${c.horas.toFixed(1)} h (SLA ${c.sla} h)</li>
      </ul>`,
     url,
@@ -143,10 +167,10 @@ export function templateHitoEsperaAprobacion(c: ExpedienteContextoEmail & { rol_
   const subject = `[TECHTRAFO] Hito requiere tu aprobación: ${c.hito_nombre}`;
   const html = layout(
     "Aprobación requerida",
-    `<p>Hay un hito esperando tu visto bueno como <strong>${c.rol_aprobador}</strong>:</p>
+    `<p>Hay un hito esperando tu visto bueno como <strong>${escapeHtml(c.rol_aprobador)}</strong>:</p>
      <ul>
-       <li><strong>Expediente:</strong> ${c.expediente_codigo} (${c.cliente_nombre})</li>
-       <li><strong>Hito:</strong> ${c.hito_nombre}</li>
+       <li><strong>Expediente:</strong> ${escapeHtml(c.expediente_codigo)} (${escapeHtml(c.cliente_nombre)})</li>
+       <li><strong>Hito:</strong> ${escapeHtml(c.hito_nombre)}</li>
      </ul>
      <p>Ingresa al panel para revisar y aprobar/rechazar.</p>`,
     url,
@@ -164,11 +188,11 @@ export function templateHitoResolucion(
   const subject = `[TECHTRAFO] Hito ${verbo}: ${c.hito_nombre} (${c.expediente_codigo})`;
   const html = layout(
     `Hito ${verbo}`,
-    `<p>El hito <strong>${c.hito_nombre}</strong> fue ${verbo} por ${c.aprobador}.</p>
+    `<p>El hito <strong>${escapeHtml(c.hito_nombre)}</strong> fue ${verbo} por ${escapeHtml(c.aprobador)}.</p>
      <ul>
-       <li><strong>Expediente:</strong> ${c.expediente_codigo} (${c.cliente_nombre})</li>
+       <li><strong>Expediente:</strong> ${escapeHtml(c.expediente_codigo)} (${escapeHtml(c.cliente_nombre)})</li>
      </ul>
-     ${c.motivo ? `<p><strong>Motivo:</strong> ${c.motivo}</p>` : ""}`,
+     ${c.motivo ? `<p><strong>Motivo:</strong> ${escapeHtmlMultiline(c.motivo)}</p>` : ""}`,
     url,
     "Ver expediente",
   );
@@ -185,14 +209,14 @@ export function templateEscalacionHito(c: ExpedienteContextoEmail & {
   const subject = `[TECHTRAFO] Escalación: ${c.hito_nombre} (${c.expediente_codigo})`;
   const html = layout(
     "Hito escalado a tu rol",
-    `<p>Un hito fue escalado a tu rol <strong>${c.rol_destino}</strong> para que decidas el próximo paso:</p>
+    `<p>Un hito fue escalado a tu rol <strong>${escapeHtml(c.rol_destino)}</strong> para que decidas el próximo paso:</p>
      <ul>
-       <li><strong>Expediente:</strong> ${c.expediente_codigo} (${c.cliente_nombre})</li>
-       <li><strong>Hito:</strong> ${c.hito_nombre}</li>
-       <li><strong>Escalado por:</strong> ${c.escalado_por}</li>
+       <li><strong>Expediente:</strong> ${escapeHtml(c.expediente_codigo)} (${escapeHtml(c.cliente_nombre)})</li>
+       <li><strong>Hito:</strong> ${escapeHtml(c.hito_nombre)}</li>
+       <li><strong>Escalado por:</strong> ${escapeHtml(c.escalado_por)}</li>
      </ul>
      <p><strong>Mensaje:</strong></p>
-     <blockquote style="border-left:3px solid #cbd5e1;padding-left:12px;color:#475569;white-space:pre-wrap;">${c.mensaje}</blockquote>
+     <blockquote style="border-left:3px solid #cbd5e1;padding-left:12px;color:#475569;white-space:pre-wrap;">${escapeHtml(c.mensaje)}</blockquote>
      <p>Abrí el expediente para revisar el contexto y decidir.</p>`,
     url,
     "Abrir expediente",
@@ -225,27 +249,29 @@ export function templateRevisionInternaCotizacion(c: {
     rechazada:  "Cotización rechazada",
   };
   const verbo = verboMap[c.evento];
+  const actorE = escapeHtml(c.actor_nombre);
+  const nivelE = escapeHtml(c.nivel_label);
   const accionMsg: Record<EventoRevisionCotizacion, string> = {
-    solicitada: `<strong>${c.actor_nombre}</strong> solicita tu revisión y aprobación como <strong>${c.nivel_label}</strong>.`,
-    escalada:   `<strong>${c.actor_nombre}</strong> ha escalado la cotización a <strong>${c.nivel_label}</strong> para que decida sobre la aprobación.`,
-    aprobada:   `<strong>${c.actor_nombre}</strong> aprobó la cotización en nivel <strong>${c.nivel_label}</strong>. Ya puede enviarse al cliente.`,
-    rechazada:  `<strong>${c.actor_nombre}</strong> rechazó la cotización en nivel <strong>${c.nivel_label}</strong>. Revisa el motivo y corrige antes de re-solicitar.`,
+    solicitada: `<strong>${actorE}</strong> solicita tu revisión y aprobación como <strong>${nivelE}</strong>.`,
+    escalada:   `<strong>${actorE}</strong> ha escalado la cotización a <strong>${nivelE}</strong> para que decida sobre la aprobación.`,
+    aprobada:   `<strong>${actorE}</strong> aprobó la cotización en nivel <strong>${nivelE}</strong>. Ya puede enviarse al cliente.`,
+    rechazada:  `<strong>${actorE}</strong> rechazó la cotización en nivel <strong>${nivelE}</strong>. Revisa el motivo y corrige antes de re-solicitar.`,
   };
   const subject = `[TECHTRAFO] ${verbo} · Cotización ${c.cotizacion_codigo}`;
   const mensajeBlock = c.mensaje
     ? `<p><strong>${c.evento === "rechazada" ? "Motivo del rechazo" : c.evento === "escalada" ? "Mensaje" : "Notas"}:</strong></p>
-       <blockquote style="border-left:3px solid #cbd5e1;padding-left:10px;margin:8px 0;color:#475569;">${c.mensaje.replace(/\n/g, "<br>")}</blockquote>`
+       <blockquote style="border-left:3px solid #cbd5e1;padding-left:10px;margin:8px 0;color:#475569;">${escapeHtmlMultiline(c.mensaje)}</blockquote>`
     : "";
   const html = layout(
     `${verbo} — ${c.cotizacion_codigo}`,
     `<p>${accionMsg[c.evento]}</p>
      <ul>
-       <li><strong>Cotización:</strong> ${c.cotizacion_codigo}</li>
-       <li><strong>Cliente:</strong> ${c.cliente_nombre}</li>
-       <li><strong>Total:</strong> ${c.total}</li>
+       <li><strong>Cotización:</strong> ${escapeHtml(c.cotizacion_codigo)}</li>
+       <li><strong>Cliente:</strong> ${escapeHtml(c.cliente_nombre)}</li>
+       <li><strong>Total:</strong> ${escapeHtml(c.total)}</li>
      </ul>
      ${mensajeBlock}
-     <p><a href="${link}" style="display:inline-block;background:#2563eb;color:white;padding:8px 14px;border-radius:6px;text-decoration:none;">Abrir cotización en el panel</a></p>`,
+     <p><a href="${escapeHtml(link)}" style="display:inline-block;background:#2563eb;color:white;padding:8px 14px;border-radius:6px;text-decoration:none;">Abrir cotización en el panel</a></p>`,
   );
   const text = `${verbo}: cotizacion ${c.cotizacion_codigo} - ${c.cliente_nombre} - total ${c.total}. ${c.actor_nombre} en nivel ${c.nivel_label}.${c.mensaje ? ` Mensaje: ${c.mensaje}` : ""} Link: ${link}`;
   return { subject, html, text };
@@ -268,10 +294,10 @@ export function templateGarantiaPorVencer(c: {
   const subject = `[TECHTRAFO] Garantía ${c.garantia_codigo} vence en ${c.dias_restantes} día${c.dias_restantes === 1 ? "" : "s"}`;
   const html = layout(
     `Garantía por vencer · ${tono}`,
-    `<p>Estimado/a <strong>${c.cliente_nombre}</strong>,</p>
-     <p>Le recordamos que la garantía de ${equipo} está próxima a vencer:</p>
+    `<p>Estimado/a <strong>${escapeHtml(c.cliente_nombre)}</strong>,</p>
+     <p>Le recordamos que la garantía de ${escapeHtml(equipo)} está próxima a vencer:</p>
      <ul>
-       <li><strong>Garantía:</strong> ${c.garantia_codigo}</li>
+       <li><strong>Garantía:</strong> ${escapeHtml(c.garantia_codigo)}</li>
        <li><strong>Fecha de vencimiento:</strong> ${fechaStr}</li>
        <li><strong>Días restantes:</strong> ${c.dias_restantes}</li>
      </ul>

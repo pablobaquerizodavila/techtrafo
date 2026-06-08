@@ -52,6 +52,14 @@ if (!parsed.success) {
 
 export const env = parsed.data;
 
+// Fix auditoria B-2: en produccion, CORS_ORIGINS DEBE setearse explicitamente.
+// El default permisivo (origenes de desarrollo: localhost/IP-LAN) no debe
+// aplicar en prod por accidente. Si falta, fallamos rapido al arrancar.
+if (env.NODE_ENV === "production" && !process.env.CORS_ORIGINS) {
+  console.error("CORS_ORIGINS es obligatorio en produccion (no usar el default de desarrollo). Setealo en el .env.");
+  process.exit(1);
+}
+
 export const corsOrigins = env.CORS_ORIGINS.split(",")
   .map((s) => s.trim())
   .filter(Boolean);
