@@ -743,6 +743,62 @@ router.patch("/:id", requirePermission("cotizaciones", "write"), async (req, res
 });
 
 // -------------------------------------------------------------------
+// GET /api/cotizaciones/config-margen
+// Lista los umbrales de margen por tipo_servicio.
+// -------------------------------------------------------------------
+router.get("/config-margen", requirePermission("cotizaciones", "read"), async (_req, res) => {
+  const rows = await prisma.config_margen_minimo.findMany({
+    orderBy: { tipo_servicio: "asc" },
+    select: { tipo_servicio: true, margen_minimo: true, updated_at: true },
+  });
+  res.json({ data: rows });
+});
+
+// -------------------------------------------------------------------
+// PATCH /api/cotizaciones/config-margen/:tipo_servicio
+// Actualizar umbral. Solo presidencia / gerencia_general / super_admin.
+// -------------------------------------------------------------------
+router.patch(
+  "/config-margen/:tipo_servicio",
+  requirePermission("cotizaciones", "aprobar"),
+  async (req, res) => {
+    const tipo = req.params.tipo_servicio;
+    const parsed = z.object({ margen_minimo: z.number().min(0).max(100) }).safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
+      return;
+    }
+    const userId = req.user!.id;
+    const rolNombre = req.user!.rol_nombre;
+    const esSuperAdmin = req.user!.es_super_admin;
+    const rolesPermitidos = ["presidencia", "gerencia_general"];
+    if (!esSuperAdmin && !rolesPermitidos.includes(rolNombre ?? "")) {
+      res.status(403).json({ error: "sin_permiso_config_margen" });
+      return;
+    }
+
+    const row = await prisma.config_margen_minimo.findUnique({ where: { tipo_servicio: tipo } });
+    if (!row) {
+      res.status(404).json({ error: "tipo_servicio_no_encontrado" });
+      return;
+    }
+
+    await prisma.$executeRaw`
+      UPDATE comercial.config_margen_minimo
+         SET margen_minimo = ${parsed.data.margen_minimo},
+             actualizado_por = ${userId}::uuid,
+             updated_at = NOW()
+       WHERE tipo_servicio = ${tipo}
+    `;
+
+    const updated = await prisma.config_margen_minimo.findUnique({
+      where: { tipo_servicio: tipo },
+    });
+    res.json({ data: updated });
+  }
+);
+
+// -------------------------------------------------------------------
 // POST /api/cotizaciones/:id/transicion  -  cambiar estado
 // -------------------------------------------------------------------
 router.post("/:id/transicion", requirePermission("cotizaciones", "aprobar"), async (req, res) => {
@@ -770,6 +826,14 @@ router.post("/:id/transicion", requirePermission("cotizaciones", "aprobar"), asy
     convertida: {},
   };
 
+  // Variable compartida entre la transaccion y el catch para detalles del error de margen
+  let margenErrorDetails: {
+    margen_actual: number;
+    margen_minimo: number;
+    tipo_servicio: string;
+    puede_forzar: boolean;
+  } | null = null;
+
   try {
     const updated = await withAppUser(userId, async (tx) => {
       const existing = await tx.cotizaciones.findUnique({ where: { id } });
@@ -793,6 +857,47 @@ router.post("/:id/transicion", requirePermission("cotizaciones", "aprobar"), asy
         const fecha = new Date().toISOString().split("T")[0];
         const entrada = `[${nuevoEstado.toUpperCase()} ${fecha}] ${motivo}`;
         notasInternasNueva = `${entrada}\n${existing.notas_internas ?? ""}`.trim();
+      }
+
+      // Guard de margen minimo: verificar antes de emitir al cliente.
+      if (accion === "enviar" && existing.tipo_servicio) {
+        const configMargen = await tx.config_margen_minimo.findUnique({
+          where: { tipo_servicio: existing.tipo_servicio },
+        });
+        if (configMargen) {
+          const margenActual = Number(existing.margen_porcentaje ?? 0);
+          const margenMinimo = Number(configMargen.margen_minimo);
+          if (margenActual < margenMinimo) {
+            const rolNombre = req.user!.rol_nombre;
+            const esSuperAdmin = req.user!.es_super_admin;
+            const rolesForzar = ["gerencia_comercial", "gerencia_general", "presidencia"];
+            const puedeForzar = esSuperAdmin || rolesForzar.includes(rolNombre ?? "");
+            const forzar = req.query.forzar_margen === "true";
+
+            if (!puedeForzar || !forzar) {
+              margenErrorDetails = {
+                margen_actual: margenActual,
+                margen_minimo: margenMinimo,
+                tipo_servicio: existing.tipo_servicio,
+                puede_forzar: puedeForzar,
+              };
+              throw new Error("margen_insuficiente");
+            }
+
+            // Puede forzar — registrar nota interna
+            const userRow = await tx.usuarios.findUnique({
+              where: { id: userId },
+              select: { nombres: true, apellidos: true },
+            });
+            const nombreUsuario = userRow
+              ? `${userRow.nombres} ${userRow.apellidos}`
+              : "usuario";
+            const rolLabel = rolNombre ?? "super_admin";
+            const fecha = new Date().toISOString().split("T")[0];
+            const notaForced = `[SISTEMA] Margen forzado: ${margenActual}% (mínimo ${margenMinimo}%) por ${nombreUsuario} (${rolLabel}) el ${fecha}`;
+            notasInternasNueva = `${notaForced}\n${notasInternasNueva ?? ""}`.trim();
+          }
+        }
       }
 
       // SQL directo: Prisma update no acepta campos UUID directos como
@@ -830,6 +935,18 @@ router.post("/:id/transicion", requirePermission("cotizaciones", "aprobar"), asy
       }
       if (err.message === "revision_interna_pendiente") {
         res.status(409).json({ error: "revision_interna_pendiente" });
+        return;
+      }
+      if (err.message === "margen_insuficiente" && margenErrorDetails !== null) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const det = margenErrorDetails as any;
+        res.status(422).json({
+          error: "margen_insuficiente",
+          margen_actual: det.margen_actual as number,
+          margen_minimo: det.margen_minimo as number,
+          tipo_servicio: det.tipo_servicio as string,
+          puede_forzar: det.puede_forzar as boolean,
+        });
         return;
       }
     }
