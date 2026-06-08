@@ -1,6 +1,6 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-06-08 · #38 PDF formal de OC**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-06-08 · #32+#33+#34+#45 ops/infra/email/backup**.
 
 > 📄 **Ver también [`ACCESO-Y-BACKUPS.md`](ACCESO-Y-BACKUPS.md)** — guía de hosts, credenciales, ubicación de backups y recuperación desde PC nueva.
 
@@ -42,6 +42,13 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 ---
 
 ## 0. Estado al cierre 2026-06-08 (leer primero)
+
+**Sesión 2026-06-08c — #32+#33+#34+#45 ops/infra/email/backup**
+
+- ✅ **#32 web-public versionado** (commit `5bb7bec`). `infrastructure/web-public/` en repo: docker-compose (nginx:1.27+php:8.2), 5 vhost configs (techtrafo.com, panel/api/portal.techtrafo.com, medicvip.org, siscormed.com), README. Certbot conf/live/archive/accounts en .gitignore.
+- ✅ **#33 CHANGELOG ops** (commit `5bb7bec`). Entrada `[ops] 2026-05-27` documenta jornada de restauración: NAS reemplazado → VM .7 caída → stack emergencia en .23 → certbot → MailPlus → restauración completa .7 el 2026-05-28.
+- ✅ **#34 email e2e** — SMTP panel→mailcow:465→Gmail: OPERACIONAL. `notif-worker` procesa cola correctamente. Smoke test id=13 → `enviado=t`. Root cause de 12 registros `enviado=f`: `egonsalez@techtrafo.com` no existe como buzón en mailcow → worker agotó 5 intentos (MAX_INTENTOS). Solución: crear buzón en mailcow o actualizar email del usuario de prueba.
+- ✅ **#45 netvoice_backup.py** — cron `0 2 * * *` en panel (.7) funcionando. Último run 2026-06-08 02:00 → `FIN BACKUP exitoso`. Dumps: asterisk (62 KB) + netvoice (34 KB). SCP al NAS (.116) OK. Retención: 5 local / 14 NAS. Script en `/usr/local/bin/netvoice_backup.py` (también en repo infra).
 
 **Sesión 2026-06-08b — #38 PDF formal de Orden de Compra**
 
