@@ -3,11 +3,11 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Toaster, toast } from "sonner";
-import { PageHeader, HeaderActionGhost } from "@/components/page-header";
+import { PageHeader, HeaderActionGhost, HeaderActionPrimary } from "@/components/page-header";
 import { Panel } from "@/components/panel";
 import {
   ESTADO_OC_LABEL, EstadoOC, OrdenCompra, listOrdenesCompra, fmtMoneda,
@@ -66,7 +66,14 @@ export default function OCListPage() {
         title="Órdenes"
         titleAccent="de compra"
         meta={<span>Se generan desde solicitudes aprobadas · aprobación escalonada por monto</span>}
-        actions={<HeaderActionGhost href="/compras">← Dashboard</HeaderActionGhost>}
+        actions={
+          <div className="flex items-center gap-2">
+            <HeaderActionPrimary href="/compras/ordenes-compra/nueva" icon={<Plus className="h-3.5 w-3.5" />}>
+              Nueva OC
+            </HeaderActionPrimary>
+            <HeaderActionGhost href="/compras">← Dashboard</HeaderActionGhost>
+          </div>
+        }
       />
 
       <div className="space-y-6 pt-6">

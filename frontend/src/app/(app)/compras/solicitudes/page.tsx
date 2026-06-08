@@ -3,11 +3,11 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { FileText } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Toaster, toast } from "sonner";
-import { PageHeader, HeaderActionGhost } from "@/components/page-header";
+import { PageHeader, HeaderActionGhost, HeaderActionPrimary } from "@/components/page-header";
 import { Panel } from "@/components/panel";
 import {
   ESTADO_SC_LABEL, EstadoSC, SolicitudCompra, listSolicitudesCompra,
@@ -60,7 +60,14 @@ export default function SolicitudesCompraPage() {
         title="Solicitudes"
         titleAccent="de compra"
         meta={<span>Generadas desde cotizaciones, alertas de stock o manualmente</span>}
-        actions={<HeaderActionGhost href="/compras">← Dashboard</HeaderActionGhost>}
+        actions={
+          <div className="flex items-center gap-2">
+            <HeaderActionPrimary href="/compras/solicitudes/nueva" icon={<Plus className="h-3.5 w-3.5" />}>
+              Nueva SC
+            </HeaderActionPrimary>
+            <HeaderActionGhost href="/compras">← Dashboard</HeaderActionGhost>
+          </div>
+        }
       />
 
       <div className="space-y-6 pt-6">

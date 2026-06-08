@@ -459,6 +459,78 @@ export async function getHistorialPrecios(itemId: number): Promise<{ data: Preci
 }
 
 // -------------------------------------------------------------------
+// Crear SC y OC manualmente
+// -------------------------------------------------------------------
+export type Departamento =
+  | "produccion" | "ingenieria" | "mantenimiento" | "bodega"
+  | "calidad" | "comercial" | "gerencia" | "compras";
+
+export const DEPARTAMENTO_LABEL: Record<Departamento, string> = {
+  produccion: "Producción",
+  ingenieria: "Ingeniería",
+  mantenimiento: "Mantenimiento",
+  bodega: "Bodega",
+  calidad: "Calidad",
+  comercial: "Comercial",
+  gerencia: "Gerencia",
+  compras: "Compras",
+};
+
+export interface SolicitudCompraCreateInput {
+  departamento_solicitante: Departamento;
+  prioridad?: Prioridad;
+  fecha_requerida?: string | null;
+  justificacion?: string | null;
+  observaciones?: string | null;
+  origen?: OrigenSC;
+  moneda?: string;
+  lineas: Array<{
+    orden: number;
+    item_id?: number | null;
+    descripcion: string;
+    unidad_medida?: string;
+    cantidad_solicitada: number;
+    precio_referencial?: number;
+    moneda?: string;
+    proveedor_sugerido_id?: number | null;
+    notas?: string | null;
+  }>;
+}
+
+export async function createSolicitudCompra(payload: SolicitudCompraCreateInput): Promise<{ data: SolicitudCompra }> {
+  return api.post(`/api/solicitudes-compra`, payload);
+}
+
+export interface OrdenCompraCreateInput {
+  proveedor_id: number;
+  solicitud_id?: number | null;
+  expediente_id?: number | null;
+  fecha_entrega_acordada?: string | null;
+  condiciones_pago?: string | null;
+  moneda?: string;
+  iva_porcentaje?: number;
+  descuento_porcentaje?: number;
+  retencion_valor?: number;
+  observaciones_internas?: string | null;
+  observaciones_proveedor?: string | null;
+  lineas: Array<{
+    orden: number;
+    item_id?: number | null;
+    descripcion: string;
+    codigo_proveedor_item?: string | null;
+    unidad_medida?: string;
+    cantidad_solicitada: number;
+    precio_unitario: number;
+    descuento_porcentaje?: number;
+    notas?: string | null;
+  }>;
+}
+
+export async function createOrdenCompra(payload: OrdenCompraCreateInput): Promise<{ data: OrdenCompra }> {
+  return api.post(`/api/ordenes-compra`, payload);
+}
+
+// -------------------------------------------------------------------
 // Labels / helpers de UI
 // -------------------------------------------------------------------
 export const ESTADO_OC_LABEL: Record<EstadoOC, string> = {
