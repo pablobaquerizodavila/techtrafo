@@ -6,6 +6,16 @@ El formato sigue Keep a Changelog y este proyecto adhiere a Semantic Versioning.
 
 ---
 
+## [0.20.0] — 2026-06-08 — feat(compras): #38 PDF formal de Orden de Compra
+
+### Agregado
+- **PDF de OC** (`GET /api/pdf/orden-compra/:id?nivel=N`): documento formal para envío al proveedor. Secciones: proveedor (razón social, RUC, ciudad/país, contacto), datos de la orden (código, fechas, moneda, condiciones), referencia interna SC/expediente (N≥2), tabla de líneas (8 columnas — descripción, cód. proveedor, U/M, cantidad, precio, dto%, subtotal), resumen financiero (subtotal → descuento → base → IVA → retención), bloque de firma TECHTRAFO, notas internas (N≥3). Autorización: `compras.read`.
+- **`DataOrdenCompra` + `renderOrdenCompra()`** en `backend/src/services/pdf/documentos.ts`.
+- **`"orden-compra"`** añadido al tipo `Recurso` de `pdf-button.tsx`.
+- **Botón "Descargar PDF"** (`PdfButton`, maxNivel=3) en la página de detalle de OC.
+
+---
+
 ## [0.19.0] — 2026-06-08 — feat(compras): #37 forms SC/OC manuales + security fixes + demo cleanup
 
 ### Agregado

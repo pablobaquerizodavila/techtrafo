@@ -1,6 +1,6 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-06-08 · #37 forms SC/OC manuales + demo cleanup + umbrales OC reales**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-06-08 · #38 PDF formal de OC**.
 
 > 📄 **Ver también [`ACCESO-Y-BACKUPS.md`](ACCESO-Y-BACKUPS.md)** — guía de hosts, credenciales, ubicación de backups y recuperación desde PC nueva.
 
@@ -42,6 +42,10 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 ---
 
 ## 0. Estado al cierre 2026-06-08 (leer primero)
+
+**Sesión 2026-06-08b — #38 PDF formal de Orden de Compra**
+
+- ✅ **#38 PDF de OC** (commit `3c5b19a`). `GET /api/pdf/orden-compra/:id?nivel=N` — requiere `compras.read`. Secciones: proveedor (razón social, RUC, ciudad/país, contacto), datos de la orden (código, fechas, moneda, condiciones pago, incoterm, lugar entrega), referencia interna SC/expediente (N≥2), tabla de 8 columnas (descripción, cód. proveedor, U/M, cantidad, precio unitario, dto%, subtotal), resumen financiero (subtotal → descuento → base imponible → IVA → retención), bloque de firma con línea + "Autorizado por: [rol]" + TECHTRAFO S.A., notas internas (N≥3). PDF button con maxNivel=3 en detalle de OC. Backup NAS `tech-trafo-v0.19.0-pdf-formal-de-orden-de-compra-38-3c5b19a-20260608-133834.zip`.
 
 **Sesión 2026-06-08 — code-review hardening + #37 forms SC/OC manuales + demo data cleanup + umbrales OC reales**
 
