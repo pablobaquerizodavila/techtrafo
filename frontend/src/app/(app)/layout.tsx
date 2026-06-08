@@ -140,6 +140,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                   <NavSubLink href="/compras/solicitudes" icon={<ClipboardList className="h-3 w-3" />}>Solicitudes</NavSubLink>
                   <NavSubLink href="/compras/ordenes-compra" icon={<FileText className="h-3 w-3" />}>Órdenes de compra</NavSubLink>
                   <NavSubLink href="/compras/recepciones" icon={<PackageCheck className="h-3 w-3" />}>Recepciones</NavSubLink>
+                  <NavSubLink href="/compras/no-conformidades" icon={<AlertTriangle className="h-3 w-3" />}>No conformidades</NavSubLink>
                   <NavSubLink href="/admin/proveedores" icon={<Truck className="h-3 w-3" />}>Proveedores</NavSubLink>
                 </NavGroup>
               )}

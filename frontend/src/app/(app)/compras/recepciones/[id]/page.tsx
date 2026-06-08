@@ -29,6 +29,7 @@ export default function RecepcionDetallePage({ params }: { params: Promise<{ id:
   const [rec, setRec] = useState<Recepcion | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [nc, setNc] = useState<{ id: number; codigo: string; estado: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -38,6 +39,13 @@ export default function RecepcionDetallePage({ params }: { params: Promise<{ id:
   }, [recId]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    fetch(`/api/no-conformidades?recepcion_id=${recId}`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => { if (d.data?.length > 0) setNc(d.data[0]); })
+      .catch(() => {});
+  }, [recId]);
 
   async function action(fn: () => Promise<unknown>, ok: string) {
     setBusy(true);
@@ -87,6 +95,20 @@ export default function RecepcionDetallePage({ params }: { params: Promise<{ id:
       />
 
       <div className="space-y-6 pt-6">
+        {nc && (
+          <div className="px-1">
+            <Link
+              href={`/compras/no-conformidades/${nc.id}`}
+              className="inline-flex items-center gap-2 text-sm text-red-400 hover:text-red-300 font-medium"
+            >
+              ⚠ No conformidad: {nc.codigo}
+              <span className={`text-xs px-2 py-0.5 rounded-full ${nc.estado === "cerrada" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                {nc.estado}
+              </span>
+            </Link>
+          </div>
+        )}
+
         {rec.estado === "borrador" && (
           <Panel title="Acciones disponibles" subtitle="Confirmá para que el material entre a bodega">
             <div className="flex gap-2">
