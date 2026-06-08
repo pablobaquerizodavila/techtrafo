@@ -27,7 +27,6 @@ import {
   transicionCotizacion,
   transicionCotizacionForzada,
   getConfigMargen,
-  ConfigMargenRow,
   transicionesPosibles,
   updateCotizacion,
 } from "@/lib/cotizaciones";
@@ -143,12 +142,13 @@ export default function CotizacionDetallePage({ params }: PageProps) {
             setShowMargenDialog(true);
           } else {
             toast.error(
-              `Margen insuficiente: ${body.margen_actual ?? 0}% (minimo ${body.margen_minimo ?? 0}% para ${body.tipo_servicio}). Contacta a gerencia.`
+              `Margen insuficiente: ${body.margen_actual ?? 0}% (minimo ${body.margen_minimo ?? 0}% para ${body.tipo_servicio ?? cotizacion.tipo_servicio}). Contacta a gerencia.`
             );
           }
           return;
         }
       }
+      if (forzar) { setShowMargenDialog(false); setMargenDialogInfo(null); }
       toast.error(err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error");
     }
   }
