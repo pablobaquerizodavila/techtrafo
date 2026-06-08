@@ -367,6 +367,7 @@ model usuarios {
   motivo_rechazo                                                        String?
   telefono_solicitud                                                    String?                                 @db.VarChar(20)
   cliente_id                                                            BigInt?
+  proveedor_id                                                          BigInt?
   token_version                                                         Int                                     @default(1)
   nombre_completo                                                       String?                                 @default(dbgenerated("(((nombres)::text || ' '::text) || (apellidos)::text)")) @db.VarChar(201)
   nombre_usuario                                                        String                                  @unique @db.VarChar(50)
@@ -426,6 +427,7 @@ model usuarios {
   usuarios                                                              usuarios?                               @relation("usuariosTousuarios", fields: [aprobado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
   other_usuarios                                                        usuarios[]                              @relation("usuariosTousuarios")
   clientes_usuarios_cliente_idToclientes                                clientes?                               @relation("usuarios_cliente_idToclientes", fields: [cliente_id], references: [id], onUpdate: NoAction)
+  proveedores_portal                                                    proveedores?                            @relation("usuarios_proveedor_portal", fields: [proveedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   roles                                                                 roles?                                  @relation(fields: [rol_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   categorias_item_categorias_item_actualizado_porTousuarios             categorias_item[]                       @relation("categorias_item_actualizado_porTousuarios")
   categorias_item_categorias_item_creado_porTousuarios                  categorias_item[]                       @relation("categorias_item_creado_porTousuarios")
@@ -462,6 +464,7 @@ model usuarios {
   @@index([estado_aprobacion], map: "idx_usuarios_estado_aprobacion")
   @@index([nombre_completo], map: "idx_usuarios_nombre_completo")
   @@index([nombre_usuario], map: "idx_usuarios_nombre_usuario")
+  @@index([proveedor_id], map: "idx_usuarios_proveedor_id")
   @@schema("core")
 }
 
@@ -1442,6 +1445,9 @@ model ordenes_compra {
   actualizado_por                                         String?                            @db.Uuid
   created_at                                              DateTime                           @default(now()) @db.Timestamptz(6)
   updated_at                                              DateTime                           @default(now()) @db.Timestamptz(6)
+  acuse_recibo_at                                         DateTime?                          @db.Timestamptz(6)
+  factura_proveedor_numero                                String?                            @db.VarChar(80)
+  factura_proveedor_url                                   String?
   item_proveedor_precios_historial                        item_proveedor_precios_historial[]
   orden_compra_lineas                                     orden_compra_lineas[]
   usuarios_ordenes_compra_actualizado_porTousuarios       usuarios?                          @relation("ordenes_compra_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -1502,6 +1508,8 @@ model proveedores {
   solicitud_lineas                               solicitud_lineas[]
   items                                          items[]
   no_conformidades                               no_conformidades[]
+
+  usuarios_portal                                usuarios[]                         @relation("usuarios_proveedor_portal")
 
   @@index([estado], map: "idx_proveedores_estado")
   @@schema("compras")
