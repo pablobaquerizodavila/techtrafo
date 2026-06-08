@@ -216,6 +216,18 @@ router.get("/", requirePermission("cotizaciones", "read"), async (req, res) => {
 });
 
 // -------------------------------------------------------------------
+// GET /api/cotizaciones/config-margen
+// Lista los umbrales de margen por tipo_servicio.
+// -------------------------------------------------------------------
+router.get("/config-margen", requirePermission("cotizaciones", "read"), async (_req, res) => {
+  const rows = await prisma.config_margen_minimo.findMany({
+    orderBy: { tipo_servicio: "asc" },
+    select: { tipo_servicio: true, margen_minimo: true, updated_at: true },
+  });
+  res.json({ data: rows });
+});
+
+// -------------------------------------------------------------------
 // GET /api/cotizaciones/:id  -  detalle con lineas y revisiones
 // -------------------------------------------------------------------
 router.get("/:id", requirePermission("cotizaciones", "read"), async (req, res) => {
@@ -598,6 +610,50 @@ router.post("/desde-plantilla", requirePermission("cotizaciones", "write"), asyn
 });
 
 // -------------------------------------------------------------------
+// PATCH /api/cotizaciones/config-margen/:tipo_servicio
+// Actualizar umbral. Solo presidencia / gerencia_general / super_admin.
+// -------------------------------------------------------------------
+router.patch(
+  "/config-margen/:tipo_servicio",
+  requirePermission("cotizaciones", "aprobar"),
+  async (req, res) => {
+    const tipo = req.params.tipo_servicio;
+    const parsed = z.object({ margen_minimo: z.number().min(0).max(100) }).safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
+      return;
+    }
+    const userId = req.user!.id;
+    const rolNombre = req.user!.rol_nombre;
+    const esSuperAdmin = req.user!.es_super_admin;
+    const rolesPermitidos = ["presidencia", "gerencia_general"];
+    if (!esSuperAdmin && !rolesPermitidos.includes(rolNombre ?? "")) {
+      res.status(403).json({ error: "sin_permiso_config_margen" });
+      return;
+    }
+
+    const row = await prisma.config_margen_minimo.findUnique({ where: { tipo_servicio: tipo } });
+    if (!row) {
+      res.status(404).json({ error: "tipo_servicio_no_encontrado" });
+      return;
+    }
+
+    await prisma.$executeRaw`
+      UPDATE comercial.config_margen_minimo
+         SET margen_minimo = ${parsed.data.margen_minimo},
+             actualizado_por = ${userId}::uuid,
+             updated_at = NOW()
+       WHERE tipo_servicio = ${tipo}
+    `;
+
+    const updated = await prisma.config_margen_minimo.findUnique({
+      where: { tipo_servicio: tipo },
+    });
+    res.json({ data: updated });
+  }
+);
+
+// -------------------------------------------------------------------
 // PATCH /api/cotizaciones/:id  -  editar (snapshot automatico si ya enviada)
 // -------------------------------------------------------------------
 router.patch("/:id", requirePermission("cotizaciones", "write"), async (req, res) => {
@@ -741,62 +797,6 @@ router.patch("/:id", requirePermission("cotizaciones", "write"), async (req, res
     throw err;
   }
 });
-
-// -------------------------------------------------------------------
-// GET /api/cotizaciones/config-margen
-// Lista los umbrales de margen por tipo_servicio.
-// -------------------------------------------------------------------
-router.get("/config-margen", requirePermission("cotizaciones", "read"), async (_req, res) => {
-  const rows = await prisma.config_margen_minimo.findMany({
-    orderBy: { tipo_servicio: "asc" },
-    select: { tipo_servicio: true, margen_minimo: true, updated_at: true },
-  });
-  res.json({ data: rows });
-});
-
-// -------------------------------------------------------------------
-// PATCH /api/cotizaciones/config-margen/:tipo_servicio
-// Actualizar umbral. Solo presidencia / gerencia_general / super_admin.
-// -------------------------------------------------------------------
-router.patch(
-  "/config-margen/:tipo_servicio",
-  requirePermission("cotizaciones", "aprobar"),
-  async (req, res) => {
-    const tipo = req.params.tipo_servicio;
-    const parsed = z.object({ margen_minimo: z.number().min(0).max(100) }).safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
-      return;
-    }
-    const userId = req.user!.id;
-    const rolNombre = req.user!.rol_nombre;
-    const esSuperAdmin = req.user!.es_super_admin;
-    const rolesPermitidos = ["presidencia", "gerencia_general"];
-    if (!esSuperAdmin && !rolesPermitidos.includes(rolNombre ?? "")) {
-      res.status(403).json({ error: "sin_permiso_config_margen" });
-      return;
-    }
-
-    const row = await prisma.config_margen_minimo.findUnique({ where: { tipo_servicio: tipo } });
-    if (!row) {
-      res.status(404).json({ error: "tipo_servicio_no_encontrado" });
-      return;
-    }
-
-    await prisma.$executeRaw`
-      UPDATE comercial.config_margen_minimo
-         SET margen_minimo = ${parsed.data.margen_minimo},
-             actualizado_por = ${userId}::uuid,
-             updated_at = NOW()
-       WHERE tipo_servicio = ${tipo}
-    `;
-
-    const updated = await prisma.config_margen_minimo.findUnique({
-      where: { tipo_servicio: tipo },
-    });
-    res.json({ data: updated });
-  }
-);
 
 // -------------------------------------------------------------------
 // POST /api/cotizaciones/:id/transicion  -  cambiar estado
