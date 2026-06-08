@@ -34,74 +34,96 @@ function requireProveedorId(req: Request, res: Response, next: NextFunction): vo
 }
 
 // GET /api/proveedor-portal/mis-ocs
-router.get("/mis-ocs", requireProveedorId, async (req, res) => {
-  const proveedorId = BigInt(req.user!.proveedor_id!);
-  const ocs = await prisma.ordenes_compra.findMany({
-    where: { proveedor_id: proveedorId },
-    orderBy: { created_at: "desc" },
-    select: {
-      id: true, codigo: true, estado: true,
-      fecha_emision: true, fecha_entrega_acordada: true,
-      total: true, moneda: true,
-      acuse_recibo_at: true, factura_proveedor_numero: true, factura_proveedor_url: true,
-      _count: { select: { orden_compra_lineas: true } },
-    },
-  });
-  res.json({ data: ser(ocs) });
+router.get("/mis-ocs", requireProveedorId, async (req, res, next) => {
+  try {
+    const proveedorId = BigInt(req.user!.proveedor_id!);
+    const ocs = await prisma.ordenes_compra.findMany({
+      where: { proveedor_id: proveedorId },
+      orderBy: { created_at: "desc" },
+      select: {
+        id: true, codigo: true, estado: true,
+        fecha_emision: true, fecha_entrega_acordada: true,
+        total: true, moneda: true,
+        acuse_recibo_at: true, factura_proveedor_numero: true, factura_proveedor_url: true,
+        _count: { select: { orden_compra_lineas: true } },
+      },
+    });
+    res.json({ data: ser(ocs) });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // GET /api/proveedor-portal/oc/:id
-router.get("/oc/:id", requireProveedorId, async (req, res) => {
-  const idNum = Number(req.params.id);
-  if (!Number.isInteger(idNum) || idNum <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
-  const id = BigInt(idNum);
-  const proveedorId = BigInt(req.user!.proveedor_id!);
-  const oc = await prisma.ordenes_compra.findFirst({
-    where: { id, proveedor_id: proveedorId },
-    include: {
-      orden_compra_lineas: {
-        include: { items: { select: { codigo_interno: true, descripcion: true, unidad_medida: true } } },
+router.get("/oc/:id", requireProveedorId, async (req, res, next) => {
+  try {
+    const idNum = Number(req.params.id);
+    if (!Number.isInteger(idNum) || idNum <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+    const id = BigInt(idNum);
+    const proveedorId = BigInt(req.user!.proveedor_id!);
+    const oc = await prisma.ordenes_compra.findFirst({
+      where: { id, proveedor_id: proveedorId },
+      include: {
+        orden_compra_lineas: {
+          include: { items: { select: { codigo_interno: true, descripcion: true, unidad_medida: true } } },
+        },
       },
-    },
-  });
-  if (!oc) { res.status(404).json({ error: "oc_no_encontrada" }); return; }
-  res.json({ data: ser(oc) });
+    });
+    if (!oc) { res.status(404).json({ error: "oc_no_encontrada" }); return; }
+    res.json({ data: ser(oc) });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // POST /api/proveedor-portal/oc/:id/acusar-recibo
-router.post("/oc/:id/acusar-recibo", requireProveedorId, async (req, res) => {
-  const idNum = Number(req.params.id);
-  if (!Number.isInteger(idNum) || idNum <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
-  const id = BigInt(idNum);
-  const proveedorId = BigInt(req.user!.proveedor_id!);
-  const userId = req.user!.id;
-  const updated = await withAppUser(userId, async (tx) => {
-    const oc = await tx.ordenes_compra.findFirst({ where: { id, proveedor_id: proveedorId } });
-    if (!oc) throw new Error("oc_no_encontrada");
-    if (oc.acuse_recibo_at) return oc; // idempotente
-    return tx.ordenes_compra.update({ where: { id }, data: { acuse_recibo_at: new Date() } });
-  });
-  res.json({ data: ser(updated) });
+router.post("/oc/:id/acusar-recibo", requireProveedorId, async (req, res, next) => {
+  try {
+    const idNum = Number(req.params.id);
+    if (!Number.isInteger(idNum) || idNum <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+    const id = BigInt(idNum);
+    const proveedorId = BigInt(req.user!.proveedor_id!);
+    const userId = req.user!.id;
+    const updated = await withAppUser(userId, async (tx) => {
+      const oc = await tx.ordenes_compra.findFirst({ where: { id, proveedor_id: proveedorId } });
+      if (!oc) throw new Error("oc_no_encontrada");
+      if (oc.acuse_recibo_at) return oc; // idempotente
+      return tx.ordenes_compra.update({ where: { id }, data: { acuse_recibo_at: new Date() } });
+    });
+    res.json({ data: ser(updated) });
+  } catch (err: any) {
+    if (err?.message === "oc_no_encontrada") {
+      res.status(404).json({ error: "oc_no_encontrada" }); return;
+    }
+    next(err);
+  }
 });
 
 // POST /api/proveedor-portal/oc/:id/factura
-router.post("/oc/:id/factura", requireProveedorId, async (req, res) => {
-  const idNum = Number(req.params.id);
-  if (!Number.isInteger(idNum) || idNum <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
-  const id = BigInt(idNum);
-  const proveedorId = BigInt(req.user!.proveedor_id!);
-  const userId = req.user!.id;
-  const parsed = z.object({ numero: z.string().max(80).nonempty(), url: z.string().max(2000).nonempty() }).safeParse(req.body);
-  if (!parsed.success) { res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors }); return; }
-  const updated = await withAppUser(userId, async (tx) => {
-    const oc = await tx.ordenes_compra.findFirst({ where: { id, proveedor_id: proveedorId } });
-    if (!oc) throw new Error("oc_no_encontrada");
-    return tx.ordenes_compra.update({
-      where: { id },
-      data: { factura_proveedor_numero: parsed.data.numero, factura_proveedor_url: parsed.data.url },
+router.post("/oc/:id/factura", requireProveedorId, async (req, res, next) => {
+  try {
+    const idNum = Number(req.params.id);
+    if (!Number.isInteger(idNum) || idNum <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+    const id = BigInt(idNum);
+    const proveedorId = BigInt(req.user!.proveedor_id!);
+    const userId = req.user!.id;
+    const parsed = z.object({ numero: z.string().max(80).nonempty(), url: z.string().max(2000).url() }).safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors }); return; }
+    const updated = await withAppUser(userId, async (tx) => {
+      const oc = await tx.ordenes_compra.findFirst({ where: { id, proveedor_id: proveedorId } });
+      if (!oc) throw new Error("oc_no_encontrada");
+      return tx.ordenes_compra.update({
+        where: { id },
+        data: { factura_proveedor_numero: parsed.data.numero, factura_proveedor_url: parsed.data.url },
+      });
     });
-  });
-  res.json({ data: ser(updated) });
+    res.json({ data: ser(updated) });
+  } catch (err: any) {
+    if (err?.message === "oc_no_encontrada") {
+      res.status(404).json({ error: "oc_no_encontrada" }); return;
+    }
+    next(err);
+  }
 });
 
 export default router;
