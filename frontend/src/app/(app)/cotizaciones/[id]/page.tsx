@@ -25,6 +25,9 @@ import {
   rolDeNivelRevision,
   solicitarRevisionInterna,
   transicionCotizacion,
+  transicionCotizacionForzada,
+  getConfigMargen,
+  ConfigMargenRow,
   transicionesPosibles,
   updateCotizacion,
 } from "@/lib/cotizaciones";
@@ -64,6 +67,13 @@ export default function CotizacionDetallePage({ params }: PageProps) {
   const [historial, setHistorial] = useState<RevisionHistorialItem[]>([]);
   const [mostrarHistorial, setMostrarHistorial] = useState(false);
   const [working, setWorking] = useState(false);
+  const [configMargen, setConfigMargen] = useState<Record<string, number>>({});
+  const [showMargenDialog, setShowMargenDialog] = useState(false);
+  const [margenDialogInfo, setMargenDialogInfo] = useState<{
+    margen_actual: number;
+    margen_minimo: number;
+    tipo_servicio: string;
+  } | null>(null);
 
   useEffect(() => { params.then(({ id }) => setId(Number(id))); }, [params]);
   useEffect(() => { getCurrentUser().then(setCurrentUser).catch(() => setCurrentUser(null)); }, []);
@@ -87,7 +97,17 @@ export default function CotizacionDetallePage({ params }: PageProps) {
 
   useEffect(() => { if (id) load(); }, [id, load]);
 
-  async function handleTransicion(accion: TransicionAccion) {
+  useEffect(() => {
+    getConfigMargen()
+      .then((rows) => {
+        const map: Record<string, number> = {};
+        for (const row of rows) map[row.tipo_servicio] = Number(row.margen_minimo);
+        setConfigMargen(map);
+      })
+      .catch(() => {}); // non-blocking
+  }, []);
+
+  async function handleTransicion(accion: TransicionAccion, forzar = false) {
     if (!cotizacion) return;
     if (accion === "convertir") { router.push(`/contratos/nuevo?cotizacion=${cotizacion.id}`); return; }
     if (["rechazar", "cancelar", "vencer"].includes(accion)) {
@@ -95,19 +115,40 @@ export default function CotizacionDetallePage({ params }: PageProps) {
       if (motivo === null) return;
       try {
         await transicionCotizacion(cotizacion.id, accion, motivo);
-        toast.success(`Cotización ${accion === "cancelar" ? "cancelada" : accion + "da"}`);
+        toast.success(`Cotizacion ${accion === "cancelar" ? "cancelada" : accion + "da"}`);
         load();
       } catch (err) {
         toast.error(err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error");
       }
       return;
     }
-    if (!window.confirm(`Confirmar: ${accionConfig[accion].label}?`)) return;
+    if (accion !== "enviar" && !window.confirm(`Confirmar: ${accionConfig[accion].label}?`)) return;
     try {
-      await transicionCotizacion(cotizacion.id, accion);
-      toast.success(`Estado actualizado`);
+      const fn = forzar ? transicionCotizacionForzada : transicionCotizacion;
+      await fn(cotizacion.id, accion);
+      toast.success("Estado actualizado");
+      setShowMargenDialog(false);
+      setMargenDialogInfo(null);
       load();
     } catch (err) {
+      if (err instanceof ApiError && err.status === 422) {
+        const body = err.body as { error?: string; margen_actual?: number; margen_minimo?: number; tipo_servicio?: string; puede_forzar?: boolean };
+        if (body.error === "margen_insuficiente") {
+          if (body.puede_forzar) {
+            setMargenDialogInfo({
+              margen_actual: body.margen_actual ?? 0,
+              margen_minimo: body.margen_minimo ?? 0,
+              tipo_servicio: body.tipo_servicio ?? cotizacion.tipo_servicio,
+            });
+            setShowMargenDialog(true);
+          } else {
+            toast.error(
+              `Margen insuficiente: ${body.margen_actual ?? 0}% (minimo ${body.margen_minimo ?? 0}% para ${body.tipo_servicio}). Contacta a gerencia.`
+            );
+          }
+          return;
+        }
+      }
       toast.error(err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error");
     }
   }
@@ -322,6 +363,23 @@ export default function CotizacionDetallePage({ params }: PageProps) {
         {transicionesFiltradas.length > 0 && (
           <Panel title="Acciones disponibles" subtitle="Transiciones de estado">
             <div className="flex flex-wrap items-center gap-2">
+              {/* Indicador de margen minimo */}
+              {cotizacion.margen_porcentaje !== null && cotizacion.tipo_servicio && configMargen[cotizacion.tipo_servicio] !== undefined && (() => {
+                const margenActual = Number(cotizacion.margen_porcentaje);
+                const margenMin = configMargen[cotizacion.tipo_servicio];
+                const diff = margenActual - margenMin;
+                const color = diff >= 0
+                  ? "text-green-400 bg-green-500/10 border-green-500/20"
+                  : diff >= -5
+                  ? "text-yellow-400 bg-yellow-500/10 border-yellow-500/20"
+                  : "text-rose-400 bg-rose-500/10 border-rose-500/20";
+                const icon = diff >= 0 ? "✓" : "✗";
+                return (
+                  <span className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium ${color}`}>
+                    Margen: {margenActual}% {icon} (min {margenMin}%)
+                  </span>
+                );
+              })()}
               {transicionesFiltradas.map((accion) => {
                 const cfg = accionConfig[accion];
                 const Icon = cfg.icon;
@@ -382,6 +440,42 @@ export default function CotizacionDetallePage({ params }: PageProps) {
           }}
         />
       </div>
+
+      {/* Dialogo de confirmacion para margen forzado */}
+      {showMargenDialog && margenDialogInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-glass bg-[#1a1d23] p-6 shadow-2xl inset-highlight">
+            <h3 className="mb-2 font-display text-base font-semibold text-rose-300">
+              Margen por debajo del minimo
+            </h3>
+            <p className="mb-5 text-sm text-foreground/80">
+              El margen actual{" "}
+              <span className="font-semibold text-foreground">({margenDialogInfo.margen_actual}%)</span>{" "}
+              esta por debajo del minimo para{" "}
+              <span className="font-semibold text-foreground capitalize">{margenDialogInfo.tipo_servicio}</span>{" "}
+              ({margenDialogInfo.margen_minimo}%). Se registrara una nota automatica en la cotizacion.
+              <br /><br />
+              ¿Confirmar emision de todas formas?
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => { setShowMargenDialog(false); setMargenDialogInfo(null); }}
+                className={actionClass("ghost")}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTransicion("enviar", true)}
+                className={actionClass("destructive")}
+              >
+                Emitir de todas formas
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Toaster richColors position="top-right" theme="dark" />
     </div>

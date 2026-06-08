@@ -161,6 +161,25 @@ export async function transicionCotizacion(
   return api.post(`/api/cotizaciones/${id}/transicion`, { accion, motivo });
 }
 
+export async function transicionCotizacionForzada(
+  id: number,
+  accion: TransicionAccion,
+  motivo?: string,
+): Promise<{ data: Cotizacion }> {
+  return api.post(`/api/cotizaciones/${id}/transicion?forzar_margen=true`, { accion, motivo });
+}
+
+export interface ConfigMargenRow {
+  tipo_servicio: string;
+  margen_minimo: string; // Prisma Decimal comes as string
+  updated_at: string | null;
+}
+
+export async function getConfigMargen(): Promise<ConfigMargenRow[]> {
+  const res = await api.get<{ data: ConfigMargenRow[] }>("/api/cotizaciones/config-margen");
+  return res.data;
+}
+
 export async function archiveCotizacion(id: number): Promise<void> {
   await api.delete(`/api/cotizaciones/${id}`);
 }
