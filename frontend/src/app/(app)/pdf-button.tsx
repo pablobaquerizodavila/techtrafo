@@ -4,7 +4,7 @@ import { useState } from "react";
 import { FileDown, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-type Recurso = "cotizacion" | "contrato" | "ot" | "informe-tecnico";
+type Recurso = "cotizacion" | "contrato" | "ot" | "informe-tecnico" | "orden-compra";
 
 interface Props {
   recurso: Recurso;

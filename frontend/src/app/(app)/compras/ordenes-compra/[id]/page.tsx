@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, use as usePromise } from "react";
 import Link from "next/link";
 import { ChevronLeft, Send, Check, X, Truck, PackageCheck, ShoppingCart } from "lucide-react";
+import { PdfButton } from "../../../pdf-button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -134,6 +135,8 @@ export default function OCDetallePage({ params }: { params: Promise<{ id: string
                 <PackageCheck className="h-3.5 w-3.5" /> Registrar recepción
               </Link>
             )}
+            <PdfButton recurso="orden-compra" id={ocId} label="Descargar PDF" maxNivel={3} />
+
             {!["recibida_total", "cerrada", "cancelada"].includes(oc.estado) && (
               <button type="button" onClick={() => action(() => cancelarOC(ocId), "OC cancelada")} disabled={busy} className={actionClass("ghost")}>
                 Cancelar OC

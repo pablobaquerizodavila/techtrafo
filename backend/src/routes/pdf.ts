@@ -14,8 +14,8 @@ import { prisma } from "../db/client";
 import { requireAuth, requirePermission } from "../auth/middleware";
 import { crearDocumento, enviarPDF, resolverNivel } from "../services/pdf/base";
 import {
-  renderCotizacion, renderContrato, renderOT, renderInformeTecnico,
-  DataCotizacion, DataContrato, DataOT, DataInformeTecnico,
+  renderCotizacion, renderContrato, renderOT, renderInformeTecnico, renderOrdenCompra,
+  DataCotizacion, DataContrato, DataOT, DataInformeTecnico, DataOrdenCompra,
 } from "../services/pdf/documentos";
 
 const router = Router();
@@ -147,6 +147,41 @@ router.get("/informe-tecnico/:id", requirePermission("expedientes", "read"), asy
   });
   renderInformeTecnico(doc, inf as unknown as DataInformeTecnico, nivel);
   enviarPDF(doc, res, `${inf.numero}-N${nivel}`);
+});
+
+// ===================================================================
+// ORDEN DE COMPRA
+// ===================================================================
+router.get("/orden-compra/:id", requirePermission("compras", "read"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  const oc = await prisma.ordenes_compra.findUnique({
+    where: { id: BigInt(id) },
+    include: {
+      proveedores: true,
+      roles: { select: { nombre: true } },
+      orden_compra_lineas: { orderBy: { orden: "asc" } },
+      solicitudes_ordenes_compra_solicitud_idTosolicitudes: {
+        select: { codigo: true, departamento_solicitante: true },
+      },
+      expedientes: { select: { codigo: true } },
+      usuarios_ordenes_compra_aprobador_idTousuarios: { select: { nombre_completo: true } },
+    },
+  });
+  if (!oc) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+  const { nivel } = resolverNivel(parseNivel(req.query.nivel), req.user!.rol_nombre, req.user!.es_super_admin);
+  const doc = crearDocumento({
+    documento: "ORDEN DE COMPRA", codigo: oc.codigo, fecha: oc.fecha_emision ?? new Date(), nivel,
+    subtitulo: "Documento formal de compra",
+  });
+  renderOrdenCompra(doc, oc as unknown as DataOrdenCompra, nivel);
+  enviarPDF(doc, res, `${oc.codigo}-N${nivel}`);
 });
 
 export default router;

@@ -494,3 +494,151 @@ export function renderInformeTecnico(doc: Doc, inf: DataInformeTecnico, nivel: N
     doc.moveDown(2);
   }
 }
+
+// ===================================================================
+// ORDEN DE COMPRA
+// ===================================================================
+export interface DataOrdenCompra {
+  codigo: string;
+  fecha_emision: Date | string;
+  fecha_entrega_acordada: Date | string | null;
+  condiciones_pago: string | null;
+  incoterm: string | null;
+  lugar_entrega: string | null;
+  moneda: string;
+  subtotal: string | number;
+  descuento_porcentaje: string | number | null;
+  descuento_valor: string | number | null;
+  iva_porcentaje: string | number;
+  iva_valor: string | number;
+  retencion_valor: string | number | null;
+  total: string | number;
+  observaciones_proveedor: string | null;
+  observaciones_internas: string | null;
+  proveedores: {
+    codigo: string;
+    razon_social: string;
+    ruc: string | null;
+    ciudad: string | null;
+    pais: string;
+    contacto_nombre: string | null;
+    contacto_email: string | null;
+    contacto_telefono: string | null;
+  } | null;
+  roles: { nombre: string } | null;
+  solicitudes_ordenes_compra_solicitud_idTosolicitudes: { codigo: string; departamento_solicitante: string } | null;
+  expedientes: { codigo: string } | null;
+  usuarios_ordenes_compra_aprobador_idTousuarios?: { nombre_completo: string } | null;
+  orden_compra_lineas: Array<{
+    orden: number;
+    descripcion: string;
+    codigo_proveedor_item: string | null;
+    unidad_medida: string | null;
+    cantidad_solicitada: number | string;
+    precio_unitario: number | string;
+    descuento_porcentaje: number | string | null;
+    subtotal: number | string | null;
+  }>;
+}
+
+export function renderOrdenCompra(doc: Doc, oc: DataOrdenCompra, nivel: Nivel): void {
+  const prov = oc.proveedores;
+
+  // -- Proveedor
+  titulo(doc, "Proveedor");
+  bloqueDatos(doc, [
+    { label: "Razón social",  valor: prov?.razon_social ?? "—" },
+    { label: "RUC",           valor: prov?.ruc },
+    { label: "Ciudad / País", valor: [prov?.ciudad, prov?.pais].filter(Boolean).join(", ") || null },
+    { label: "Contacto",      valor: prov?.contacto_nombre },
+    { label: "Email",         valor: prov?.contacto_email },
+    { label: "Teléfono",      valor: prov?.contacto_telefono },
+  ]);
+
+  // -- Datos de la orden
+  titulo(doc, "Datos de la orden");
+  bloqueDatos(doc, [
+    { label: "Código",           valor: oc.codigo },
+    { label: "Fecha de emisión", valor: fmtDate(oc.fecha_emision) },
+    { label: "Entrega acordada", valor: fmtDate(oc.fecha_entrega_acordada) },
+    { label: "Moneda",           valor: oc.moneda },
+    { label: "Condic. de pago",  valor: oc.condiciones_pago },
+    { label: "Incoterm",         valor: oc.incoterm },
+    { label: "Lugar de entrega", valor: oc.lugar_entrega },
+  ]);
+
+  // -- Referencia (N>=2)
+  if (nivel >= 2) {
+    const sc = oc.solicitudes_ordenes_compra_solicitud_idTosolicitudes;
+    if (sc || oc.expedientes) {
+      titulo(doc, "Referencia interna");
+      const refs: FilaDato[] = [];
+      if (sc) {
+        refs.push(
+          { label: "Solicitud de compra", valor: sc.codigo },
+          { label: "Departamento",        valor: sc.departamento_solicitante },
+        );
+      }
+      if (oc.expedientes) refs.push({ label: "Expediente", valor: oc.expedientes.codigo });
+      bloqueDatos(doc, refs);
+    }
+  }
+
+  // -- Líneas
+  titulo(doc, "Líneas de la orden");
+  // Suma de widths = 495 = doc.page.width - 100 (A4 595 - 50 left - 50 right)
+  const cols: ColumnaTabla<DataOrdenCompra["orden_compra_lineas"][0]>[] = [
+    { label: "#",            width: 20,  align: "center", render: (l) => String(l.orden) },
+    { label: "Descripción",  width: 175,                  render: (l) => l.descripcion },
+    { label: "Cód. Prov.",   width: 60,                   render: (l) => l.codigo_proveedor_item ?? "—" },
+    { label: "U/M",          width: 35,  align: "center", render: (l) => l.unidad_medida ?? "—" },
+    { label: "Cantidad",     width: 50,  align: "right",  render: (l) => Number(l.cantidad_solicitada).toLocaleString("es-EC", { minimumFractionDigits: 0 }) },
+    { label: "Precio Unit.", width: 75,  align: "right",  render: (l) => fmtMoney(l.precio_unitario) },
+    { label: "Dto%",         width: 25,  align: "right",  render: (l) => l.descuento_porcentaje && Number(l.descuento_porcentaje) > 0 ? `${Number(l.descuento_porcentaje)}%` : "—" },
+    { label: "Subtotal",     width: 55,  align: "right",  bold: true, render: (l) => fmtMoney(l.subtotal) },
+  ];
+  tablaSimple(doc, cols, oc.orden_compra_lineas);
+
+  // -- Resumen financiero
+  const descPc  = Number(oc.descuento_porcentaje ?? 0);
+  const descVal = Number(oc.descuento_valor ?? 0);
+  const ivaPorc = Number(oc.iva_porcentaje);
+  const ivaVal  = Number(oc.iva_valor);
+  const ret     = Number(oc.retencion_valor ?? 0);
+  const sub     = Number(oc.subtotal);
+
+  doc.moveDown(0.3);
+  const resumFila: FilaDato[] = [
+    { label: "Subtotal",       valor: fmtMoney(sub) },
+    { label: `Descuento (${descPc}%)`, valor: descVal > 0 ? `−${fmtMoney(descVal)}` : "—" },
+    { label: "Base imponible", valor: fmtMoney(sub - descVal) },
+    { label: `IVA ${ivaPorc}%`, valor: fmtMoney(ivaVal) },
+    ...(ret > 0 ? [{ label: "Retención", valor: `−${fmtMoney(ret)}` }] : []),
+  ];
+  bloqueDatos(doc, resumFila);
+
+  totalDestacado(doc, "TOTAL", fmtMoney(oc.total));
+
+  // -- Observaciones al proveedor
+  if (oc.observaciones_proveedor) {
+    titulo(doc, "Observaciones al proveedor");
+    parrafo(doc, oc.observaciones_proveedor);
+  }
+
+  // -- Bloque de firma
+  doc.moveDown(2);
+  const sigY = doc.y;
+  doc.moveTo(50, sigY).lineTo(240, sigY).strokeColor(COLORS.rule).lineWidth(0.5).stroke();
+  doc.moveDown(0.4);
+  doc.font("Helvetica").fontSize(9).fillColor(COLORS.muted)
+     .text(`Autorizado por: ${oc.roles?.nombre ?? "Gerencia"}`);
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(COLORS.brand)
+     .text("TECHTRAFO S.A.");
+
+  // -- Notas internas (N>=3)
+  if (nivel >= 3 && oc.observaciones_internas) {
+    doc.moveDown(2);
+    titulo(doc, "Notas internas");
+    parrafo(doc, oc.observaciones_internas);
+  }
+}
