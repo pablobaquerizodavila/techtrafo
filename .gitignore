@@ -1,3 +1,9 @@
+# web-public — certbot data y logs (nunca versionar claves privadas)
+infrastructure/web-public/certbot/conf/live/
+infrastructure/web-public/certbot/conf/archive/
+infrastructure/web-public/certbot/conf/accounts/
+infrastructure/web-public/nginx/logs/
+
 # Variables de entorno y secretos
 .env
 .env.local

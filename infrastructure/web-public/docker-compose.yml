@@ -1,0 +1,47 @@
+version: "3.9"
+
+# Stack web público: nginx (frontfacing) + php-fpm para sitios PHP.
+# Sirve los sitios estáticos y PHP de /home/techtrafo/sites/ + hace
+# reverse proxy a los containers del panel TECHTRAFO (panel.techtrafo.com,
+# api.techtrafo.com, portal.techtrafo.com) via la red techtrafo_net.
+#
+# Ruta live en el server: /home/techtrafo/web-public/
+# Arrancar: cd /home/techtrafo/web-public && docker compose up -d
+# Reload nginx (sin bajar): docker exec web-nginx nginx -s reload
+
+services:
+  web-nginx:
+    image: nginx:1.27-alpine
+    container_name: web-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/logs:/var/log/nginx
+      - /home/techtrafo/sites:/var/www/sites:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+    networks:
+      - techtrafo_net
+    depends_on:
+      - web-php
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  web-php:
+    image: php:8.2-fpm-alpine
+    container_name: web-php
+    restart: unless-stopped
+    volumes:
+      - /home/techtrafo/sites:/var/www/sites:ro
+    networks:
+      - techtrafo_net
+
+networks:
+  techtrafo_net:
+    external: true
