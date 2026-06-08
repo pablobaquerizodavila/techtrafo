@@ -18,6 +18,14 @@ import {
   updateProveedor, fmtMoneda,
 } from "@/lib/compras";
 import { ApiError } from "@/lib/api";
+import {
+  AccesoProveedor,
+  AccesoProveedorCreateInput,
+  listAccesosProveedor,
+  crearAccesoProveedor,
+  toggleAccesoProveedor,
+  deleteAccesoProveedor,
+} from "@/lib/proveedor-portal";
 
 interface ProveedorFull extends Proveedor {
   item_proveedores: ItemProveedor[];
@@ -39,6 +47,10 @@ export default function ProveedorDetallePage({ params }: { params: Promise<{ id:
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Partial<ProveedorCreateInput>>({});
+  const [accesos, setAccesos] = useState<AccesoProveedor[]>([]);
+  const [loadingAccesos, setLoadingAccesos] = useState(false);
+  const [newAcceso, setNewAcceso] = useState<AccesoProveedorCreateInput>({ email: "", nombres: "", apellidos: "", password: "" });
+  const [creatingAcceso, setCreatingAcceso] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -70,6 +82,57 @@ export default function ProveedorDetallePage({ params }: { params: Promise<{ id:
       setLoading(false);
     }
   }, [provId]);
+
+  const loadAccesos = useCallback(async () => {
+    setLoadingAccesos(true);
+    try {
+      const res = await listAccesosProveedor(provId);
+      setAccesos(res.data);
+    } catch {
+      // silent
+    } finally {
+      setLoadingAccesos(false);
+    }
+  }, [provId]);
+
+  useEffect(() => { loadAccesos(); }, [loadAccesos]);
+
+  async function handleCrearAcceso() {
+    if (!newAcceso.email.trim() || !newAcceso.nombres.trim() || !newAcceso.apellidos.trim() || !newAcceso.password.trim()) {
+      toast.error("Completa todos los campos del nuevo acceso");
+      return;
+    }
+    setCreatingAcceso(true);
+    try {
+      await crearAccesoProveedor(provId, newAcceso);
+      toast.success("Acceso creado");
+      setNewAcceso({ email: "", nombres: "", apellidos: "", password: "" });
+      await loadAccesos();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? String((err.body as { error?: string })?.error ?? err.status) : "Error al crear acceso");
+    }
+    setCreatingAcceso(false);
+  }
+
+  async function handleToggleAcceso(userId: string, activo: boolean) {
+    try {
+      await toggleAccesoProveedor(provId, userId, activo);
+      setAccesos((prev) => prev.map((a) => a.id === userId ? { ...a, activo } : a));
+    } catch {
+      toast.error("Error al cambiar estado del acceso");
+    }
+  }
+
+  async function handleDeleteAcceso(userId: string) {
+    if (!window.confirm("Eliminar acceso permanentemente?")) return;
+    try {
+      await deleteAccesoProveedor(provId, userId);
+      setAccesos((prev) => prev.filter((a) => a.id !== userId));
+      toast.success("Acceso eliminado");
+    } catch {
+      toast.error("Error al eliminar acceso");
+    }
+  }
 
   useEffect(() => { load(); }, [load]);
 
@@ -244,6 +307,86 @@ export default function ProveedorDetallePage({ params }: { params: Promise<{ id:
               </TableBody>
             </Table>
           )}
+        </Panel>
+        <Panel title="Acceso al portal de proveedor" padded>
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Los accesos permiten al proveedor ingresar al portal de proveedor para ver sus OCs, registrar acuse de recibo y subir facturas.
+            </p>
+            {loadingAccesos ? (
+              <p className="text-xs text-muted-foreground">Cargando accesos...</p>
+            ) : accesos.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No hay accesos configurados.</p>
+            ) : (
+              <div className="space-y-2">
+                {accesos.map((a) => (
+                  <div key={a.id} className="flex items-center gap-3 rounded-lg border border-glass-mid bg-glass px-3 py-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium">{a.nombres} {a.apellidos}</div>
+                      <div className="text-xs text-muted-foreground font-mono">{a.email}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleAcceso(a.id, !a.activo)}
+                      className={`text-xs px-2 py-0.5 rounded-full ${a.activo ? "bg-green-500/15 text-green-400" : "bg-rose-500/15 text-rose-400"}`}
+                    >
+                      {a.activo ? "Activo" : "Inactivo"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteAcceso(a.id)}
+                      className="text-muted-foreground/50 hover:text-rose-400 transition-colors"
+                      title="Eliminar acceso"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="border border-glass-mid rounded-lg p-3 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Nuevo acceso</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <input
+                  type="text"
+                  placeholder="Nombres"
+                  value={newAcceso.nombres}
+                  onChange={(e) => setNewAcceso((a) => ({ ...a, nombres: e.target.value }))}
+                  className="h-9 rounded-md border border-glass bg-glass px-3 text-sm focus:outline-none focus:ring-1 focus:ring-copper/50"
+                />
+                <input
+                  type="text"
+                  placeholder="Apellidos"
+                  value={newAcceso.apellidos}
+                  onChange={(e) => setNewAcceso((a) => ({ ...a, apellidos: e.target.value }))}
+                  className="h-9 rounded-md border border-glass bg-glass px-3 text-sm focus:outline-none focus:ring-1 focus:ring-copper/50"
+                />
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={newAcceso.email}
+                  onChange={(e) => setNewAcceso((a) => ({ ...a, email: e.target.value }))}
+                  className="h-9 rounded-md border border-glass bg-glass px-3 text-sm focus:outline-none focus:ring-1 focus:ring-copper/50"
+                />
+                <input
+                  type="password"
+                  placeholder="Contrasena (min. 8 caracteres)"
+                  value={newAcceso.password}
+                  onChange={(e) => setNewAcceso((a) => ({ ...a, password: e.target.value }))}
+                  className="h-9 rounded-md border border-glass bg-glass px-3 text-sm focus:outline-none focus:ring-1 focus:ring-copper/50"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleCrearAcceso}
+                disabled={creatingAcceso}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-b from-copper to-copper-deep px-3.5 py-2 text-xs font-medium text-white glow-copper-sm inset-highlight-md transition hover:glow-copper disabled:opacity-60"
+              >
+                {creatingAcceso ? "Creando..." : "Crear acceso"}
+              </button>
+            </div>
+          </div>
         </Panel>
       </div>
 

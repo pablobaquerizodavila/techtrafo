@@ -418,4 +418,129 @@ router.get("/buscar-por-item/:itemId", requirePermission("proveedores", "read"),
   res.json({ data });
 });
 
+
+// ===================================================================
+// ACCESOS AL PORTAL - usuarios (rol "proveedor") vinculados a un proveedor
+// ===================================================================
+import { hashPassword } from "../auth/password";
+
+const accesoProveedorCreateSchema = z.object({
+  email: z.string().email().max(255),
+  nombres: z.string().min(1).max(100),
+  apellidos: z.string().min(1).max(100),
+  password: z.string().min(8).max(100),
+});
+
+function isUniqueViolationProv(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
+}
+
+async function generarNombreUsuarioProv(email: string): Promise<string> {
+  const base = email.split("@")[0].toLowerCase().replace(/[^a-z0-9._-]/g, "").slice(0, 40) || "proveedor";
+  let candidato = base;
+  let n = 1;
+  while (await prisma.usuarios.findFirst({ where: { nombre_usuario: candidato }, select: { id: true } })) {
+    candidato = `${base}${n}`.slice(0, 50);
+    n += 1;
+    if (n > 9999) { candidato = `${base}${Date.now()}`.slice(0, 50); break; }
+  }
+  return candidato;
+}
+
+async function getRolProveedorId(): Promise<number | null> {
+  const rol = await prisma.roles.findFirst({ where: { nombre: "proveedor" }, select: { id: true } });
+  return rol?.id ?? null;
+}
+
+// GET /api/proveedores/:id/accesos
+router.get("/:id/accesos", requirePermission("proveedores", "read"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+  const data = await prisma.usuarios.findMany({
+    where: { proveedor_id: BigInt(id) },
+    orderBy: { created_at: "asc" },
+    select: {
+      id: true, email: true, nombre_usuario: true, nombres: true, apellidos: true,
+      activo: true, estado_aprobacion: true, ultimo_login: true, created_at: true,
+    },
+  });
+  res.json({ data });
+});
+
+// POST /api/proveedores/:id/accesos
+router.post("/:id/accesos", requirePermission("proveedores", "write"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+  const parsed = accesoProveedorCreateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  const { email, nombres, apellidos, password } = parsed.data;
+
+  const proveedor = await prisma.proveedores.findUnique({ where: { id: BigInt(id) }, select: { id: true } });
+  if (!proveedor) { res.status(404).json({ error: "proveedor_not_found" }); return; }
+
+  const existeEmail = await prisma.usuarios.findUnique({ where: { email }, select: { id: true } });
+  if (existeEmail) { res.status(409).json({ error: "email_duplicado" }); return; }
+
+  const rolProveedorId = await getRolProveedorId();
+  if (!rolProveedorId) { res.status(500).json({ error: "rol_proveedor_no_existe" }); return; }
+
+  const nombre_usuario = await generarNombreUsuarioProv(email);
+  const password_hash = await hashPassword(password);
+
+  try {
+    const nuevo = await withAppUser(req.user!.id, (tx) =>
+      tx.usuarios.create({
+        data: {
+          email,
+          password_hash,
+          nombre_usuario,
+          nombres,
+          apellidos,
+          rol_id: rolProveedorId,
+          proveedor_id: BigInt(id),
+          activo: true,
+          estado_aprobacion: "aprobado",
+          aprobado_por: req.user!.id,
+          fecha_aprobacion: new Date(),
+        },
+        select: {
+          id: true, email: true, nombre_usuario: true, nombres: true, apellidos: true,
+          activo: true, estado_aprobacion: true, created_at: true,
+        },
+      }),
+    );
+    res.status(201).json({ data: nuevo });
+  } catch (err) {
+    if (isUniqueViolationProv(err)) { res.status(409).json({ error: "email_o_usuario_duplicado" }); return; }
+    throw err;
+  }
+});
+
+// PATCH /api/proveedores/:id/accesos/:userId  (toggle activo)
+router.patch("/:id/accesos/:userId", requirePermission("proveedores", "write"), async (req, res) => {
+  const id = Number(req.params.id);
+  const userId = req.params.userId;
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+  const pw = z.object({ activo: z.boolean() }).safeParse(req.body);
+  if (!pw.success) { res.status(400).json({ error: "invalid_payload" }); return; }
+  const u = await prisma.usuarios.findFirst({ where: { id: userId, proveedor_id: BigInt(id) }, select: { id: true } });
+  if (!u) { res.status(404).json({ error: "not_found" }); return; }
+  await prisma.$executeRaw`UPDATE core.usuarios SET activo = ${pw.data.activo}, updated_at = NOW() WHERE id = ${userId}::uuid`;
+  res.json({ status: "ok" });
+});
+
+// DELETE /api/proveedores/:id/accesos/:userId
+router.delete("/:id/accesos/:userId", requirePermission("proveedores", "write"), async (req, res) => {
+  const id = Number(req.params.id);
+  const userId = req.params.userId;
+  if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+  const u = await prisma.usuarios.findFirst({ where: { id: userId, proveedor_id: BigInt(id) }, select: { id: true } });
+  if (!u) { res.status(404).json({ error: "not_found" }); return; }
+  await prisma.usuarios.delete({ where: { id: userId } });
+  res.status(204).end();
+});
+
 export default router;
