@@ -171,10 +171,12 @@ export default function NoConformidadDetallePage({ params }: { params: Promise<{
           <p className="text-sm text-foreground/90 whitespace-pre-wrap">{nc.descripcion}</p>
         </Panel>
 
-        {/* Acción tomada (solo visible si está cerrada) */}
-        {nc.accion_tomada && nc.estado === "cerrada" && (
-          <Panel title="Acción tomada">
-            <p className="text-sm text-foreground/90 whitespace-pre-wrap">{nc.accion_tomada}</p>
+        {/* Accion tomada (visible cuando cerrada, fallback si no hay texto) */}
+        {nc.estado === "cerrada" && (
+          <Panel title="Accion tomada">
+            <p className="text-sm text-foreground/90 whitespace-pre-wrap">
+              {nc.accion_tomada ?? <span className="text-muted-foreground/60 italic">Sin accion registrada</span>}
+            </p>
           </Panel>
         )}
 

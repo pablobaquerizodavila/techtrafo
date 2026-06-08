@@ -12,6 +12,7 @@ import {
   anularRecepcion, confirmarRecepcion, fmtMoneda, getRecepcion, Recepcion,
 } from "@/lib/compras";
 import { ApiError } from "@/lib/api";
+import { getNoConformidades } from "@/lib/no-conformidades";
 
 const REC_BADGE: Record<string, "muted" | "success" | "destructive" | "warning"> = {
   borrador: "muted", confirmada: "success", rechazada: "destructive", anulada: "warning",
@@ -41,8 +42,7 @@ export default function RecepcionDetallePage({ params }: { params: Promise<{ id:
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    fetch(`/api/no-conformidades?recepcion_id=${recId}`, { credentials: "include" })
-      .then((r) => r.json())
+    getNoConformidades({ recepcion_id: Number(recId) })
       .then((d) => { if (d.data?.length > 0) setNc(d.data[0]); })
       .catch(() => {});
   }, [recId]);
