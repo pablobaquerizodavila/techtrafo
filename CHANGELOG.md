@@ -6,6 +6,15 @@ El formato sigue Keep a Changelog y este proyecto adhiere a Semantic Versioning.
 
 ---
 
+## [0.17.0] — 2026-06-08
+
+### Added
+- **#39** Validación de margen mínimo en cotizaciones: tabla `comercial.config_margen_minimo` por tipo_servicio (fabricacion 25%, mantenimiento/reparacion 20%, otro 15%). Guard en POST /cotizaciones/:id/transicion accion=enviar: roles vendedor/tecnico → HTTP 422 bloqueante; roles gerenciales → confirmación con ?forzar_margen=true + nota automática `[SISTEMA]`. Badge verde/amarillo/rojo dinámico en form. Admin config en /admin/config-margen.
+- **#41** No conformidades en recepciones: tablas `compras.no_conformidades` + `compras.nc_lineas` con trigger auto-código `NC-YYYY-NNNN`. Trigger automático `crearOActualizarNC` al confirmar recepción con líneas rechazadas. Backend CRUD /api/no-conformidades (GET lista, GET detalle, PATCH, POST cerrar). Frontend /compras/no-conformidades + link desde recepción + sublink en nav. Notificación email al responsable_calidad_id.
+- **#40** Portal de proveedor: campo `proveedor_id` en `core.usuarios`, nuevos campos en `compras.ordenes_compra` (acuse_recibo_at, factura_proveedor_numero, factura_proveedor_url), rol `proveedor`. Backend /api/proveedor-portal (mis-ocs, oc/:id, acusar-recibo, factura) con middleware requireProveedorId. proveedor_id incluido en AuthUser JWT. Frontend /proveedor con layout propio. Sección acceso al portal en ficha admin de proveedor (/api/proveedores/:id/accesos).
+
+---
+
 ## [0.20.0] — 2026-06-08 — feat(compras): #38 PDF formal de Orden de Compra
 
 ### Agregado

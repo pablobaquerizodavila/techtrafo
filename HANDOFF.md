@@ -1,6 +1,6 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-06-08 · #32+#33+#34+#45 ops/infra/email/backup**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-06-08 · #39+#41+#40 margen/NC/portal**.
 
 > 📄 **Ver también [`ACCESO-Y-BACKUPS.md`](ACCESO-Y-BACKUPS.md)** — guía de hosts, credenciales, ubicación de backups y recuperación desde PC nueva.
 
@@ -42,6 +42,14 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 ---
 
 ## 0. Estado al cierre 2026-06-08 (leer primero)
+
+**Sesión 2026-06-08d — #39+#41+#40 margen/NC/portal**
+
+- ✅ **#39 Margen mínimo** (commits 25b5349/bbe7c1f/051b4bd/eeb3ad9/0d217fc/d84fe4b): Migration 026 + guard en cotizaciones POST /transicion (bloquea/fuerza según rol) + badge dinámico verde/amarillo/rojo + diálogo de confirmación + admin config-margen.
+- ✅ **#41 No conformidades** (commits b6c4127/51fd819/0c45919/9245290/1722f58/2725e66/a42d6a2): Migration 028 + trigger DB tg_nc_codigo + backend CRUD /api/no-conformidades + crearOActualizarNC en recepciones + notificarNCCreada + frontend /compras/no-conformidades + link en recepciones + nav.
+- ✅ **#40 Portal proveedor** (commits dbe5a8b/e34f6e0/90c217d): Migration 027 (proveedor_id usuarios + campos OC + rol proveedor) + backend /api/proveedor-portal (mis-ocs/acusar/factura) + proveedor_id en AuthUser + frontend /proveedor con layout propio. Sección accesos en admin.
+- ⚠️ **Push pendiente**: GitHub token expirado en server .23. Todos los commits están locales. Pablo debe actualizar el token.
+- 🔜 **#42 E2E checklist**: ejecutar en el panel con datos reales (ver HANDOFF para detalles).
 
 **Sesión 2026-06-08c — #32+#33+#34+#45 ops/infra/email/backup**
 
