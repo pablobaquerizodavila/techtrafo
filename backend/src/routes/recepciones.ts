@@ -55,6 +55,55 @@ const createSchema = z.object({
 // -------------------------------------------------------------------
 // GET /api/recepciones
 // -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+// Helper: crea automaticamente una NC cuando hay lineas rechazadas.
+// Si ya existe NC activa (abierta/en_proceso) para la recepcion, no hace nada.
+// El codigo NC es auto-generado por el trigger tg_nc_codigo en el DB.
+// -------------------------------------------------------------------
+async function crearOActualizarNC(
+  tx: Prisma.TransactionClient,
+  recepcionId: bigint,
+  lineasRechazadas: Array<{ id: bigint; cantidad_rechazada: number; motivo_rechazo: string | null }>,
+  creadoPor: string,
+): Promise<bigint | null> {
+  if (lineasRechazadas.length === 0) return null;
+
+  const ncExistente = await tx.no_conformidades.findFirst({
+    where: { recepcion_id: recepcionId, estado: { in: ["abierta", "en_proceso"] } },
+    select: { id: true },
+  });
+  if (ncExistente) return ncExistente.id;
+
+  const recepcion = await tx.recepciones.findUnique({
+    where: { id: recepcionId },
+    select: { id: true, orden_compra_id: true, ordenes_compra: { select: { proveedor_id: true } } },
+  });
+  if (!recepcion) return null;
+
+  const nc = await tx.no_conformidades.create({
+    data: {
+      recepcion_id: recepcionId,
+      orden_compra_id: recepcion.orden_compra_id,
+      proveedor_id: recepcion.ordenes_compra?.proveedor_id ?? null,
+      // Prisma requiere el campo; el trigger tg_nc_codigo lo sobreescribe en BEFORE INSERT
+      codigo: "NC-PENDING",
+      tipo: "calidad",
+      descripcion: `No conformidad detectada en recepcion #${recepcionId}. ${lineasRechazadas.length} linea(s) rechazada(s).`,
+      estado: "abierta",
+      creado_por: creadoPor,
+      nc_lineas: {
+        create: lineasRechazadas.map((l) => ({
+          recepcion_linea_id: l.id,
+          cantidad_no_conforme: new Prisma.Decimal(l.cantidad_rechazada),
+          motivo: l.motivo_rechazo,
+        })),
+      },
+    },
+    select: { id: true, codigo: true },
+  });
+  return nc.id;
+}
 router.get("/", requirePermission("compras", "read"), async (req, res) => {
   const ocId = req.query.orden_compra_id ? Number(req.query.orden_compra_id) : undefined;
   const estado = req.query.estado as string | undefined;
@@ -375,7 +424,18 @@ router.post("/:id/confirmar", requirePermission("compras", "recibir"), async (re
         },
       });
 
-      return { recepcion: recConfirmada, oc_estado: nuevoEstadoOC, movimientos: movimientosCreados.length };
+
+      // Auto-crear NC si hay lineas rechazadas
+      const lineasRechazadas = rec.recepcion_lineas
+        .filter((rl) => rl.resultado_inspeccion === "rechazado" && Number(rl.cantidad_rechazada ?? 0) > 0)
+        .map((rl) => ({
+          id: rl.id,
+          cantidad_rechazada: Number(rl.cantidad_rechazada ?? 1),
+          motivo_rechazo: rl.motivo_rechazo ?? null,
+        }));
+      await crearOActualizarNC(tx, rec.id, lineasRechazadas, userId);
+
+            return { recepcion: recConfirmada, oc_estado: nuevoEstadoOC, movimientos: movimientosCreados.length };
     });
 
     res.json({ data: result });

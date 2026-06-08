@@ -34,7 +34,8 @@ export type TipoNotificacion =
   | "cotizacion_revision_solicitada"
   | "cotizacion_revision_escalada"
   | "cotizacion_revision_aprobada"
-  | "cotizacion_revision_rechazada";
+  | "cotizacion_revision_rechazada"
+  | "nc_creada";
 
 interface CreateInput {
   tipo: TipoNotificacion;
@@ -462,4 +463,37 @@ export async function notificarRevisionCotizacion(input: {
     if (created) creadas++;
   }
   return creadas;
+}
+
+/**
+ * Notifica al responsable de calidad cuando se crea automaticamente una NC
+ * a partir de una recepcion con lineas rechazadas.
+ */
+export async function notificarNCCreada(input: {
+  nc_id: bigint;
+  nc_codigo: string;
+  proveedor_nombre: string;
+  responsable_calidad_id: string | null;
+}): Promise<void> {
+  if (!input.responsable_calidad_id) return;
+  const responsable = await prisma.usuarios.findUnique({
+    where: { id: input.responsable_calidad_id },
+    select: { email: true, nombre_completo: true },
+  });
+  if (!responsable?.email) return;
+
+  await crear({
+    tipo: "nc_creada",
+    destinatario_id: input.responsable_calidad_id,
+    destinatario_email: responsable.email,
+    asunto: `[TECHTRAFO] Nueva no conformidad: ${input.nc_codigo} — ${input.proveedor_nombre}`,
+    cuerpo_html: `
+      <p>Se ha registrado una nueva no conformidad en una recepcion de compras.</p>
+      <p><strong>Codigo:</strong> ${input.nc_codigo}</p>
+      <p><strong>Proveedor:</strong> ${input.proveedor_nombre}</p>
+      <p>Ingresa al panel para revisar el detalle y asignar acciones correctivas.</p>
+    `,
+    cuerpo_texto: `Nueva no conformidad: ${input.nc_codigo} — ${input.proveedor_nombre}. Revisa el panel.`,
+    contexto: { nc_id: Number(input.nc_id), nc_codigo: input.nc_codigo },
+  });
 }
