@@ -6,6 +6,27 @@ El formato sigue Keep a Changelog y este proyecto adhiere a Semantic Versioning.
 
 ---
 
+## [0.19.0] — 2026-06-08 — feat(compras): #37 forms SC/OC manuales + security fixes + demo cleanup
+
+### Agregado
+- **Forms de creación manual de SC** (`/compras/solicitudes/nueva`): cabecera (depto, prioridad, fecha requerida, justificación) + tabla de líneas con búsqueda inline de ítems de inventario con dropdown flotante.
+- **Forms de creación manual de OC** (`/compras/ordenes-compra/nueva`): cabecera (proveedor select, entrega, condiciones pago, moneda, IVA%, descuento%) + tabla de líneas + bloque de totales calculados en vivo (subtotal→base→IVA→total) + indicador del rol aprobador requerido.
+- **Botones "Nueva SC" / "Nueva OC"** (`HeaderActionPrimary`) en headers de las listas de solicitudes y órdenes de compra.
+- `lib/compras.ts`: `SolicitudCompraCreateInput`, `OrdenCompraCreateInput`, `createSolicitudCompra()`, `createOrdenCompra()`, `Departamento` type + `DEPARTAMENTO_LABEL`.
+
+### Cambiado
+- **Umbrales reales de aprobación OC** en `compras.config_aprobacion`: ≤$1.000 → `jefe_compras` · $1.001–$5.000 → `gerencia_comercial` · >$5.000 → `gerencia_general` (antes eran valores tentativos del seed).
+- **SSH key-based auth** en `.23`: `id_ed25519` de pablo-workstation en `authorized_keys`.
+
+### Corregido (security code-review)
+- `scripts/tt-alert.py`: TLS `CERT_NONE` incondicional → ahora porta `_is_lan_host()` igual que `email.ts` (solo deshabilita verificación para IPs privadas RFC-1918).
+- `nginx/default.conf`: `$http_x_real_ip` (header spoofeable) → `$remote_addr` en bloques api y web.
+
+### Eliminado
+- Demo data: contratos CTR-2026-D001/2/3, cotizaciones COT-2026-D002/3, expediente demo (13 hitos, 6 pagos). DB lista para data real.
+
+---
+
 ## [0.16.1] — 2026-05-25 — chore(tooling): script automatizado de backup al NAS
 
 Automatiza el workflow de snapshot al NAS que veniamos haciendo a mano

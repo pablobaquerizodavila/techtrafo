@@ -1,6 +1,6 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-06-01 · accesos cliente al portal + fix crash API + hardening + correo a mailcow**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-06-08 · #37 forms SC/OC manuales + demo cleanup + umbrales OC reales**.
 
 > 📄 **Ver también [`ACCESO-Y-BACKUPS.md`](ACCESO-Y-BACKUPS.md)** — guía de hosts, credenciales, ubicación de backups y recuperación desde PC nueva.
 
@@ -41,7 +41,41 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 
 ---
 
-## 0. Estado al cierre 2026-06-05 (leer primero)
+## 0. Estado al cierre 2026-06-08 (leer primero)
+
+**Sesión 2026-06-08 — code-review hardening + #37 forms SC/OC manuales + demo data cleanup + umbrales OC reales**
+
+- ✅ **Code-review security fixes** (commit `9662790`). Dos hallazgos confirmados y corregidos: (1) `scripts/tt-alert.py` tenía `CERT_NONE` incondicional — ahora porta la misma lógica `_is_lan_host()` de `email.ts` (usa `ipaddress.ip_address(h).is_private`; solo deshabilita verificación para IPs privadas RFC-1918). (2) `nginx/default.conf` usaba `$http_x_real_ip` (header spoofeable) → cambiado a `$remote_addr` en los bloques api y web (el bloque grafana ya usaba `$remote_addr` correctamente). Live nginx recargado.
+
+- ✅ **SSH key-based auth en `.23`** — `id_ed25519` (pablo-workstation) agregado a `/home/techtrafo/.ssh/authorized_keys`. Contraseña de techtrafo seteada a `Groundunder8299` (vía GRUB recovery mode root shell). Acceso: `ssh -i "C:\Users\Pablo B\.ssh\id_ed25519" techtrafo@192.168.0.23`.
+
+- ✅ **Crontab del server `.23`** configurado: `0 3 * * *` certbot-renew.sh · `0 2 * * *` tt-backup.sh.
+
+- ✅ **Demo data cleanup** (via psql directo). Eliminados: contratos CTR-2026-D001/2/3, cotizaciones COT-2026-D002/3, el expediente EXP demo (13 hitos, 6 pagos, 1 visita). DB lista para data real.
+
+- ✅ **Umbrales reales de aprobación OC** (commit `8f5f302` + UPDATE directo DB). Tabla `compras.config_aprobacion` actualizada: ≤$1.000 → `jefe_compras` · $1.001–$5.000 → `gerencia_comercial` · >$5.000 → `gerencia_general`.
+
+- ✅ **#37 Forms manuales SC y OC** (commit `8f5f302`). Sin pasar por el flujo de alertas de stock:
+  - `lib/compras.ts`: agrega `SolicitudCompraCreateInput`, `OrdenCompraCreateInput`, `createSolicitudCompra()`, `createOrdenCompra()`, `Departamento` type + `DEPARTAMENTO_LABEL`.
+  - `/compras/solicitudes/nueva`: form con departamento, prioridad, fecha requerida, justificación + tabla de líneas. Cada línea tiene búsqueda inline de ítems de inventario (debounce, dropdown flotante, rellena descripción+U.M.) con fallback gracioso si el rol no tiene `inventario.read`. Submit → POST → redirect al detalle.
+  - `/compras/ordenes-compra/nueva`: form con proveedor (select cargado on-mount), condiciones de pago, moneda, IVA%, descuento cabecera, observaciones + tabla de líneas + **bloque de totales en vivo** (subtotal→base→IVA→total) + indicador del rol aprobador requerido según umbrales.
+  - Listas SC y OC: botón **Nueva SC** / **Nueva OC** (`HeaderActionPrimary`) en header.
+  - Verificado: 307 (auth redirect) en `/compras/solicitudes/nueva` y `/compras/ordenes-compra/nueva`; no hay errores nuevos en tsc; dev server compila `✓ Compiled` sin fallo.
+
+**Pendientes inmediatos (próxima sesión):**
+- **#38**: PDF formal de OC para enviar al proveedor.
+- **#39**: Validación margen mínimo en cotizaciones.
+- **#40**: Portal de proveedor con auth limitada.
+- **#41**: Calidad / no conformidades en recepciones.
+- **#42**: Prueba e2e con data real.
+- **#43** cerrado (umbrales aplicados esta sesión).
+- **#44/#45** (certbot-renew monitor + backup check) — ya hay certbot-renew.sh con alertas; tarea pendiente de verificación.
+- Pablo debe **cambiar su contraseña temporal** del panel.
+- Task #34: test e2e real de email (cotización → correo).
+
+---
+
+## 0a. Estado al cierre 2026-06-05 (leer primero)
 
 **Sesión 2026-06-01→05 — accesos de cliente al portal, fix de crash del API, hardening, cutover de correo a mailcow, aprobación de cotización desde el portal, representante legal del cliente, plantillas de contrato, card de "etapas en riesgo (SLA)" en el dashboard, corrección/verificación de infra de hosting y módulo financiero.**
 
