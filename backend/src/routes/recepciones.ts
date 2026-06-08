@@ -87,7 +87,7 @@ async function crearOActualizarNC(
       orden_compra_id: recepcion.orden_compra_id,
       proveedor_id: recepcion.ordenes_compra?.proveedor_id ?? null,
       // Prisma requiere el campo; el trigger tg_nc_codigo lo sobreescribe en BEFORE INSERT
-      codigo: "NC-PENDING",
+      codigo: "",
       tipo: "calidad",
       descripcion: `No conformidad detectada en recepcion #${recepcionId}. ${lineasRechazadas.length} linea(s) rechazada(s).`,
       estado: "abierta",
