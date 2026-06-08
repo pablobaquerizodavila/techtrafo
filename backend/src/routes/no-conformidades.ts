@@ -67,7 +67,9 @@ router.get("/", requirePermission("compras", "read"), async (req, res) => {
 });
 
 router.get("/:id", requirePermission("compras", "read"), async (req, res) => {
-  const id = BigInt(req.params.id);
+  const idNum = Number(req.params.id);
+  if (!Number.isInteger(idNum) || idNum <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+  const id = BigInt(idNum);
   const nc = await prisma.no_conformidades.findUnique({
     where: { id },
     include: {
@@ -96,7 +98,9 @@ const patchSchema = z.object({
 });
 
 router.patch("/:id", requirePermission("compras", "write"), async (req, res) => {
-  const id = BigInt(req.params.id);
+  const idNum = Number(req.params.id);
+  if (!Number.isInteger(idNum) || idNum <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+  const id = BigInt(idNum);
   const parsed = patchSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
@@ -136,7 +140,9 @@ router.patch("/:id", requirePermission("compras", "write"), async (req, res) => 
 });
 
 router.post("/:id/cerrar", requirePermission("compras", "write"), async (req, res) => {
-  const id = BigInt(req.params.id);
+  const idNum = Number(req.params.id);
+  if (!Number.isInteger(idNum) || idNum <= 0) { res.status(400).json({ error: "invalid_id" }); return; }
+  const id = BigInt(idNum);
   const userId = req.user!.id;
 
   try {

@@ -19,6 +19,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { withAppUser } from "../db/withAppUser";
 import { requireAuth, requirePermission } from "../auth/middleware";
+import { notificarNCCreada } from "../services/notificaciones";
 
 const router = Router();
 router.use(requireAuth);
@@ -66,14 +67,14 @@ async function crearOActualizarNC(
   recepcionId: bigint,
   lineasRechazadas: Array<{ id: bigint; cantidad_rechazada: number; motivo_rechazo: string | null }>,
   creadoPor: string,
-): Promise<bigint | null> {
+): Promise<{ id: bigint; codigo: string } | null> {
   if (lineasRechazadas.length === 0) return null;
 
   const ncExistente = await tx.no_conformidades.findFirst({
     where: { recepcion_id: recepcionId, estado: { in: ["abierta", "en_proceso"] } },
-    select: { id: true },
+    select: { id: true, codigo: true },
   });
-  if (ncExistente) return ncExistente.id;
+  if (ncExistente) return { id: ncExistente.id, codigo: ncExistente.codigo };
 
   const recepcion = await tx.recepciones.findUnique({
     where: { id: recepcionId },
@@ -87,7 +88,7 @@ async function crearOActualizarNC(
       orden_compra_id: recepcion.orden_compra_id,
       proveedor_id: recepcion.ordenes_compra?.proveedor_id ?? null,
       // Prisma requiere el campo; el trigger tg_nc_codigo lo sobreescribe en BEFORE INSERT
-      codigo: "",
+      codigo: "", // empty string → DB trigger tg_nc_codigo fires and sets NC-YYYY-NNNN
       tipo: "calidad",
       descripcion: `No conformidad detectada en recepcion #${recepcionId}. ${lineasRechazadas.length} linea(s) rechazada(s).`,
       estado: "abierta",
@@ -102,7 +103,7 @@ async function crearOActualizarNC(
     },
     select: { id: true, codigo: true },
   });
-  return nc.id;
+  return { id: nc.id, codigo: nc.codigo };
 }
 router.get("/", requirePermission("compras", "read"), async (req, res) => {
   const ocId = req.query.orden_compra_id ? Number(req.query.orden_compra_id) : undefined;
@@ -433,12 +434,24 @@ router.post("/:id/confirmar", requirePermission("compras", "recibir"), async (re
           cantidad_rechazada: Number(rl.cantidad_rechazada ?? 1),
           motivo_rechazo: rl.motivo_rechazo ?? null,
         }));
-      await crearOActualizarNC(tx, rec.id, lineasRechazadas, userId);
+      const ncResult = await crearOActualizarNC(tx, rec.id, lineasRechazadas, userId);
 
-            return { recepcion: recConfirmada, oc_estado: nuevoEstadoOC, movimientos: movimientosCreados.length };
+      return { recepcion: recConfirmada, oc_estado: nuevoEstadoOC, movimientos: movimientosCreados.length, ncResult, rec };
     });
 
-    res.json({ data: result });
+    // Fire notification OUTSIDE the transaction so SMTP doesn't hold the DB connection open
+    if (result.ncResult) {
+      const proveedorNombre = (result.rec as any).ordenes_compra?.proveedores?.razon_social ?? "proveedor desconocido";
+      const responsableId = (result.rec as any).responsable_calidad_id as string | null ?? null;
+      notificarNCCreada({
+        nc_id: result.ncResult.id,
+        nc_codigo: result.ncResult.codigo,
+        proveedor_nombre: proveedorNombre,
+        responsable_calidad_id: responsableId,
+      }).catch(() => {}); // silent fail — don't block response
+    }
+
+    res.json({ data: { recepcion: result.recepcion, oc_estado: result.oc_estado, movimientos: result.movimientos } });
   } catch (err) {
     if (err instanceof Error) {
       const map: Record<string, number> = {
