@@ -43,21 +43,33 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 
 ## 0. Estado al cierre 2026-06-09 (leer primero)
 
-**Sesión 2026-06-09 — Cierre de pendientes + limpieza E2E**
+**Sesión 2026-06-09 (2ª) — Portal proveedor: subida real de factura + notificación email** · commit `f6b4cef`
 
-- ✅ **E2E data cleanup**: eliminados todos los registros de prueba del checklist #42 (PROV-E2E-01, OC-E2E-0001, REC-2026-0001, NC-2026-0001, COT-E2E-0001, usuarios proveedor.e2e y e2e.admin). DB limpia para datos reales.
-- ✅ **#31 eliminado**: MailPlus ya no se usa en TECHTRAFO. El relay SMTP es mailcow (VM .3, 192.168.0.3:465, cuenta noreply@techtrafo.com). La cuenta techtrafonotif no existe.
-- ✅ **#34 email e2e confirmado**:  envió correo a pablobaquerizodavila@gmail.com con éxito;  desde el container API → OK (192.168.0.3:465). Gmail confirma arrival.
-- ✅ **#38 PDF de OC confirmado**: ya implementado en commit 3c5b19a. Endpoint  +  completo + botón en detalle OC.
-- ✅ **#45 backup cron confirmado**:  — corrió 2026-06-09 02:00 → backup completo (DB 52K + .env + código 784K) → NAS OK + mirror synced.
-- ✅ **#32/#33 ya commiteados** (5bb7bec) en sesión anterior; confirmados como completados.
-- ✅ **Security fixes ya aplicados** (commit 9662790):  usa  para TLS; nginx usa  en los 3 bloques.
+- ✅ **Migration 029**: columna `factura_proveedor_nombre_original VARCHAR(255)` en `compras.ordenes_compra`; Prisma regenerado y API reiniciado
+- ✅ **Backend API**: `POST /api/proveedor-portal/oc/:id/factura` reemplazado — ahora acepta `multipart/form-data` (multer, PDF/imagen, max 20 MB); guarda `factura_proveedor_url` (ruta relativa), `factura_proveedor_numero` y `factura_proveedor_nombre_original`
+- ✅ **Descarga**: `GET /api/proveedor-portal/oc/:id/factura/file` y `GET /api/ordenes-compra/:id/factura/file` — stream con path-traversal protection (mismo patrón evidencias.ts)
+- ✅ **Notificación**: `notificarFacturaProveedorSubida` encola email a usuarios con rol `jefe_compras` o `financiero`; fire-and-forget, no bloquea respuesta
+- ✅ **Frontend portal proveedor**: file input (PDF/imagen) en lugar de input URL; "Ver factura" apunta al endpoint de descarga
+- ✅ **Frontend panel interno**: Panel "Factura del proveedor" en detalle OC con número, nombre de archivo y botón "Ver factura"
+- ✅ **7/7 smoke tests OK**: columnas DB, directorio /uploads, auth 401, logs limpios, Prisma schema
 
-**Estado del proyecto**: 🟢 **Sin pendientes conocidos.** Todos los ítems del tracker están completed. El sistema está operativo: panel accesible en https://panel.techtrafo.com, SMTP relay via mailcow, backup automático diario al NAS, certbot renew automático.
+**Estado del proyecto**: 🟢 **Sin pendientes.** Sistema operativo.
 
 **Próximos pasos sugeridos** (no son deuda, son mejoras futuras):
 - Módulo financiero fase 2: dashboards con datos reales de producción
 - Módulo de pagos/cobranza desde contratos
+
+---
+
+**Sesión 2026-06-09 (1ª) — Cierre de pendientes + limpieza E2E**
+
+- ✅ **E2E data cleanup**: eliminados todos los registros de prueba del checklist #42 (PROV-E2E-01, OC-E2E-0001, REC-2026-0001, NC-2026-0001, COT-E2E-0001, usuarios proveedor.e2e y e2e.admin). DB limpia para datos reales.
+- ✅ **#31 eliminado**: MailPlus ya no se usa en TECHTRAFO. El relay SMTP es mailcow (VM .3, 192.168.0.3:465, cuenta noreply@techtrafo.com). La cuenta techtrafonotif no existe.
+- ✅ **#34 email e2e confirmado**: envió correo a pablobaquerizodavila@gmail.com con éxito; desde el container API → OK (192.168.0.3:465). Gmail confirma arrival.
+- ✅ **#38 PDF de OC confirmado**: ya implementado en commit 3c5b19a. Endpoint + completo + botón en detalle OC.
+- ✅ **#45 backup cron confirmado**: corrió 2026-06-09 02:00 → backup completo (DB 52K + .env + código 784K) → NAS OK + mirror synced.
+- ✅ **#32/#33 ya commiteados** (5bb7bec) en sesión anterior; confirmados como completados.
+- ✅ **Security fixes ya aplicados** (commit 9662790): usa TLS; nginx usa los 3 bloques.
 - Integración portal proveedor con envío de facturas por email
 
 ---
