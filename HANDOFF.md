@@ -1,6 +1,6 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-06-08 · #39+#41+#40 margen/NC/portal**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-06-09 · cierre de pendientes — proyecto al día, sin deudas técnicas**.
 
 > 📄 **Ver también [`ACCESO-Y-BACKUPS.md`](ACCESO-Y-BACKUPS.md)** — guía de hosts, credenciales, ubicación de backups y recuperación desde PC nueva.
 
@@ -41,7 +41,28 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 
 ---
 
-## 0. Estado al cierre 2026-06-08 (leer primero)
+## 0. Estado al cierre 2026-06-09 (leer primero)
+
+**Sesión 2026-06-09 — Cierre de pendientes + limpieza E2E**
+
+- ✅ **E2E data cleanup**: eliminados todos los registros de prueba del checklist #42 (PROV-E2E-01, OC-E2E-0001, REC-2026-0001, NC-2026-0001, COT-E2E-0001, usuarios proveedor.e2e y e2e.admin). DB limpia para datos reales.
+- ✅ **#31 eliminado**: MailPlus ya no se usa en TECHTRAFO. El relay SMTP es mailcow (VM .3, 192.168.0.3:465, cuenta noreply@techtrafo.com). La cuenta techtrafonotif no existe.
+- ✅ **#34 email e2e confirmado**:  envió correo a pablobaquerizodavila@gmail.com con éxito;  desde el container API → OK (192.168.0.3:465). Gmail confirma arrival.
+- ✅ **#38 PDF de OC confirmado**: ya implementado en commit 3c5b19a. Endpoint  +  completo + botón en detalle OC.
+- ✅ **#45 backup cron confirmado**:  — corrió 2026-06-09 02:00 → backup completo (DB 52K + .env + código 784K) → NAS OK + mirror synced.
+- ✅ **#32/#33 ya commiteados** (5bb7bec) en sesión anterior; confirmados como completados.
+- ✅ **Security fixes ya aplicados** (commit 9662790):  usa  para TLS; nginx usa  en los 3 bloques.
+
+**Estado del proyecto**: 🟢 **Sin pendientes conocidos.** Todos los ítems del tracker están completed. El sistema está operativo: panel accesible en https://panel.techtrafo.com, SMTP relay via mailcow, backup automático diario al NAS, certbot renew automático.
+
+**Próximos pasos sugeridos** (no son deuda, son mejoras futuras):
+- Módulo financiero fase 2: dashboards con datos reales de producción
+- Módulo de pagos/cobranza desde contratos
+- Integración portal proveedor con envío de facturas por email
+
+---
+
+## 0b. Estado al cierre 2026-06-08 (historial)
 
 **Sesión 2026-06-08d — #39+#41+#40 margen/NC/portal**
 
