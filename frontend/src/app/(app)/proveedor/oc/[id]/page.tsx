@@ -9,7 +9,7 @@ export default function OcDetallePage() {
   const router = useRouter();
   const [oc, setOc] = useState<OcDetalle | null>(null);
   const [factNumero, setFactNumero] = useState("");
-  const [factUrl, setFactUrl] = useState("");
+  const [factArchivo, setFactArchivo] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -35,19 +35,21 @@ export default function OcDetallePage() {
   async function handleFactura() {
     if (!oc) return;
     if (!factNumero.trim()) { toast.error("Ingresa el numero de factura"); return; }
-    if (!factUrl.trim()) { toast.error("Ingresa la URL de la factura"); return; }
+    if (!factArchivo) { toast.error("Selecciona el archivo de la factura"); return; }
     setSaving(true);
     try {
-      const d = await subirFactura(oc.id, factNumero.trim(), factUrl.trim());
+      const d = await subirFactura(oc.id, factNumero.trim(), factArchivo);
       setOc(d.data);
       toast.success("Factura registrada");
       setFactNumero("");
-      setFactUrl("");
+      setFactArchivo(null);
     } catch {
-      toast.error("Error al registrar factura. Asegurate de ingresar una URL valida (https://...)");
+      toast.error("Error al subir la factura. Solo se permiten PDF e imagenes (max 20 MB)");
     }
     setSaving(false);
   }
+
+  const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
 
   if (!oc) return <div className="py-12 text-center text-sm text-gray-400">Cargando...</div>;
 
@@ -123,15 +125,18 @@ export default function OcDetallePage() {
             <p className="text-sm text-green-700 font-medium mb-1">
               Factura registrada: {oc.factura_proveedor_numero}
             </p>
+            {oc.factura_proveedor_nombre_original && (
+              <p className="text-xs text-gray-500 mb-2">{oc.factura_proveedor_nombre_original}</p>
+            )}
             <a
-              href={oc.factura_proveedor_url}
+              href={`${apiBase}/api/proveedor-portal/oc/${oc.id}/factura/file`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-blue-600 hover:underline"
             >
               Ver factura &rarr;
             </a>
-            <p className="text-xs text-gray-400 mt-2">Para actualizar la factura, ingresa los nuevos datos abajo.</p>
+            <p className="text-xs text-gray-400 mt-2">Para actualizar la factura, sube un nuevo archivo abajo.</p>
           </div>
         ) : null}
         <div className="space-y-2">
@@ -142,19 +147,22 @@ export default function OcDetallePage() {
             onChange={(e) => setFactNumero(e.target.value)}
             className="w-full border rounded-lg px-3 py-2 text-sm"
           />
-          <input
-            type="url"
-            placeholder="URL de la factura (https://drive.google.com/...)"
-            value={factUrl}
-            onChange={(e) => setFactUrl(e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm"
-          />
+          <label className="flex items-center gap-3 w-full border rounded-lg px-3 py-2 text-sm cursor-pointer hover:bg-gray-50">
+            <span className="text-xs text-gray-500 border border-gray-300 rounded px-2 py-0.5">Elegir archivo</span>
+            <span className="text-gray-700 truncate">{factArchivo ? factArchivo.name : "PDF o imagen (máx. 20 MB)"}</span>
+            <input
+              type="file"
+              accept="application/pdf,image/*"
+              className="sr-only"
+              onChange={(e) => setFactArchivo(e.target.files?.[0] ?? null)}
+            />
+          </label>
           <button
             onClick={handleFactura}
             disabled={saving}
             className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
           >
-            {saving ? "Guardando..." : oc.factura_proveedor_url ? "Actualizar factura" : "Subir factura"}
+            {saving ? "Subiendo..." : oc.factura_proveedor_url ? "Actualizar factura" : "Subir factura"}
           </button>
         </div>
       </div>

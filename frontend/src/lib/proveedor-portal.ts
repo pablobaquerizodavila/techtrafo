@@ -11,6 +11,7 @@ export interface OcResumen {
   acuse_recibo_at: string | null;
   factura_proveedor_numero: string | null;
   factura_proveedor_url: string | null;
+  factura_proveedor_nombre_original: string | null;
   _count: { orden_compra_lineas: number };
 }
 
@@ -56,8 +57,19 @@ export async function acusarRecibo(id: number): Promise<{ data: OcDetalle }> {
   return api.post<{ data: OcDetalle }>(`/api/proveedor-portal/oc/${id}/acusar-recibo`, {});
 }
 
-export async function subirFactura(id: number, numero: string, url: string): Promise<{ data: OcDetalle }> {
-  return api.post<{ data: OcDetalle }>(`/api/proveedor-portal/oc/${id}/factura`, { numero, url });
+export async function subirFactura(id: number, numero: string, archivo: File): Promise<{ data: OcDetalle }> {
+  const fd = new FormData();
+  fd.append("numero", numero);
+  fd.append("archivo", archivo);
+  const base = process.env.NEXT_PUBLIC_API_URL ?? "";
+  const res = await fetch(`${base}/api/proveedor-portal/oc/${id}/factura`, {
+    method: "POST",
+    body: fd,
+    credentials: "include",
+  });
+  const body = await res.json();
+  if (!res.ok) throw Object.assign(new Error("upload_failed"), { status: res.status, body });
+  return body;
 }
 
 // Admin helpers

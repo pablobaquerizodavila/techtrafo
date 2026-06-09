@@ -306,3 +306,26 @@ export function templateGarantiaPorVencer(c: {
   const text = `Garantia ${c.garantia_codigo} de ${c.cliente_nombre} vence el ${fechaStr} (${c.dias_restantes} dias). Equipo: ${equipo}.`;
   return { subject, html, text };
 }
+
+export function templateFacturaProveedorSubida(c: {
+  oc_codigo: string;
+  oc_id: number;
+  proveedor_nombre: string;
+  factura_numero: string;
+}) {
+  const link = `${env.PANEL_URL.replace(/\/$/, "")}/compras/ordenes-compra/${c.oc_id}`;
+  const subject = `[TECHTRAFO] Nueva factura recibida — ${escapeHtml(c.oc_codigo)} · ${escapeHtml(c.proveedor_nombre)}`;
+  const html = layout(
+    "Nueva factura del proveedor",
+    `<p>El proveedor <strong>${escapeHtml(c.proveedor_nombre)}</strong> ha subido su factura a la orden de compra:</p>
+     <ul>
+       <li><strong>Orden de compra:</strong> ${escapeHtml(c.oc_codigo)}</li>
+       <li><strong>Número de factura:</strong> ${escapeHtml(c.factura_numero)}</li>
+     </ul>
+     <p>Ingresa al panel para revisar y descargar el archivo adjunto.</p>`,
+    link,
+    "Ver orden de compra",
+  );
+  const text = `Nueva factura recibida. OC ${c.oc_codigo} · Proveedor: ${c.proveedor_nombre} · Factura nro. ${c.factura_numero}. Ver: ${link}`;
+  return { subject, html, text };
+}

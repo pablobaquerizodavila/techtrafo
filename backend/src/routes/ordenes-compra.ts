@@ -17,6 +17,9 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { withAppUser } from "../db/withAppUser";
 import { requireAuth, requirePermission } from "../auth/middleware";
+import fs from "node:fs";
+import path from "node:path";
+import { env } from "../config/env";
 
 const router = Router();
 router.use(requireAuth);
@@ -640,6 +643,46 @@ router.get("/config/umbrales", requirePermission("compras", "read"), async (_req
     include: { roles: { select: { id: true, nombre: true, descripcion: true } } },
   });
   res.json({ data });
+});
+
+// -------------------------------------------------------------------
+// GET /api/ordenes-compra/:id/factura/file  — descarga factura proveedor
+// -------------------------------------------------------------------
+router.get("/:id/factura/file", requirePermission("compras", "read"), async (req, res) => {
+  const idNum = Number(req.params.id);
+  if (!Number.isInteger(idNum) || idNum <= 0) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  const oc = await prisma.ordenes_compra.findUnique({
+    where: { id: BigInt(idNum) },
+    select: { factura_proveedor_url: true, factura_proveedor_nombre_original: true },
+  });
+  if (!oc || !oc.factura_proveedor_url) {
+    res.status(404).json({ error: "factura_no_disponible" });
+    return;
+  }
+  const uploadRoot = path.resolve(env.UPLOAD_DIR);
+  const fullPath = path.resolve(env.UPLOAD_DIR, oc.factura_proveedor_url);
+  if (fullPath !== uploadRoot && !fullPath.startsWith(uploadRoot + path.sep)) {
+    res.status(403).json({ error: "forbidden" });
+    return;
+  }
+  if (!fs.existsSync(fullPath)) {
+    res.status(410).json({ error: "archivo_eliminado_en_disco" });
+    return;
+  }
+  const ext = path.extname(fullPath).toLowerCase();
+  const mime = ext === ".pdf" ? "application/pdf"
+    : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg"
+    : ext === ".png" ? "image/png"
+    : ext === ".webp" ? "image/webp"
+    : "application/octet-stream";
+  const safeFilename = (oc.factura_proveedor_nombre_original ?? "factura")
+    .replace(/[\r\n"]/g, "").slice(0, 200);
+  res.setHeader("Content-Type", mime);
+  res.setHeader("Content-Disposition", `inline; filename="${safeFilename}"`);
+  fs.createReadStream(fullPath).pipe(res);
 });
 
 export default router;

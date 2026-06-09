@@ -251,6 +251,27 @@ export default function OCDetallePage({ params }: { params: Promise<{ id: string
           </dl>
         </Panel>
 
+        {oc.factura_proveedor_url && (
+          <Panel title="Factura del proveedor">
+            <div className="flex items-center justify-between gap-4">
+              <dl className="grid grid-cols-1 gap-y-2 text-sm">
+                <KVPair label="Número de factura" value={oc.factura_proveedor_numero} mono />
+                {oc.factura_proveedor_nombre_original && (
+                  <KVPair label="Archivo" value={oc.factura_proveedor_nombre_original} />
+                )}
+              </dl>
+              <a
+                href={`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/ordenes-compra/${ocId}/factura/file`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={actionClass("ghost")}
+              >
+                Ver factura
+              </a>
+            </div>
+          </Panel>
+        )}
+
         {(oc.recepciones ?? []).length > 0 && (
           <Panel title="Recepciones de esta OC" icon={<PackageCheck className="h-3.5 w-3.5" />} padded={false}>
             <Table>

@@ -271,6 +271,9 @@ export interface OrdenCompra {
   _count?: { orden_compra_lineas: number; recepciones: number };
   usuarios_ordenes_compra_creado_porTousuarios?: { id: string; nombre_completo: string };
   usuarios_ordenes_compra_aprobador_idTousuarios?: { id: string; nombre_completo: string };
+  factura_proveedor_numero?: string | null;
+  factura_proveedor_url?: string | null;
+  factura_proveedor_nombre_original?: string | null;
 }
 
 export interface ConfigUmbral {

@@ -15,6 +15,7 @@ import { prisma } from "../db/client";
 import {
   EventoRevisionCotizacion,
   templateEscalacionHito,
+  templateFacturaProveedorSubida,
   templateGarantiaPorVencer,
   templateHitoEsperaAprobacion,
   templateHitoEstancado,
@@ -35,7 +36,8 @@ export type TipoNotificacion =
   | "cotizacion_revision_escalada"
   | "cotizacion_revision_aprobada"
   | "cotizacion_revision_rechazada"
-  | "nc_creada";
+  | "nc_creada"
+  | "factura_proveedor_subida";
 
 interface CreateInput {
   tipo: TipoNotificacion;
@@ -496,4 +498,65 @@ export async function notificarNCCreada(input: {
     cuerpo_texto: `Nueva no conformidad: ${input.nc_codigo} — ${input.proveedor_nombre}. Revisa el panel.`,
     contexto: { nc_id: Number(input.nc_id), nc_codigo: input.nc_codigo },
   });
+}
+
+/**
+ * Un proveedor subio su factura al portal. Notifica a todos los usuarios
+ * activos con rol jefe_compras o financiero.
+ */
+export async function notificarFacturaProveedorSubida(ocId: number): Promise<void> {
+  const oc = await prisma.ordenes_compra.findUnique({
+    where: { id: BigInt(ocId) },
+    select: {
+      codigo: true,
+      factura_proveedor_numero: true,
+      proveedores: { select: { razon_social: true } },
+    },
+  });
+  if (!oc) {
+    console.warn(`[notificaciones] notificarFacturaProveedorSubida: OC ${ocId} no encontrada`);
+    return;
+  }
+
+  const roles = await prisma.roles.findMany({
+    where: { nombre: { in: ["jefe_compras", "financiero"] }, activo: true },
+    select: { id: true },
+  });
+  if (roles.length === 0) {
+    console.warn("[notificaciones] notificarFacturaProveedorSubida: roles jefe_compras/financiero no encontrados");
+    return;
+  }
+
+  const destinatarios = await prisma.usuarios.findMany({
+    where: {
+      rol_id: { in: roles.map((r) => r.id) },
+      estado_aprobacion: "aprobado",
+      activo: true,
+    },
+    select: { id: true, email: true },
+  });
+  if (destinatarios.length === 0) {
+    console.warn("[notificaciones] notificarFacturaProveedorSubida: sin destinatarios con rol jefe_compras/financiero");
+    return;
+  }
+
+  const tpl = templateFacturaProveedorSubida({
+    oc_codigo: oc.codigo,
+    oc_id: ocId,
+    proveedor_nombre: oc.proveedores?.razon_social ?? "Proveedor",
+    factura_numero: oc.factura_proveedor_numero ?? "—",
+  });
+
+  for (const u of destinatarios) {
+    if (!u.email) continue;
+    await crear({
+      tipo: "factura_proveedor_subida",
+      destinatario_id: u.id,
+      destinatario_email: u.email,
+      asunto: tpl.subject,
+      cuerpo_html: tpl.html,
+      cuerpo_texto: tpl.text,
+      contexto: { orden_compra_id: ocId },
+    });
+  }
 }
