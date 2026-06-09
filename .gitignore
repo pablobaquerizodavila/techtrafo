@@ -66,6 +66,9 @@ backup/
 backups/
 tmp/
 
+# Superpowers — artefactos locales del workflow de planificación (no van al repo)
+docs/superpowers/plans/
+
 # Docker
 .docker/
 docker-volumes/

@@ -46,6 +46,52 @@ El formato sigue Keep a Changelog y este proyecto adhiere a Semantic Versioning.
 
 ---
 
+## [ops] 2026-05-27 — Jornada de restauración de infraestructura (sin versión de código)
+
+> Evento de operaciones: no hubo cambios de código. Se registra aquí como referencia histórica.
+
+### Contexto
+
+Reemplazo del NAS Synology (hardware nuevo, misma IP `.116`). El NAS anterior
+alojaba la VM `voip-panel-01` (192.168.0.7) que era el reverse proxy central. Al
+cambiar el NAS, la VM `.7` quedó temporalmente caída y los sitios públicos
+(`techtrafo.com`, `panel.techtrafo.com`, `medicvip.org`, `siscormed.com`) dejaron
+de ser accesibles desde internet.
+
+### Trabajado en esta jornada
+
+**Infra inmediata (sesión 2026-05-27)**:
+- Diagnosticado que la VM `.7` corre en VMM del NAS (no en hardware independiente).
+- Verificado Web Station + PHP 8.2 en el NAS nuevo; vhosts reconfigurados.
+- Construido stack de emergencia en PC Ubuntu `.23`:
+  - `web-nginx` (nginx:1.27-alpine) + `web-php` (php:8.2-fpm): sirviendo estáticos y PHP.
+  - Certbot (webroot): emitidos nuevos certs Let's Encrypt para
+    `techtrafo.com` (SAN: panel, api, portal, nas, www),
+    `medicvip.org`, `siscormed.com`.
+  - NAT del router TP-Link apuntado a `.23:80/443`.
+- Configurado MailPlus en el NAS nuevo con DKIM/SPF/DMARC en los 4 dominios.
+  Cuenta `techtrafonotif@techtrafo.com` operativa. `notif-worker` SMTP OK.
+- MX de `eneural.org` apuntando a `mail.techtrafo.com`.
+
+**Restauración completa (sesión 2026-05-28 — Pablo)**:
+- VM `voip-panel-01` reconstruida en VMM del NAS nuevo, IP `.7` restaurada.
+- nginx reverse proxy central en `.7` reconfigurado: todos los dominios enrutando
+  a NAS (sitios estáticos/PHP), `.23:3000/3002` (panel/api), Netvoice (eneural.org).
+- NAT del router devuelto a `.7:80/443`.
+- Stack `web-public` de `.23` quedó en standby (no recibe tráfico directo, pero
+  mantiene los certs Let's Encrypt vigentes y el certbot-renew cron activo).
+- Netvoice / eneural.org / panel.eneural.org: operativos de nuevo.
+
+### Artefactos creados durante la restauración
+
+- `/home/techtrafo/web-public/` — stack nginx+certbot (docker compose) en `.23`;
+  versionado en `infrastructure/web-public/` a partir de 2026-06-08 (#32).
+- `certbot-renew.sh` — script con alertas email de renovación SSL; versionado en
+  `certbot-renew.sh` a partir de commit `a95b75b` (2026-06-08).
+- Crons en `.23`: `0 3 * * *` certbot-renew · `0 2 * * *` tt-backup.
+
+---
+
 ## [0.16.1] — 2026-05-25 — chore(tooling): script automatizado de backup al NAS
 
 Automatiza el workflow de snapshot al NAS que veniamos haciendo a mano
