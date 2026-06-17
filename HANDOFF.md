@@ -41,7 +41,28 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 
 ---
 
-## 0. Estado al cierre 2026-06-09 (leer primero)
+## 0. Estado al cierre 2026-06-17 (leer primero)
+
+**Sesión 2026-06-17 — Rebranding del sitio público techtrafo.com (identidad de marca)**
+
+> ⚠️ OJO: el **contenido del sitio público NO está versionado en git**. Vive en 3 lugares:
+> origen público **NAS** `/volume2/web/techtrafo/` (Web Station, lo que sirve techtrafo.com) ·
+> copia en **.23** `/home/techtrafo/sites/techtrafo/` · **fuente editable local** en
+> `C:\Users\<user>\techtrafo-landing\prod\` (mirror NAS `Desarrollos\techtrafo-landing`).
+> El repo git solo versiona `infrastructure/web-public/` (nginx/docker), no el HTML/CSS/JSX.
+> Para editar: tocar `techtrafo-landing\prod\`, previsualizar, y `pscp` a NAS + .23.
+
+- ✅ **Paleta de marca aplicada** (del Manual de identidad 2026) en `styles.css :root`:
+  cian `#00B5DB` (P 118-6 C) + navy `#222165` (P 100-16 C) + secundarios taupe `#ABA59D` / gris `#575756` / negro `#1D1D1B`. El accent del sitio pasó de amarillo `#F5C518` → cian de marca. **SE MANTIENE.**
+- ✅ **Logos oficiales** extraídos del vectorial (`Variables Techtrafo.pdf`) a SVG en `assets/`:
+  `logo-horizontal.svg` (nav), `logo-horizontal-white.svg` (footer navy), `logo-icon.svg` (favicon + ícono). Reemplazaron el placeholder "TT" inline. Tamaños: nav 212×54, footer 238×60, móvil 170×44. **SE MANTIENEN.**
+- ↩️ **Tipografía REVERTIDA por decisión de Pablo**: se probó Unbounded+Montserrat (del manual) pero se volvió a la anterior **Sora (display) + Inter (texto) + JetBrains Mono**. NO usar las del manual para fuentes; el manual aplica solo a colores y logos.
+- 🚀 **Desplegado y verificado en vivo** en NAS público + .23. CSS versionado `?v=brand4` (cache-bust).
+- 📌 **Posible mejora futura**: versionar el contenido del sitio público en git (hoy solo respaldado en NAS Desarrollos). No se hizo para no alterar la estructura sin tu visto bueno.
+
+**Estado del proyecto**: 🟢 Sitio público con identidad de marca en vivo. Backend/panel sin cambios.
+
+---
 
 **Sesión 2026-06-09 (2ª) — Portal proveedor: subida real de factura + notificación email** · commit `f6b4cef`
 
