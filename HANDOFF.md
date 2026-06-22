@@ -1,6 +1,6 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-06-09 · cierre de pendientes — proyecto al día, sin deudas técnicas**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-06-21 · limpieza /simplify — helper compartido para descarga de factura**.
 
 > 📄 **Ver también [`ACCESO-Y-BACKUPS.md`](ACCESO-Y-BACKUPS.md)** — guía de hosts, credenciales, ubicación de backups y recuperación desde PC nueva.
 
@@ -41,9 +41,35 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 
 ---
 
-## 0. Estado al cierre 2026-06-17 (leer primero)
+## 0. Estado al cierre 2026-06-21 (leer primero)
 
-**Sesión 2026-06-17 — Rebranding del sitio público techtrafo.com (identidad de marca)**
+**Sesión 2026-06-21 — Limpieza `/simplify` del feature de factura proveedor (sin cambio de comportamiento)**
+
+Pase de calidad sobre el commit `f6b4cef` (subida de factura). 4 agentes de cleanup
+(reuse/simplification/efficiency/altitude) convergieron en **un solo hallazgo real**:
+
+- ✅ **Bloque de servir-archivo duplicado byte a byte** (21 líneas: guard path-traversal →
+  existencia → inferencia MIME → saneado de nombre → stream) en los dos endpoints
+  `GET …/factura/file` ([proveedor-portal.ts](backend/src/routes/proveedor-portal.ts) y
+  [ordenes-compra.ts](backend/src/routes/ordenes-compra.ts)). Extraído a helper compartido
+  nuevo [`backend/src/utils/serveStoredFile.ts`](backend/src/utils/serveStoredFile.ts) (mapa MIME
+  como lookup). Ambas rutas lo llaman en 1 línea. Se quitaron los imports muertos `fs`/`path`/`env`
+  de `ordenes-compra.ts`. Neto: ~42 líneas de duplicación → 1 helper + 2 call-sites.
+  **Comportamiento idéntico** (mismos 403/410, mismos headers, mismo fallback `"factura"`).
+- ✅ **Verificado**: `prisma generate` + `tsc --noEmit` en contenedor efímero `node:22` en `.23` →
+  **0 errores en los archivos tocados** (los 35 restantes son ruido preexistente de drift de
+  schema/deps del host, ajenos a este cambio).
+- ⏭️ **Descartados con razón** (no son cleanup): paralelizar roles→users (falso positivo: hay
+  dependencia de datos), batch del loop `crear()` (rompe el patrón compartido de notificaciones),
+  roles destinatarios por config (cambio de diseño), validación de subdir por OC en multer
+  (es seguridad → `/code-review`), guardar MIME en DB.
+- ⚠️ **Pendiente de deploy**: el **backend de prod aún corre la imagen anterior** (no se
+  reconstruyó el contenedor `api`). Como el cambio es un refactor sin cambio de comportamiento,
+  no hay diferencia funcional; reconstruir cuando convenga (`docker compose build api && up -d api`).
+
+---
+
+## 0.1 Sesión 2026-06-17 — Rebranding del sitio público techtrafo.com (identidad de marca)
 
 > ⚠️ OJO: el **contenido del sitio público NO está versionado en git**. Vive en 3 lugares:
 > origen público **NAS** `/volume2/web/techtrafo/` (Web Station, lo que sirve techtrafo.com) ·

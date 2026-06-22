@@ -16,6 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { prisma } from "../db/client";
+import { serveStoredFile } from "../utils/serveStoredFile";
 import { withAppUser } from "../db/withAppUser";
 import { requireAuth } from "../auth/middleware";
 import { env } from "../config/env";
@@ -213,27 +214,7 @@ router.get("/oc/:id/factura/file", requireProveedorId, async (req: Request, res:
     res.status(404).json({ error: "factura_no_disponible" });
     return;
   }
-  const uploadRoot = path.resolve(env.UPLOAD_DIR);
-  const fullPath = path.resolve(env.UPLOAD_DIR, oc.factura_proveedor_url);
-  if (fullPath !== uploadRoot && !fullPath.startsWith(uploadRoot + path.sep)) {
-    res.status(403).json({ error: "forbidden" });
-    return;
-  }
-  if (!fs.existsSync(fullPath)) {
-    res.status(410).json({ error: "archivo_eliminado_en_disco" });
-    return;
-  }
-  const ext = path.extname(fullPath).toLowerCase();
-  const mime = ext === ".pdf" ? "application/pdf"
-    : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg"
-    : ext === ".png" ? "image/png"
-    : ext === ".webp" ? "image/webp"
-    : "application/octet-stream";
-  const safeFilename = (oc.factura_proveedor_nombre_original ?? "factura")
-    .replace(/[\r\n"]/g, "").slice(0, 200);
-  res.setHeader("Content-Type", mime);
-  res.setHeader("Content-Disposition", `inline; filename="${safeFilename}"`);
-  fs.createReadStream(fullPath).pipe(res);
+  serveStoredFile(res, oc.factura_proveedor_url, oc.factura_proveedor_nombre_original, "factura");
 });
 
 export default router;
