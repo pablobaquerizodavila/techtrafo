@@ -1,6 +1,6 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-06-21 · limpieza /simplify — helper compartido para descarga de factura**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-07-03 · DR — reconstrucción del edge nginx público tras borrado accidental de la VM**.
 
 > 📄 **Ver también [`ACCESO-Y-BACKUPS.md`](ACCESO-Y-BACKUPS.md)** — guía de hosts, credenciales, ubicación de backups y recuperación desde PC nueva.
 
@@ -41,7 +41,33 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 
 ---
 
-## 0. Estado al cierre 2026-06-21 (leer primero)
+## 0. Estado 2026-07-03 — DR: reconstrucción del edge nginx público (leer primero)
+
+**Pablo borró por accidente la VM edge (`192.168.0.7`, único punto TLS público de
+TODA la infra). No había imagen/snapshot para restaurar.** Se reconstruyó a mano
+sobre una VM Ubuntu 22.04 nueva (`nginx-webserver`, user `pbaquerizo`).
+
+- ✅ **VM re-IP a `192.168.0.7` estática** (netplan; cloud-init net deshabilitado).
+  Así el NAT existente del router (`80/443` → `.7`) sirve sin tocar el router.
+- ✅ **Edge = reverse proxy puro** (nginx 1.18 + certbot). Termina TLS y proxea:
+  techtrafo/medicvip/siscormed/buscoartista/telcomag (+www) → **NAS `.116:80`**;
+  panel/api/portal.techtrafo.com → **`.23:443`** (web-nginx→containers);
+  fundacionpablobaquerizo.org → **estático local** `/var/www/fundacionpablobaquerizo`.
+- ✅ **6 certs Let's Encrypt** emitidos frescos (HTTP-01). Renovación: `certbot.timer`
+  + hook reload-nginx. nginx habilitado al boot.
+- ✅ **TODOS los dominios verificados en vivo** (fetch externo): 200/redirect correctos.
+- ⛔ **eneural.org / panel.eneural.org EXCLUIDOS por decisión de Pablo** — los migrará
+  a su propia VM aparte. NO re-agregarlos aquí.
+- 🛟 **Causa raíz del desastre: el config del edge no estaba versionado.** Ahora SÍ:
+  [`infrastructure/edge-nginx/`](infrastructure/edge-nginx/) (scripts reip/phase1/phase2 +
+  snapshot de conf.d + README con runbook de reconstrucción). Ver ese README primero
+  si el edge vuelve a caer.
+- Credenciales VM edge: `pbaquerizo@192.168.0.7` pw `Groundunder8299` (hostkey
+  `SHA256:EeEtZd0KWgPZdFwpkqqlaWuyYYT7tSBzB8LBa2kVcxs`).
+
+---
+
+## 0.1 Estado al cierre 2026-06-21
 
 **Sesión 2026-06-21 — Limpieza `/simplify` del feature de factura proveedor (sin cambio de comportamiento)**
 
@@ -69,7 +95,7 @@ Pase de calidad sobre el commit `f6b4cef` (subida de factura). 4 agentes de clea
 
 ---
 
-## 0.1 Sesión 2026-06-17 — Rebranding del sitio público techtrafo.com (identidad de marca)
+## 0.2 Sesión 2026-06-17 — Rebranding del sitio público techtrafo.com (identidad de marca)
 
 > ⚠️ OJO: el **contenido del sitio público NO está versionado en git**. Vive en 3 lugares:
 > origen público **NAS** `/volume2/web/techtrafo/` (Web Station, lo que sirve techtrafo.com) ·
