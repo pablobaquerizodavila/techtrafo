@@ -1,0 +1,33 @@
+[DEFAULT]
+bantime  = 1h
+findtime = 10m
+maxretry = 5
+ignoreip = 127.0.0.1/8 ::1 192.168.0.0/24
+banaction = ufw
+backend = auto
+
+[sshd]
+enabled = true
+backend = systemd
+maxretry = 4
+bantime  = 2h
+
+[nginx-botsearch]
+enabled = true
+logpath = /var/log/nginx/access.log
+maxretry = 3
+bantime  = 2h
+
+[nginx-limit-req]
+enabled = true
+logpath = /var/log/nginx/error.log
+maxretry = 10
+bantime  = 30m
+
+[nginx-scans]
+enabled  = true
+port     = http,https
+filter   = nginx-scans
+logpath  = /var/log/nginx/access.log
+maxretry = 2
+bantime  = 6h

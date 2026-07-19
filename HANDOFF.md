@@ -1,6 +1,6 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-07-03 · DR — reconstrucción del edge nginx público tras borrado accidental de la VM**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-07-09 · hardening del edge (ufw + fail2ban + rate-limiting)**.
 
 > 📄 **Ver también [`ACCESO-Y-BACKUPS.md`](ACCESO-Y-BACKUPS.md)** — guía de hosts, credenciales, ubicación de backups y recuperación desde PC nueva.
 
@@ -41,7 +41,20 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 
 ---
 
-## 0. Estado 2026-07-03 — DR: reconstrucción del edge nginx público (leer primero)
+## 0. Estado 2026-07-09 — Hardening del edge (leer primero)
+
+El edge `.7` (único host expuesto a internet) se **endureció** en 3 capas, todo
+versionado en [`infrastructure/edge-nginx/`](infrastructure/edge-nginx/README.md)
+(§ Hardening):
+- **ufw**: default-deny; `80/443` público, `22` **solo LAN**. (anti-lockout con auto-revert)
+- **fail2ban**: jails sshd + nginx (botsearch/limit-req/scans custom); ban vía ufw;
+  LAN whitelisteada. Ya cazando escaneos reales.
+- **rate-limiting nginx**: 30r/s burst 80 + limit_conn 50 por IP.
+- Verificado: sitios siguen 200, SSH LAN OK. Cero cambios a DNS/certs/proxy.
+
+---
+
+## 0.0 Estado 2026-07-03 — DR: reconstrucción del edge nginx público
 
 **Pablo borró por accidente la VM edge (`192.168.0.7`, único punto TLS público de
 TODA la infra). No había imagen/snapshot para restaurar.** Se reconstruyó a mano

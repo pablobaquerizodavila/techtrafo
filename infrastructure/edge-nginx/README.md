@@ -66,4 +66,25 @@ Renovación de certs: `certbot.timer` (systemd) + hook
 - `conf.d/*.conf`, `snippets/block-scans.conf` — snapshot renderizado de lo que
   corre en `.7` (fuente de verdad = los scripts; esto es respaldo).
 
-Reconstruido 2026-07-03 tras borrado accidental de la VM edge.
+## Hardening / firewall (2026-07-09)
+
+El edge es el único host expuesto a internet, así que se endureció en 3 capas
+(scripts en `scripts/`, snapshots en `hardening/`):
+
+1. **ufw** (`edge-ufw.sh`) — default-deny entrante: `80/443` desde cualquier IP,
+   `22` **solo desde LAN `192.168.0.0/24`**. Se aplica con auto-`disable` a 120 s
+   salvo `touch /tmp/ufw_ok` (anti-lockout).
+2. **fail2ban** (`edge-fail2ban.sh` + `hardening/jail.local` + `nginx-scans.conf`)
+   — jails: `sshd` (systemd), `nginx-botsearch`, `nginx-limit-req`, y `nginx-scans`
+   (filtro custom que banea escaneos `.env`/`.git`/`wp-*`/`xmlrpc`/etc). Bans vía
+   `ufw`. **Whitelist LAN + localhost** (nunca autobanearnos).
+3. **Rate-limiting nginx** (`edge-nginx-limits.sh` → `conf.d/00-limits.conf`) —
+   `limit_req` 30r/s burst 80 + `limit_conn` 50 por IP, status 429.
+
+> ⚠️ Si te bloqueas por ufw: la VM tiene consola en el VMM del NAS; `sudo ufw disable`.
+> El jail `sshd` no aplica a la LAN (whitelisted), así que operar por SSH desde la
+> oficina nunca dispara ban.
+
+---
+
+Reconstruido 2026-07-03 tras borrado accidental de la VM edge. Endurecido 2026-07-09.
