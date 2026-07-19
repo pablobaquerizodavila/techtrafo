@@ -47,9 +47,12 @@ El edge `.7` (único host expuesto a internet) se **endureció** en 3 capas, tod
 versionado en [`infrastructure/edge-nginx/`](infrastructure/edge-nginx/README.md)
 (§ Hardening):
 - **ufw**: default-deny; `80/443` público, `22` **solo LAN**. (anti-lockout con auto-revert)
-- **fail2ban**: jails sshd + nginx (botsearch/limit-req/scans custom); ban vía ufw;
-  LAN whitelisteada. Ya cazando escaneos reales.
+- **fail2ban**: jails sshd + nginx (botsearch/limit-req/scans custom); ban vía ufw.
+  Ya cazando escaneos reales.
 - **rate-limiting nginx**: 30r/s burst 80 + limit_conn 50 por IP.
+- **Whitelist fail2ban**: LAN `192.168.0.0/24` + IP pública oficina `186.101.238.135`
+  + **todo Ecuador** (ipset `ec_ips`, ~313 CIDRs de ipdeny, refresco semanal). Esos
+  orígenes nunca se banean; el rate-limiting de nginx sí les sigue aplicando.
 - Verificado: sitios siguen 200, SSH LAN OK. Cero cambios a DNS/certs/proxy.
 
 ---
