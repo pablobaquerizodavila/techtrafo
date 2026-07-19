@@ -18,7 +18,7 @@ cat > /etc/fail2ban/jail.local <<'EOF'
 bantime  = 1h
 findtime = 10m
 maxretry = 5
-ignoreip = 127.0.0.1/8 ::1 192.168.0.0/24
+ignoreip = 127.0.0.1/8 ::1 192.168.0.0/24 186.101.238.135
 banaction = ufw
 backend = auto
 
