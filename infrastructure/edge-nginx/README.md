@@ -80,6 +80,12 @@ El edge es el único host expuesto a internet, así que se endureció en 3 capas
    `ufw`. **Whitelist LAN + localhost** (nunca autobanearnos).
 3. **Rate-limiting nginx** (`edge-nginx-limits.sh` → `conf.d/00-limits.conf`) —
    `limit_req` 30r/s burst 80 + `limit_conn` 50 por IP, status 429.
+4. **Geo-whitelist Ecuador** (`edge-geo-ec.sh`) — fail2ban **nunca banea IPs de
+   Ecuador** (decisión de Pablo). Se hace con un `ipset ec_ips` (~313 CIDRs de
+   ipdeny.com) + `ignorecommand` en jail.local. Servicio de boot `ec-ipset.service`
+   restaura el set; timer `ec-ipset-refresh.timer` lo refresca semanal (Dom 04:30).
+   ⚠️ Baja la protección para orígenes ecuatorianos; el rate-limiting de nginx sí
+   sigue aplicando a todos. Fail-safe: si el set no existe, fail2ban opera normal.
 
 > ⚠️ Si te bloqueas por ufw: la VM tiene consola en el VMM del NAS; `sudo ufw disable`.
 > El jail `sshd` no aplica a la LAN (whitelisted), así que operar por SSH desde la

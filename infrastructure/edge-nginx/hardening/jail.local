@@ -3,6 +3,7 @@ bantime  = 1h
 findtime = 10m
 maxretry = 5
 ignoreip = 127.0.0.1/8 ::1 192.168.0.0/24 186.101.238.135
+ignorecommand = /usr/local/bin/f2b-ignore-ec.sh <ip>
 banaction = ufw
 backend = auto
 
