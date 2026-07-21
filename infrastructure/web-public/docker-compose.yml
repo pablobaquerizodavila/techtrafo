@@ -28,7 +28,11 @@ services:
     depends_on:
       - web-php
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost/healthz"]
+      # OJO: usar 127.0.0.1, NO "localhost". En el contenedor localhost resuelve
+      # tambien a ::1 y wget prueba IPv6 primero; nginx solo escucha en IPv4
+      # (0.0.0.0:80/443) => "connection refused" y el contenedor queda unhealthy
+      # aunque sirva perfecto. (diagnosticado 2026-07-21)
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3

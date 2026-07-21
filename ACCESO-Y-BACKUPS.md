@@ -96,7 +96,7 @@ Backup destacado: `db/techtrafo-db-20260526-151950-pre-wipe-clientes.sql.gz` (an
 
 ### 4.2 Código fuente
 - **Panel TECHTRAFO**: repo git en `/home/techtrafo/techtrafo/` (PC `.23`) ↔ GitHub `pablobaquerizodavila/techtrafo` ↔ mirror local `C:\Users\Pablo B\techtrafo\`
-- **Stack web público**: `/home/techtrafo/web-public/` en PC `.23` — ⚠️ **NO versionado todavía** (tarea pendiente). Contiene docker-compose, nginx configs, certbot-renew.sh.
+- **Stack web público**: `/home/techtrafo/web-public/` en PC `.23` — ✅ **versionado** en el repo bajo [`infrastructure/web-public/`](infrastructure/web-public/) (docker-compose + nginx/conf.d). Verificado sin drift el 2026-07-21. Si lo editas en el server, sincronízalo al repo (y viceversa). ⚠️ Ojo: este stack **sí está en el camino de producción** — el edge `.7` proxea panel/api/portal.techtrafo.com hacia `web-nginx` aquí.
 - **Sitios web**: `/home/techtrafo/sites/{techtrafo,medicvip,siscormed}/` en PC `.23` (rsync del NAS).
 
 ### 4.3 Certificados SSL (Let's Encrypt)
