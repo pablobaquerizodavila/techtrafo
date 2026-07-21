@@ -556,7 +556,6 @@ techtrafo/
 
 ## 7. Decisiones de Pablo a respetar (de memoria persistente)
 
-- **NUNCA** tocar `panel.eneural.org` (VM nginx) ni el sitio principal `eneural.org` — esa VM es de Netvoice y aloja también el frontend de TECHTRAFO. Cualquier cambio en nginx hay que validarlo con cuidado.
 - **NO** sugerir rotación de passwords compartidas en chat.
 - **Operar directo vía SSH** desde plink/pscp — Pablo NO quiere copiar-pegar comandos.
 - **Backup + commit + push después de cada hito** (ya está documentado en CHANGELOG). El backup va a `/home/techtrafo/backups/` con timestamp.
