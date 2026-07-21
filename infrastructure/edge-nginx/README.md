@@ -33,9 +33,6 @@ porque los contenedores `techtrafo-web/api` sólo escuchan en `127.0.0.1:3002/30
 dentro de la `.23`; el `web-nginx` de la `.23` (`:443`, publica en LAN) los rutea
 por Host. No exponer los contenedores a la LAN.
 
-> ⛔ **eneural.org / panel.eneural.org NO están aquí a propósito.** Vivían en la
-> VM vieja; Pablo los migrará a su propia VM aparte. No re-agregarlos sin pedírselo.
-
 ## Reconstruir desde cero (runbook)
 
 Sobre una VM Ubuntu limpia con la IP `.7` (o re-IP con `scripts/edge-reip.sh`):

@@ -72,8 +72,6 @@ sobre una VM Ubuntu 22.04 nueva (`nginx-webserver`, user `pbaquerizo`).
 - ✅ **6 certs Let's Encrypt** emitidos frescos (HTTP-01). Renovación: `certbot.timer`
   + hook reload-nginx. nginx habilitado al boot.
 - ✅ **TODOS los dominios verificados en vivo** (fetch externo): 200/redirect correctos.
-- ⛔ **eneural.org / panel.eneural.org EXCLUIDOS por decisión de Pablo** — los migrará
-  a su propia VM aparte. NO re-agregarlos aquí.
 - 🛟 **Causa raíz del desastre: el config del edge no estaba versionado.** Ahora SÍ:
   [`infrastructure/edge-nginx/`](infrastructure/edge-nginx/) (scripts reip/phase1/phase2 +
   snapshot de conf.d + README con runbook de reconstrucción). Ver ese README primero

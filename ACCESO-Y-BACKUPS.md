@@ -15,7 +15,7 @@
 | **NAS Synology `Nasr24`** | `192.168.0.116` (eth0) + `192.168.0.88` (eth1) | MailPlus (email), Container Manager, archivos | DSM web `https://192.168.0.116:5001` + SSH 22 |
 | **Router TP-Link AX6600** | `192.168.0.1` | Router LAN + Port Forwarding (NAT real) | Web `http://192.168.0.1` |
 | **ONT Huawei EG8145V5** | `192.168.100.1` | Modem ISP CNT (reenvía al TP-Link `192.168.100.89`) | Web `http://192.168.100.1` |
-| **VM edge `nginx-webserver`** | `192.168.0.7` (estática) | Reverse proxy + TLS público de TODOS los dominios (excepto eneural). Ubuntu 22.04, user `pbaquerizo`. Config versionada en `infrastructure/edge-nginx/`. Reconstruida 2026-07-03 tras borrado accidental. | SSH `pbaquerizo` / `Groundunder8299` |
+| **VM edge `nginx-webserver`** | `192.168.0.7` (estática) | Reverse proxy + TLS público de los dominios publicados. Ubuntu 22.04, user `pbaquerizo`. Config versionada en `infrastructure/edge-nginx/`. Reconstruida 2026-07-03 tras borrado accidental. | SSH `pbaquerizo` / `Groundunder8299` |
 
 **IP pública**: `186.101.238.135` (CNT, estática). DNS en **GoDaddy** (ns43/ns44.domaincontrol.com).
 
@@ -206,6 +206,5 @@ Para correrlo diario a las 02:00, agregar al crontab de `techtrafo` en `.23` (`c
 | `https://medicvip.org` | ✅ Sitio PHP |
 | `https://siscormed.com` | ✅ Sitio HTML+PHP |
 | `https://192.168.0.116:5001` | ✅ DSM NAS (solo LAN, warning self-signed esperado) |
-| `https://eneural.org` / `panel.eneural.org` | ❌ Netvoice — pendiente reconstruir (tarea #36) |
 
 Email saliente: ✅ `techtrafonotif@techtrafo.com` vía MailPlus con DKIM/SPF/DMARC en 4 dominios.
