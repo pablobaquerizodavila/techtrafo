@@ -159,6 +159,7 @@ services:
     volumes:
       - ../../backend:/app
       - /app/node_modules
+      - /opt/techtrafo/uploads:/uploads   # adjuntos persistentes (requerimientos/evidencias/facturas)
     networks:
       - techtrafo_net
     ports:

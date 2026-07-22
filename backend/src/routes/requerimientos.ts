@@ -14,12 +14,18 @@
  * El codigo (DEV-000001) lo genera el trigger desarrollo.fn_generar_codigo_dev
  * en BEFORE INSERT cuando llega vacio.
  */
-import { Router, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
+import multer from "multer";
+import fs from "node:fs";
+import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { withAppUser } from "../db/withAppUser";
 import { requireAuth, requirePermission, AuthUser } from "../auth/middleware";
+import { env } from "../config/env";
+import { serveStoredFile } from "../utils/serveStoredFile";
 
 const router = Router();
 router.use(requireAuth);
@@ -139,6 +145,66 @@ function parseId(raw: string): number | null {
   if (!Number.isInteger(id) || id <= 0) return null;
   return id;
 }
+
+// Carga un requerimiento aplicando el scope de lectura: los gestores ven
+// cualquiera; el resto solo los que solicitaron. Devuelve null cuando no existe
+// o no es visible para el usuario (el handler debe responder 404 en ambos casos
+// para no filtrar la existencia de requerimientos ajenos).
+async function cargarVisible(id: number, user: AuthUser) {
+  const r = await prisma.requerimientos.findUnique({ where: { id: BigInt(id) } });
+  if (!r) return null;
+  if (!puedeGestionar(user) && r.solicitante_id !== user.id) return null;
+  return r;
+}
+
+// -------------------------------------------------------------------
+// multer: adjuntos de requerimientos en disk (mismo patron que evidencias)
+// Estructura: /uploads/requerimientos/{req_id}/{uuid}.{ext}
+// -------------------------------------------------------------------
+const adjBaseDir = path.join(env.UPLOAD_DIR, "requerimientos");
+try { fs.mkdirSync(adjBaseDir, { recursive: true }); } catch { /* ignore */ }
+
+const adjStorage = multer.diskStorage({
+  destination: (req, _file, cb) => {
+    // Validar el id ANTES de crear el directorio, para que un ":id" tipo
+    // "../malicioso" no cree carpetas fuera de adjBaseDir.
+    const reqId = Number(req.params.id);
+    if (!Number.isInteger(reqId) || reqId <= 0) {
+      cb(new Error("invalid_req_id"), "");
+      return;
+    }
+    const dir = path.join(adjBaseDir, String(reqId));
+    try { fs.mkdirSync(dir, { recursive: true }); } catch { /* ignore */ }
+    cb(null, dir);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase().slice(0, 10);
+    const safe = randomUUID() + (ext || "");
+    cb(null, safe);
+  },
+});
+
+const adjUpload = multer({
+  storage: adjStorage,
+  limits: { fileSize: env.UPLOAD_MAX_BYTES, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const okMimes = [
+      "application/pdf",
+      "image/png", "image/jpeg", "image/webp", "image/gif",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "text/plain", "text/csv",
+      "application/zip",
+    ];
+    if (!okMimes.includes(file.mimetype)) {
+      cb(new Error(`mime_no_permitido:${file.mimetype}`));
+      return;
+    }
+    cb(null, true);
+  },
+});
 
 // -------------------------------------------------------------------
 // GET /api/requerimientos  — listado con filtros, bandejas y scope
@@ -673,6 +739,199 @@ router.post("/:id/cancelar", async (req, res) => {
     if (mapBusinessError(err, res)) return;
     throw err;
   }
+});
+
+// -------------------------------------------------------------------
+// GET /api/requerimientos/:id/comentarios  — hilo de comentarios (scope)
+// -------------------------------------------------------------------
+router.get("/:id/comentarios", requirePermission("desarrollo", "read"), async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  const user = req.user!;
+  const visible = await cargarVisible(id, user);
+  if (!visible) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+  const data = await prisma.requerimiento_comentarios.findMany({
+    where: { requerimiento_id: BigInt(id) },
+    include: { usuarios: selectUsuarioMin },
+    orderBy: { created_at: "asc" },
+  });
+  res.json({ data });
+});
+
+// -------------------------------------------------------------------
+// POST /api/requerimientos/:id/comentarios  — comentar (dueno o gestor)
+// Los gestores producen comentarios "tecnicos"; el dueno, no.
+// -------------------------------------------------------------------
+router.post("/:id/comentarios", requirePermission("desarrollo", "read"), async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  const parsed = z.object({ cuerpo: z.string().min(1).max(4000) }).safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  const { cuerpo } = parsed.data;
+  const user = req.user!;
+
+  const visible = await cargarVisible(id, user);
+  if (!visible) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+
+  const data = await withAppUser(user.id, async (tx) => {
+    const c = await tx.requerimiento_comentarios.create({
+      data: {
+        requerimiento_id: BigInt(id),
+        autor_id: user.id,
+        cuerpo,
+        es_tecnico: puedeGestionar(user),
+      },
+      include: { usuarios: selectUsuarioMin },
+    });
+    await tx.requerimiento_historial.create({
+      data: {
+        requerimiento_id: BigInt(id),
+        accion: "comentario",
+        detalle: {},
+        por_usuario_id: user.id,
+        rol_actuante: user.rol_nombre,
+      },
+    });
+    return c;
+  });
+
+  res.status(201).json({ data });
+});
+
+// -------------------------------------------------------------------
+// POST /api/requerimientos/:id/adjuntos  — subir adjunto (dueno o gestor)
+// -------------------------------------------------------------------
+router.post(
+  "/:id/adjuntos",
+  requirePermission("desarrollo", "read"),
+  (req: Request, res: Response, next: NextFunction) => {
+    adjUpload.single("file")(req, res, (err: unknown) => {
+      if (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.startsWith("mime_no_permitido:")) {
+          res.status(400).json({ error: "mime_no_permitido", mime: msg.split(":")[1] });
+          return;
+        }
+        if (msg.includes("File too large")) {
+          res.status(413).json({ error: "archivo_muy_grande", max_bytes: env.UPLOAD_MAX_BYTES });
+          return;
+        }
+        return next(err);
+      }
+      next();
+    });
+  },
+  async (req, res) => {
+    const id = parseId(req.params.id);
+    if (id === null) {
+      if (req.file) { try { fs.unlinkSync(req.file.path); } catch { /* ignore */ } }
+      res.status(400).json({ error: "invalid_id" });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ error: "file_required" });
+      return;
+    }
+    const user = req.user!;
+
+    const visible = await cargarVisible(id, user);
+    if (!visible) {
+      try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
+      res.status(404).json({ error: "not_found" });
+      return;
+    }
+
+    // Guardamos solo la ruta RELATIVA al UPLOAD_DIR (portable a MinIO).
+    const rutaRelativa = path.relative(env.UPLOAD_DIR, req.file.path).replace(/\\/g, "/");
+
+    const data = await withAppUser(user.id, async (tx) => {
+      const a = await tx.requerimiento_adjuntos.create({
+        data: {
+          requerimiento_id: BigInt(id),
+          ruta_relativa: rutaRelativa,
+          nombre_original: req.file!.originalname,
+          mime: req.file!.mimetype,
+          tamano_bytes: req.file!.size,
+          subido_por: user.id,
+        },
+        include: { usuarios: selectUsuarioMin },
+      });
+      await tx.requerimiento_historial.create({
+        data: {
+          requerimiento_id: BigInt(id),
+          accion: "adjunto",
+          detalle: { nombre: req.file!.originalname },
+          por_usuario_id: user.id,
+          rol_actuante: user.rol_nombre,
+        },
+      });
+      return a;
+    });
+
+    res.status(201).json({ data });
+  },
+);
+
+// -------------------------------------------------------------------
+// GET /api/requerimientos/:id/adjuntos  — listar adjuntos (scope)
+// -------------------------------------------------------------------
+router.get("/:id/adjuntos", requirePermission("desarrollo", "read"), async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  const user = req.user!;
+  const visible = await cargarVisible(id, user);
+  if (!visible) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+  const data = await prisma.requerimiento_adjuntos.findMany({
+    where: { requerimiento_id: BigInt(id) },
+    include: { usuarios: selectUsuarioMin },
+    orderBy: { created_at: "desc" },
+  });
+  res.json({ data });
+});
+
+// -------------------------------------------------------------------
+// GET /api/requerimientos/:id/adjuntos/:adjId/file  — descargar (scope)
+// -------------------------------------------------------------------
+router.get("/:id/adjuntos/:adjId/file", requirePermission("desarrollo", "read"), async (req, res) => {
+  const id = parseId(req.params.id);
+  const adjId = parseId(req.params.adjId);
+  if (id === null || adjId === null) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  const user = req.user!;
+  const visible = await cargarVisible(id, user);
+  if (!visible) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+  const adj = await prisma.requerimiento_adjuntos.findUnique({ where: { id: BigInt(adjId) } });
+  if (!adj || adj.requerimiento_id !== BigInt(id)) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+  serveStoredFile(res, adj.ruta_relativa, adj.nombre_original ?? undefined, "adjunto");
 });
 
 export default router;
