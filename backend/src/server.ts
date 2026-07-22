@@ -30,6 +30,7 @@ import garantiasRouter from "./routes/garantias";
 import proveedoresRouter from "./routes/proveedores";
 import solicitudesCompraRouter from "./routes/solicitudes-compra";
 import ordenesCompraRouter from "./routes/ordenes-compra";
+import requerimientosRouter from "./routes/requerimientos";
 import recepcionesRouter from "./routes/recepciones";
 import proveedorPortalRouter from "./routes/proveedor-portal";
 import noConformidadesRouter from "./routes/no-conformidades";
@@ -106,6 +107,7 @@ app.use("/api/garantias", garantiasRouter); // + /:id/reclamos[...]
 app.use("/api/proveedores", proveedoresRouter);
 app.use("/api/solicitudes-compra", solicitudesCompraRouter);
 app.use("/api/ordenes-compra", ordenesCompraRouter);
+app.use("/api/requerimientos", requerimientosRouter);
 app.use("/api/recepciones", recepcionesRouter);
 app.use("/api/proveedor-portal", proveedorPortalRouter);
 app.use("/api/no-conformidades", noConformidadesRouter);
