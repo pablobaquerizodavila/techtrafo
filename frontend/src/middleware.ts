@@ -22,6 +22,7 @@ const INTERNAL_ROOTS = [
   "/admin",
   "/visitas-tecnicas",
   "/informes-tecnicos",
+  "/requerimientos",
 ];
 
 /**

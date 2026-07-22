@@ -1,12 +1,13 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import {
-  Bell, Boxes, BookOpen, ClipboardList, FileSignature, FileText, Factory, FolderOpen,
+  Bell, Boxes, BookOpen, ClipboardCheck, ClipboardList, FileSignature, FileText, Factory, FolderOpen,
   Gauge, KeySquare, LayoutDashboard, PackageCheck, Search, Shield, ShoppingCart, SlidersHorizontal,
   Truck, Users, UsersRound, Wallet, Coins, AlertTriangle, Zap,
 } from "lucide-react";
 import { LogoutButton } from "./logout-button";
 import { NotifLink } from "./notif-link";
+import { NotificacionesBell } from "@/components/notificaciones-bell";
 import { SessionExpiredButton } from "./session-expired-button";
 
 interface MeResponse {
@@ -63,6 +64,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const puedeVerCompras = hasPerm(user, "compras", "read");
   const puedeVerProveedores = hasPerm(user, "proveedores", "read") || puedeVerCompras;
   const puedeVerFinanzas = hasPerm(user, "finanzas", "read");
+  const puedeVerRequerimientos = hasPerm(user, "desarrollo", "read");
   const esCliente = user?.rol_nombre === "cliente" && user.cliente_id !== null;
 
   return (
@@ -153,6 +155,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 </NavGroup>
               )}
 
+              {puedeVerRequerimientos && (
+                <NavGroup label="Desarrollo">
+                  <NavLink href="/requerimientos" icon={<ClipboardCheck className="h-4 w-4" />}>Requerimientos</NavLink>
+                </NavGroup>
+              )}
+
               {(puedeAdminUsuarios || puedeAdminRoles || (puedeVerProveedores && !puedeVerCompras)) && (
                 <NavGroup label="Administración">
                   {puedeAdminUsuarios && (
@@ -196,6 +204,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                     {user.rol_nombre ?? "sin rol"}{user.es_super_admin ? " · ★" : ""}
                   </p>
                 </div>
+                {!esCliente && <NotificacionesBell />}
                 <Link
                   href="/perfil"
                   className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-glass-hover hover:text-foreground"

@@ -13,7 +13,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 const CSRF_HEADER_NAME = "X-CSRF-Token";
 const CSRF_COOKIE_REGEX = /(?:^|;\s*)techtrafo_csrf=([^;]+)/;
 
-function getCsrfTokenFromCookie(): string | null {
+export function getCsrfTokenFromCookie(): string | null {
   if (typeof document === "undefined") return null; // SSR
   const match = document.cookie.match(CSRF_COOKIE_REGEX);
   return match ? decodeURIComponent(match[1]) : null;
