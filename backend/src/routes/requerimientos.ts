@@ -306,6 +306,207 @@ router.get("/", requirePermission("desarrollo", "read"), async (req, res) => {
 });
 
 // -------------------------------------------------------------------
+// GET /api/requerimientos/resumen  — KPIs respetando scope
+// IMPORTANTE: debe ir ANTES de GET /:id o Express lo captura como ":id".
+// -------------------------------------------------------------------
+router.get("/resumen", requirePermission("desarrollo", "read"), async (req, res) => {
+  const user = req.user!;
+  const where = scopeWhere(user);
+
+  const [total, grpEstado, grpPrioridad, grpResponsable, vencidos, promedioRaw] = await Promise.all([
+    prisma.requerimientos.count({ where }),
+    prisma.requerimientos.groupBy({ by: ["estado"], where, _count: { _all: true } }),
+    prisma.requerimientos.groupBy({ by: ["prioridad"], where, _count: { _all: true } }),
+    prisma.requerimientos.groupBy({
+      by: ["asignado_a"],
+      where: { ...where, asignado_a: { not: null } },
+      _count: { _all: true },
+    }),
+    prisma.requerimientos.count({
+      where: {
+        ...where,
+        fecha_requerida: { lt: new Date() },
+        estado: { notIn: ["completado", "cancelado"] },
+      },
+    }),
+    // Promedio de horas created_at -> updated_at de los completados, respetando scope.
+    puedeGestionar(user)
+      ? prisma.$queryRaw<{ h: number }[]>`
+          SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (updated_at - created_at)) / 3600), 0)::float AS h
+          FROM desarrollo.requerimientos
+          WHERE estado = 'completado'
+        `
+      : prisma.$queryRaw<{ h: number }[]>`
+          SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (updated_at - created_at)) / 3600), 0)::float AS h
+          FROM desarrollo.requerimientos
+          WHERE estado = 'completado' AND solicitante_id = ${user.id}::uuid
+        `,
+  ]);
+
+  const por_estado: Record<string, number> = {};
+  for (const g of grpEstado) por_estado[g.estado] = g._count._all;
+
+  const por_prioridad: Record<string, number> = {};
+  for (const g of grpPrioridad) por_prioridad[g.prioridad ?? "sin_prioridad"] = g._count._all;
+
+  const ids = grpResponsable
+    .map((g) => g.asignado_a)
+    .filter((x): x is string => x !== null);
+  const usuarios = ids.length
+    ? await prisma.usuarios.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, nombres: true, apellidos: true },
+      })
+    : [];
+  const nombreById = new Map(
+    usuarios.map((u) => [u.id, `${u.nombres} ${u.apellidos}`.trim()]),
+  );
+  const por_responsable = grpResponsable.map((g) => ({
+    responsable_id: g.asignado_a,
+    nombre: nombreById.get(g.asignado_a as string) ?? null,
+    total: g._count._all,
+  }));
+
+  const tiempo_promedio_horas = Math.round((promedioRaw[0]?.h ?? 0) * 10) / 10;
+
+  res.json({
+    data: {
+      total,
+      por_estado,
+      por_prioridad,
+      por_responsable,
+      tiempo_promedio_horas,
+      vencidos,
+    },
+  });
+});
+
+// -------------------------------------------------------------------
+// GET /api/requerimientos/export  — CSV con los mismos filtros que GET /
+// IMPORTANTE: debe ir ANTES de GET /:id o Express lo captura como ":id".
+// -------------------------------------------------------------------
+router.get("/export", requirePermission("desarrollo", "read"), async (req, res) => {
+  const user = req.user!;
+  const q = (req.query.q as string | undefined)?.trim();
+  const estado = req.query.estado as string | undefined;
+  const prioridad = req.query.prioridad as string | undefined;
+  const tipo = req.query.tipo as string | undefined;
+  const modulo = req.query.modulo as string | undefined;
+  const solicitante = req.query.solicitante as string | undefined;
+  const responsable = req.query.responsable as string | undefined;
+  const desde = req.query.desde as string | undefined;
+  const hasta = req.query.hasta as string | undefined;
+  const bandeja = req.query.bandeja as string | undefined;
+
+  // Misma construccion de where/bandeja que GET / (sin paginacion).
+  const and: Prisma.requerimientosWhereInput[] = [scopeWhere(user)];
+
+  if (q) {
+    and.push({
+      OR: [
+        { codigo: { contains: q, mode: "insensitive" } },
+        { titulo: { contains: q, mode: "insensitive" } },
+      ],
+    });
+  }
+  if (estado) and.push({ estado });
+  if (prioridad) and.push({ prioridad });
+  if (tipo) and.push({ tipo });
+  if (modulo) and.push({ modulo_relacionado: { contains: modulo, mode: "insensitive" } });
+  if (solicitante) and.push({ solicitante_id: solicitante });
+  if (responsable) and.push({ asignado_a: responsable });
+
+  if (desde || hasta) {
+    const createdAt: Prisma.DateTimeFilter = {};
+    if (desde) createdAt.gte = new Date(desde);
+    if (hasta) createdAt.lte = new Date(hasta);
+    and.push({ created_at: createdAt });
+  }
+
+  switch (bandeja) {
+    case "mis":
+      and.push({ solicitante_id: user.id });
+      break;
+    case "asignados":
+      and.push({ asignado_a: user.id });
+      break;
+    case "pend_revision":
+      and.push({ estado: { in: ["registrado", "en_revision"] } });
+      break;
+    case "en_desarrollo":
+      and.push({ estado: "en_desarrollo" });
+      break;
+    case "pend_info":
+      and.push({ estado: "pendiente_informacion" });
+      break;
+    case "completados":
+      and.push({ estado: "completado" });
+      break;
+    case "cancelados":
+      and.push({ estado: "cancelado" });
+      break;
+    default:
+      break;
+  }
+
+  const where: Prisma.requerimientosWhereInput = { AND: and };
+
+  const rows = await prisma.requerimientos.findMany({
+    where,
+    include: {
+      usuarios_requerimientos_solicitante_idTousuarios: selectUsuarioMin,
+      usuarios_requerimientos_asignado_aTousuarios: selectUsuarioMin,
+    },
+    orderBy: [{ created_at: "desc" }, { id: "desc" }],
+    take: 5000,
+  });
+
+  const nombreDe = (u: { nombres: string; apellidos: string } | null): string =>
+    u ? `${u.nombres} ${u.apellidos}`.trim() : "";
+  const iso = (d: Date | null): string => (d ? d.toISOString() : "");
+  const esc = (v: unknown): string => `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+  const headers = [
+    "codigo",
+    "titulo",
+    "tipo",
+    "estado",
+    "prioridad",
+    "solicitante",
+    "responsable",
+    "modulo",
+    "fecha_creacion",
+    "fecha_requerida",
+    "ultima_actualizacion",
+  ];
+
+  const lineas = rows.map((r) =>
+    [
+      r.codigo,
+      r.titulo,
+      r.tipo,
+      r.estado,
+      r.prioridad ?? r.prioridad_sugerida,
+      nombreDe(r.usuarios_requerimientos_solicitante_idTousuarios),
+      nombreDe(r.usuarios_requerimientos_asignado_aTousuarios),
+      r.modulo_relacionado ?? "",
+      iso(r.created_at),
+      iso(r.fecha_requerida),
+      iso(r.updated_at),
+    ]
+      .map(esc)
+      .join(","),
+  );
+
+  // BOM UTF-8 para que Excel detecte la codificacion.
+  const csv = "﻿" + [headers.map(esc).join(","), ...lineas].join("\r\n");
+
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", 'attachment; filename="requerimientos.csv"');
+  res.send(csv);
+});
+
+// -------------------------------------------------------------------
 // GET /api/requerimientos/:id
 // -------------------------------------------------------------------
 router.get("/:id", requirePermission("desarrollo", "read"), async (req, res) => {
@@ -330,6 +531,29 @@ router.get("/:id", requirePermission("desarrollo", "read"), async (req, res) => 
     res.status(404).json({ error: "not_found" });
     return;
   }
+  res.json({ data });
+});
+
+// -------------------------------------------------------------------
+// GET /api/requerimientos/:id/historial  — bitacora de acciones (scope)
+// -------------------------------------------------------------------
+router.get("/:id/historial", requirePermission("desarrollo", "read"), async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  const user = req.user!;
+  const r = await cargarVisible(id, user);
+  if (!r) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+  const data = await prisma.requerimiento_historial.findMany({
+    where: { requerimiento_id: BigInt(id) },
+    include: { usuarios: selectUsuarioMin },
+    orderBy: { created_at: "desc" },
+  });
   res.json({ data });
 });
 
