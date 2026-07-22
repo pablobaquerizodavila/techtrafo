@@ -37,8 +37,12 @@ router.get("/", async (req, res) => {
     fecha_envio: Date | null;
     contexto: unknown;
     created_at: Date | null;
+    leido: boolean;
+    leido_at: Date | null;
+    enlace: string | null;
   }>>`
-    SELECT n.id, n.tipo, n.asunto, n.enviado, n.fecha_envio, n.contexto, n.created_at
+    SELECT n.id, n.tipo, n.asunto, n.enviado, n.fecha_envio, n.contexto, n.created_at,
+           n.leido, n.leido_at, n.enlace
       FROM core.notificaciones n
      WHERE n.destinatario_id = ${userId}::uuid
        AND NOT EXISTS (
@@ -95,6 +99,54 @@ router.get("/resumen", async (req, res) => {
   res.json({
     data: { recientes_48h: recientes, total: totales },
   });
+});
+
+// ===================================================================
+// Campana in-app (Fase 3): estado leido/no-leido por notificacion.
+//
+// IMPORTANTE: las rutas estaticas (/unread-count, /leer-todas) se declaran
+// ANTES de la dinamica /:id/leer para evitar shadowing.
+// ===================================================================
+
+/**
+ * GET /api/notificaciones/unread-count
+ * Cuenta de notificaciones no leidas del usuario autenticado (badge de la campana).
+ */
+router.get("/unread-count", async (req, res) => {
+  const count = await prisma.notificaciones.count({
+    where: { destinatario_id: req.user!.id, leido: false },
+  });
+  res.json({ count });
+});
+
+/**
+ * POST /api/notificaciones/leer-todas
+ * Marca como leidas todas las notificaciones no leidas del usuario.
+ */
+router.post("/leer-todas", async (req, res) => {
+  const result = await prisma.notificaciones.updateMany({
+    where: { destinatario_id: req.user!.id, leido: false },
+    data: { leido: true, leido_at: new Date() },
+  });
+  res.json({ ok: true, count: result.count });
+});
+
+/**
+ * POST /api/notificaciones/:id/leer
+ * Marca una notificacion del usuario como leida. updateMany con filtro por
+ * destinatario asegura que no se pueda marcar la de otro usuario.
+ */
+router.post("/:id/leer", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  await prisma.notificaciones.updateMany({
+    where: { id: BigInt(id), destinatario_id: req.user!.id },
+    data: { leido: true, leido_at: new Date() },
+  });
+  res.json({ ok: true });
 });
 
 export default router;

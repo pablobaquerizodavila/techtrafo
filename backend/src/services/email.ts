@@ -329,3 +329,109 @@ export function templateFacturaProveedorSubida(c: {
   const text = `Nueva factura recibida. OC ${c.oc_codigo} · Proveedor: ${c.proveedor_nombre} · Factura nro. ${c.factura_numero}. Ver: ${link}`;
   return { subject, html, text };
 }
+
+// ===================================================================
+// Requerimientos de Desarrollo (ticketing interno)
+// ===================================================================
+export interface RequerimientoContextoEmail {
+  id: number;
+  codigo: string;
+  titulo: string;
+}
+
+export function templateReqCreado(
+  c: RequerimientoContextoEmail & { tipo: string; prioridad_sugerida: string; solicitante_nombre?: string | null },
+) {
+  const link = `${env.PANEL_URL.replace(/\/$/, "")}/requerimientos/${c.id}`;
+  const subject = `[${c.codigo}] Nuevo requerimiento: ${c.titulo}`;
+  const html = layout(
+    "Nuevo requerimiento registrado",
+    `<p>Se registró un nuevo requerimiento de desarrollo que requiere triage:</p>
+     <ul>
+       <li><strong>Código:</strong> ${escapeHtml(c.codigo)}</li>
+       <li><strong>Título:</strong> ${escapeHtml(c.titulo)}</li>
+       <li><strong>Tipo:</strong> ${escapeHtml(c.tipo)}</li>
+       <li><strong>Prioridad sugerida:</strong> ${escapeHtml(c.prioridad_sugerida)}</li>
+       ${c.solicitante_nombre ? `<li><strong>Solicitante:</strong> ${escapeHtml(c.solicitante_nombre)}</li>` : ""}
+     </ul>
+     <p>Ingresá al panel para revisarlo y asignar responsable.</p>`,
+    link,
+    "Ver requerimiento",
+  );
+  const text = `Nuevo requerimiento ${c.codigo}: ${c.titulo}. Tipo ${c.tipo}, prioridad sugerida ${c.prioridad_sugerida}. Ver: ${link}`;
+  return { subject, html, text };
+}
+
+export function templateReqAsignado(c: RequerimientoContextoEmail & { prioridad?: string | null }) {
+  const link = `${env.PANEL_URL.replace(/\/$/, "")}/requerimientos/${c.id}`;
+  const subject = `[${c.codigo}] Te asignaron un requerimiento: ${c.titulo}`;
+  const html = layout(
+    "Requerimiento asignado a ti",
+    `<p>Se te asignó un requerimiento de desarrollo:</p>
+     <ul>
+       <li><strong>Código:</strong> ${escapeHtml(c.codigo)}</li>
+       <li><strong>Título:</strong> ${escapeHtml(c.titulo)}</li>
+       ${c.prioridad ? `<li><strong>Prioridad:</strong> ${escapeHtml(c.prioridad)}</li>` : ""}
+     </ul>
+     <p>Ingresá al panel para revisar el detalle y comenzar.</p>`,
+    link,
+    "Ver requerimiento",
+  );
+  const text = `Se te asignó el requerimiento ${c.codigo}: ${c.titulo}.${c.prioridad ? ` Prioridad ${c.prioridad}.` : ""} Ver: ${link}`;
+  return { subject, html, text };
+}
+
+export function templateReqCambioEstado(c: RequerimientoContextoEmail & { estado: string }) {
+  const link = `${env.PANEL_URL.replace(/\/$/, "")}/requerimientos/${c.id}`;
+  const subject = `[${c.codigo}] Cambio de estado: ${c.estado}`;
+  const html = layout(
+    "Cambio de estado del requerimiento",
+    `<p>El requerimiento cambió de estado:</p>
+     <ul>
+       <li><strong>Código:</strong> ${escapeHtml(c.codigo)}</li>
+       <li><strong>Título:</strong> ${escapeHtml(c.titulo)}</li>
+       <li><strong>Nuevo estado:</strong> ${escapeHtml(c.estado)}</li>
+     </ul>
+     <p>Ingresá al panel para ver el detalle.</p>`,
+    link,
+    "Ver requerimiento",
+  );
+  const text = `El requerimiento ${c.codigo} (${c.titulo}) cambió al estado ${c.estado}. Ver: ${link}`;
+  return { subject, html, text };
+}
+
+export function templateReqComentario(c: RequerimientoContextoEmail) {
+  const link = `${env.PANEL_URL.replace(/\/$/, "")}/requerimientos/${c.id}`;
+  const subject = `[${c.codigo}] Nuevo comentario en: ${c.titulo}`;
+  const html = layout(
+    "Nuevo comentario en el requerimiento",
+    `<p>Se agregó un nuevo comentario al requerimiento:</p>
+     <ul>
+       <li><strong>Código:</strong> ${escapeHtml(c.codigo)}</li>
+       <li><strong>Título:</strong> ${escapeHtml(c.titulo)}</li>
+     </ul>
+     <p>Ingresá al panel para leer el comentario y responder.</p>`,
+    link,
+    "Ver requerimiento",
+  );
+  const text = `Nuevo comentario en el requerimiento ${c.codigo} (${c.titulo}). Ver: ${link}`;
+  return { subject, html, text };
+}
+
+export function templateReqSolicitudInfo(c: RequerimientoContextoEmail) {
+  const link = `${env.PANEL_URL.replace(/\/$/, "")}/requerimientos/${c.id}`;
+  const subject = `[${c.codigo}] Se requiere información adicional`;
+  const html = layout(
+    "Información adicional requerida",
+    `<p>El equipo de desarrollo necesita más información para continuar con tu requerimiento:</p>
+     <ul>
+       <li><strong>Código:</strong> ${escapeHtml(c.codigo)}</li>
+       <li><strong>Título:</strong> ${escapeHtml(c.titulo)}</li>
+     </ul>
+     <p>Ingresá al panel para ver la solicitud y responder con los detalles pedidos.</p>`,
+    link,
+    "Ver requerimiento",
+  );
+  const text = `Se requiere información adicional en el requerimiento ${c.codigo} (${c.titulo}). Ver: ${link}`;
+  return { subject, html, text };
+}

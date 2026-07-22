@@ -1070,9 +1070,13 @@ model notificaciones {
   contexto           Json?     @default("{}")
   created_at         DateTime? @default(now()) @db.Timestamptz(6)
   updated_at         DateTime? @default(now()) @db.Timestamptz(6)
+  leido              Boolean   @default(false)
+  leido_at           DateTime? @db.Timestamptz(6)
+  enlace             String?   @db.VarChar(300)
   usuarios           usuarios? @relation(fields: [destinatario_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([destinatario_id, created_at(sort: Desc)], map: "idx_notif_destinatario")
+  @@index([destinatario_id, leido, created_at(sort: Desc)], map: "idx_notif_inapp")
   @@schema("core")
 }
 

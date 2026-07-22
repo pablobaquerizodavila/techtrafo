@@ -26,6 +26,13 @@ import { withAppUser } from "../db/withAppUser";
 import { requireAuth, requirePermission, AuthUser } from "../auth/middleware";
 import { env } from "../config/env";
 import { serveStoredFile } from "../utils/serveStoredFile";
+import {
+  notificarReqCreado,
+  notificarReqAsignado,
+  notificarReqCambioEstado,
+  notificarReqComentario,
+  notificarReqSolicitudInfo,
+} from "../services/notificaciones";
 
 const router = Router();
 router.use(requireAuth);
@@ -370,6 +377,8 @@ router.post("/", requirePermission("desarrollo", "crear"), async (req, res) => {
     return r;
   });
 
+  void notificarReqCreado(data.id, req.user!.id).catch((e) => console.error("[notif]", e));
+
   res.status(201).json({ data });
 });
 
@@ -489,6 +498,7 @@ router.post("/:id/estado", requirePermission("desarrollo", "gestionar"), async (
       }
       return r;
     });
+    void notificarReqCambioEstado(BigInt(id), user.id).catch((e) => console.error("[notif]", e));
     res.json({ data: updated });
   } catch (err) {
     if (mapBusinessError(err, res)) return;
@@ -588,6 +598,7 @@ router.post("/:id/asignar", requirePermission("desarrollo", "gestionar"), async 
       });
       return r;
     });
+    void notificarReqAsignado(BigInt(id), user.id).catch((e) => console.error("[notif]", e));
     res.json({ data: updated });
   } catch (err) {
     if (mapBusinessError(err, res)) return;
@@ -688,6 +699,7 @@ router.post("/:id/solicitar-info", requirePermission("desarrollo", "gestionar"),
       });
       return r;
     });
+    void notificarReqSolicitudInfo(BigInt(id), user.id).catch((e) => console.error("[notif]", e));
     res.json({ data: updated });
   } catch (err) {
     if (mapBusinessError(err, res)) return;
@@ -734,6 +746,7 @@ router.post("/:id/cancelar", async (req, res) => {
       });
       return r;
     });
+    void notificarReqCambioEstado(BigInt(id), user.id).catch((e) => console.error("[notif]", e));
     res.json({ data: updated });
   } catch (err) {
     if (mapBusinessError(err, res)) return;
@@ -809,6 +822,8 @@ router.post("/:id/comentarios", requirePermission("desarrollo", "read"), async (
     });
     return c;
   });
+
+  void notificarReqComentario(BigInt(id), user.id).catch((e) => console.error("[notif]", e));
 
   res.status(201).json({ data });
 });

@@ -21,6 +21,11 @@ import {
   templateHitoEstancado,
   templateHitoResolucion,
   templateRevisionInternaCotizacion,
+  templateReqCreado,
+  templateReqAsignado,
+  templateReqCambioEstado,
+  templateReqComentario,
+  templateReqSolicitudInfo,
   ExpedienteContextoEmail,
 } from "./email";
 
@@ -37,7 +42,12 @@ export type TipoNotificacion =
   | "cotizacion_revision_aprobada"
   | "cotizacion_revision_rechazada"
   | "nc_creada"
-  | "factura_proveedor_subida";
+  | "factura_proveedor_subida"
+  | "dev_creado"
+  | "dev_asignado"
+  | "dev_cambio_estado"
+  | "dev_comentario"
+  | "dev_solicitud_info";
 
 interface CreateInput {
   tipo: TipoNotificacion;
@@ -47,6 +57,7 @@ interface CreateInput {
   cuerpo_html: string;
   cuerpo_texto: string;
   contexto: Record<string, unknown>;
+  enlace?: string;
 }
 
 async function crear(input: CreateInput) {
@@ -60,6 +71,7 @@ async function crear(input: CreateInput) {
       cuerpo_html: input.cuerpo_html,
       cuerpo_texto: input.cuerpo_texto,
       contexto: input.contexto as object,
+      enlace: input.enlace ?? null,
     },
   });
 }
@@ -559,4 +571,204 @@ export async function notificarFacturaProveedorSubida(ocId: number): Promise<voi
       contexto: { orden_compra_id: ocId },
     });
   }
+}
+
+// ===================================================================
+// Requerimientos de Desarrollo (ticketing interno) — Fase 3
+// ===================================================================
+
+/**
+ * Carga un requerimiento con solicitante + asignado para las notificaciones.
+ */
+function cargarReqParaNotif(reqId: bigint) {
+  return prisma.requerimientos.findUnique({
+    where: { id: reqId },
+    include: {
+      usuarios_requerimientos_solicitante_idTousuarios: { select: { id: true, email: true, nombres: true } },
+      usuarios_requerimientos_asignado_aTousuarios: { select: { id: true, email: true, nombres: true } },
+    },
+  });
+}
+
+type ReqDestinatario = { id: string; email: string | null };
+
+/**
+ * Un requerimiento nuevo fue registrado. Notifica a todos los usuarios del
+ * rol `desarrollo` (activos, aprobados) para que hagan triage. Excluye al actor.
+ */
+export async function notificarReqCreado(reqId: bigint, actorId: string): Promise<void> {
+  const req = await cargarReqParaNotif(reqId);
+  if (!req) return;
+
+  const rol = await prisma.roles.findFirst({
+    where: { nombre: "desarrollo", activo: true },
+    select: { id: true },
+  });
+  if (!rol) return;
+
+  const destinatarios = await prisma.usuarios.findMany({
+    where: { rol_id: rol.id, estado_aprobacion: "aprobado", activo: true },
+    select: { id: true, email: true },
+  });
+
+  const solicitanteNombre = req.usuarios_requerimientos_solicitante_idTousuarios?.nombres ?? null;
+  const enlace = `/requerimientos/${reqId}`;
+
+  const vistos = new Set<string>();
+  for (const u of destinatarios) {
+    if (u.id === actorId || vistos.has(u.id) || !u.email) continue;
+    vistos.add(u.id);
+    const tpl = templateReqCreado({
+      id: Number(reqId),
+      codigo: req.codigo,
+      titulo: req.titulo,
+      tipo: req.tipo,
+      prioridad_sugerida: req.prioridad_sugerida,
+      solicitante_nombre: solicitanteNombre,
+    });
+    await crear({
+      tipo: "dev_creado",
+      destinatario_id: u.id,
+      destinatario_email: u.email,
+      asunto: tpl.subject,
+      cuerpo_html: tpl.html,
+      cuerpo_texto: tpl.text,
+      enlace,
+      contexto: { requerimiento_id: Number(reqId) },
+    });
+  }
+}
+
+/**
+ * Un requerimiento fue asignado a un responsable. Notifica al asignado.
+ */
+export async function notificarReqAsignado(reqId: bigint, actorId: string): Promise<void> {
+  const req = await cargarReqParaNotif(reqId);
+  if (!req) return;
+
+  const asignado = req.usuarios_requerimientos_asignado_aTousuarios;
+  if (!asignado || asignado.id === actorId || !asignado.email) return;
+
+  const tpl = templateReqAsignado({
+    id: Number(reqId),
+    codigo: req.codigo,
+    titulo: req.titulo,
+    prioridad: req.prioridad,
+  });
+  await crear({
+    tipo: "dev_asignado",
+    destinatario_id: asignado.id,
+    destinatario_email: asignado.email,
+    asunto: tpl.subject,
+    cuerpo_html: tpl.html,
+    cuerpo_texto: tpl.text,
+    enlace: `/requerimientos/${reqId}`,
+    contexto: { requerimiento_id: Number(reqId) },
+  });
+}
+
+/**
+ * El estado de un requerimiento cambio. Notifica al solicitante y al asignado
+ * (si existe). Excluye al actor.
+ */
+export async function notificarReqCambioEstado(reqId: bigint, actorId: string): Promise<void> {
+  const req = await cargarReqParaNotif(reqId);
+  if (!req) return;
+
+  const destinatarios: ReqDestinatario[] = [];
+  if (req.usuarios_requerimientos_solicitante_idTousuarios) {
+    destinatarios.push(req.usuarios_requerimientos_solicitante_idTousuarios);
+  }
+  if (req.usuarios_requerimientos_asignado_aTousuarios) {
+    destinatarios.push(req.usuarios_requerimientos_asignado_aTousuarios);
+  }
+
+  const enlace = `/requerimientos/${reqId}`;
+  const vistos = new Set<string>();
+  for (const u of destinatarios) {
+    if (u.id === actorId || vistos.has(u.id) || !u.email) continue;
+    vistos.add(u.id);
+    const tpl = templateReqCambioEstado({
+      id: Number(reqId),
+      codigo: req.codigo,
+      titulo: req.titulo,
+      estado: req.estado,
+    });
+    await crear({
+      tipo: "dev_cambio_estado",
+      destinatario_id: u.id,
+      destinatario_email: u.email,
+      asunto: tpl.subject,
+      cuerpo_html: tpl.html,
+      cuerpo_texto: tpl.text,
+      enlace,
+      contexto: { requerimiento_id: Number(reqId) },
+    });
+  }
+}
+
+/**
+ * Se agrego un comentario a un requerimiento. Notifica al solicitante y al
+ * asignado (si existe). Excluye al actor (autor del comentario).
+ */
+export async function notificarReqComentario(reqId: bigint, actorId: string): Promise<void> {
+  const req = await cargarReqParaNotif(reqId);
+  if (!req) return;
+
+  const destinatarios: ReqDestinatario[] = [];
+  if (req.usuarios_requerimientos_solicitante_idTousuarios) {
+    destinatarios.push(req.usuarios_requerimientos_solicitante_idTousuarios);
+  }
+  if (req.usuarios_requerimientos_asignado_aTousuarios) {
+    destinatarios.push(req.usuarios_requerimientos_asignado_aTousuarios);
+  }
+
+  const enlace = `/requerimientos/${reqId}`;
+  const vistos = new Set<string>();
+  for (const u of destinatarios) {
+    if (u.id === actorId || vistos.has(u.id) || !u.email) continue;
+    vistos.add(u.id);
+    const tpl = templateReqComentario({
+      id: Number(reqId),
+      codigo: req.codigo,
+      titulo: req.titulo,
+    });
+    await crear({
+      tipo: "dev_comentario",
+      destinatario_id: u.id,
+      destinatario_email: u.email,
+      asunto: tpl.subject,
+      cuerpo_html: tpl.html,
+      cuerpo_texto: tpl.text,
+      enlace,
+      contexto: { requerimiento_id: Number(reqId) },
+    });
+  }
+}
+
+/**
+ * Se solicito informacion adicional al solicitante. Notifica al solicitante.
+ */
+export async function notificarReqSolicitudInfo(reqId: bigint, actorId: string): Promise<void> {
+  const req = await cargarReqParaNotif(reqId);
+  if (!req) return;
+
+  const solicitante = req.usuarios_requerimientos_solicitante_idTousuarios;
+  if (!solicitante || solicitante.id === actorId || !solicitante.email) return;
+
+  const tpl = templateReqSolicitudInfo({
+    id: Number(reqId),
+    codigo: req.codigo,
+    titulo: req.titulo,
+  });
+  await crear({
+    tipo: "dev_solicitud_info",
+    destinatario_id: solicitante.id,
+    destinatario_email: solicitante.email,
+    asunto: tpl.subject,
+    cuerpo_html: tpl.html,
+    cuerpo_texto: tpl.text,
+    enlace: `/requerimientos/${reqId}`,
+    contexto: { requerimiento_id: Number(reqId) },
+  });
 }
