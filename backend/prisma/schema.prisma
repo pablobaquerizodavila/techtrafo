@@ -6,7 +6,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["comercial", "compras", "core", "inventario", "posventa", "produccion"]
+  schemas  = ["comercial", "compras", "core", "desarrollo", "inventario", "posventa", "produccion"]
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -433,6 +433,13 @@ model usuarios {
   clientes_usuarios_cliente_idToclientes                                clientes?                               @relation("usuarios_cliente_idToclientes", fields: [cliente_id], references: [id], onUpdate: NoAction)
   proveedores_portal                                                    proveedores?                            @relation("usuarios_proveedor_portal", fields: [proveedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   roles                                                                 roles?                                  @relation(fields: [rol_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  requerimiento_adjuntos                                                requerimiento_adjuntos[]
+  requerimiento_comentarios                                             requerimiento_comentarios[]
+  requerimiento_historial                                               requerimiento_historial[]
+  requerimientos_requerimientos_actualizado_porTousuarios               requerimientos[]                        @relation("requerimientos_actualizado_porTousuarios")
+  requerimientos_requerimientos_asignado_aTousuarios                    requerimientos[]                        @relation("requerimientos_asignado_aTousuarios")
+  requerimientos_requerimientos_creado_porTousuarios                    requerimientos[]                        @relation("requerimientos_creado_porTousuarios")
+  requerimientos_requerimientos_solicitante_idTousuarios                requerimientos[]                        @relation("requerimientos_solicitante_idTousuarios")
   categorias_item_categorias_item_actualizado_porTousuarios             categorias_item[]                       @relation("categorias_item_actualizado_porTousuarios")
   categorias_item_categorias_item_creado_porTousuarios                  categorias_item[]                       @relation("categorias_item_creado_porTousuarios")
   items_items_actualizado_porTousuarios                                 items[]                                 @relation("items_actualizado_porTousuarios")
@@ -1690,4 +1697,87 @@ model nc_lineas {
   @@index([no_conformidad_id], map: "idx_nc_lineas_nc")
   @@index([recepcion_linea_id], map: "idx_nc_lineas_recepcion_linea")
   @@schema("compras")
+}
+
+model requerimiento_adjuntos {
+  id               BigInt         @id @default(autoincrement())
+  requerimiento_id BigInt
+  ruta_relativa    String
+  nombre_original  String?        @db.VarChar(255)
+  mime             String?        @db.VarChar(120)
+  tamano_bytes     BigInt?
+  subido_por       String?        @db.Uuid
+  created_at       DateTime       @default(now()) @db.Timestamptz(6)
+  requerimientos   requerimientos @relation(fields: [requerimiento_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  usuarios         usuarios?      @relation(fields: [subido_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([requerimiento_id], map: "idx_reqadj_req")
+  @@schema("desarrollo")
+}
+
+model requerimiento_comentarios {
+  id               BigInt         @id @default(autoincrement())
+  requerimiento_id BigInt
+  autor_id         String?        @db.Uuid
+  cuerpo           String
+  es_tecnico       Boolean        @default(false)
+  created_at       DateTime       @default(now()) @db.Timestamptz(6)
+  usuarios         usuarios?      @relation(fields: [autor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  requerimientos   requerimientos @relation(fields: [requerimiento_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([requerimiento_id, created_at], map: "idx_reqcom_req")
+  @@schema("desarrollo")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model requerimiento_historial {
+  id               BigInt         @id @default(autoincrement())
+  requerimiento_id BigInt
+  accion           String         @db.VarChar(30)
+  detalle          Json           @default("{}")
+  por_usuario_id   String?        @db.Uuid
+  rol_actuante     String?        @db.VarChar(50)
+  created_at       DateTime       @default(now()) @db.Timestamptz(6)
+  usuarios         usuarios?      @relation(fields: [por_usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  requerimientos   requerimientos @relation(fields: [requerimiento_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([requerimiento_id, created_at(sort: Desc)], map: "idx_reqhist_req")
+  @@schema("desarrollo")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model requerimientos {
+  id                                                BigInt                      @id @default(autoincrement())
+  codigo                                            String                      @unique @db.VarChar(30)
+  titulo                                            String                      @db.VarChar(200)
+  tipo                                              String                      @db.VarChar(30)
+  modulo_relacionado                                String?                     @db.VarChar(120)
+  descripcion                                       String
+  problema                                          String?
+  resultado_esperado                                String?
+  prioridad_sugerida                                String                      @default("media") @db.VarChar(10)
+  prioridad                                         String?                     @db.VarChar(10)
+  estado                                            String                      @default("registrado") @db.VarChar(25)
+  solicitante_id                                    String                      @db.Uuid
+  asignado_a                                        String?                     @db.Uuid
+  fecha_requerida                                   DateTime?                   @db.Date
+  fecha_estimada_entrega                            DateTime?                   @db.Date
+  creado_por                                        String?                     @db.Uuid
+  actualizado_por                                   String?                     @db.Uuid
+  created_at                                        DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                                        DateTime                    @default(now()) @db.Timestamptz(6)
+  requerimiento_adjuntos                            requerimiento_adjuntos[]
+  requerimiento_comentarios                         requerimiento_comentarios[]
+  requerimiento_historial                           requerimiento_historial[]
+  usuarios_requerimientos_actualizado_porTousuarios usuarios?                   @relation("requerimientos_actualizado_porTousuarios", fields: [actualizado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_requerimientos_asignado_aTousuarios      usuarios?                   @relation("requerimientos_asignado_aTousuarios", fields: [asignado_a], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_requerimientos_creado_porTousuarios      usuarios?                   @relation("requerimientos_creado_porTousuarios", fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_requerimientos_solicitante_idTousuarios  usuarios                    @relation("requerimientos_solicitante_idTousuarios", fields: [solicitante_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([asignado_a], map: "idx_req_asignado")
+  @@index([created_at(sort: Desc)], map: "idx_req_created")
+  @@index([estado], map: "idx_req_estado")
+  @@index([prioridad], map: "idx_req_prioridad")
+  @@index([solicitante_id], map: "idx_req_solicitante")
+  @@schema("desarrollo")
 }
