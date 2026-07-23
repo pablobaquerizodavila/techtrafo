@@ -1,6 +1,6 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-07-09 · hardening del edge (ufw + fail2ban + rate-limiting)**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-07-22 · módulo Requerimientos de Desarrollo (DEV) EN VIVO**.
 
 > 📄 **Ver también [`ACCESO-Y-BACKUPS.md`](ACCESO-Y-BACKUPS.md)** — guía de hosts, credenciales, ubicación de backups y recuperación desde PC nueva.
 
@@ -41,7 +41,33 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 
 ---
 
-## 0. Estado 2026-07-09 — Hardening del edge (leer primero)
+## 0. Estado 2026-07-22 — Módulo "Requerimientos de Desarrollo" (DEV) EN VIVO (leer primero)
+
+Ticketing interno completo, desplegado en `.23` y verificado. Spec+plan en
+`docs/superpowers/specs/2026-07-22-*` y `docs/superpowers/plans/2026-07-22-*` (plan gitignoreado).
+
+- **DB**: migraciones `030` (schema `desarrollo`: requerimientos + comentarios + adjuntos +
+  historial; código `DEV-000001`; rol `desarrollo`) y `031` (`core.notificaciones`: leido/enlace).
+  **Ya aplicadas en prod.** Actualizar `database/README.md`.
+- **Backend** `/api/requerimientos`: CRUD + scope + 11 estados + acciones + comentarios + adjuntos
+  + historial + `/resumen` + `/export`. Notificaciones in-app + email. Smoke E2E OK.
+- **Frontend**: menú Desarrollo→Requerimientos, listado/bandejas/filtros/KPIs/export, form nuevo,
+  detalle + paneles + acciones, campana 🔔. Compila y sirve 200.
+- **Cómo operar**: cualquier usuario interno crea y ve los suyos. Para que alguien **gestione**
+  (cambiar estado/asignar/etc.), asignarle el rol **`desarrollo`** en Admin → Usuarios. super_admin
+  hace todo. Adjuntos persisten en `/opt/techtrafo/uploads` (volumen nuevo en el compose).
+- **Pendiente menor**: la asignación de responsable/prioridad/fecha usa `window.prompt` (UUID a
+  mano) — se puede pulir a un selector de usuarios. Y el bug latente de CSRF en multipart de
+  **evidencias/facturas** (no mandan `X-CSRF-Token` → 403 desde el navegador; se arregló para
+  adjuntos de requerimientos, falta replicarlo en `subirEvidencia`/`subirFactura`).
+- **Deploy en prod (ya hecho; para un entorno nuevo)**: aplicar `030`+`031` con psql →
+  `prisma db pull && generate` (contenedor api) → asegurar volumen `/opt/techtrafo/uploads` →
+  `docker compose up -d --build api web` (o restart si bind-mount) → verificar `/api/requerimientos`
+  responde y el menú aparece → asignar rol `desarrollo`.
+
+---
+
+## 0.1 Estado 2026-07-09 — Hardening del edge
 
 El edge `.7` (único host expuesto a internet) se **endureció** en 3 capas, todo
 versionado en [`infrastructure/edge-nginx/`](infrastructure/edge-nginx/README.md)

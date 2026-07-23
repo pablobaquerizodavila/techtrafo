@@ -6,6 +6,32 @@ El formato sigue Keep a Changelog y este proyecto adhiere a Semantic Versioning.
 
 ---
 
+## [0.21.0] — 2026-07-22 — Módulo Requerimientos de Desarrollo (DEV)
+
+### Added
+- **Módulo de ticketing interno "Requerimientos de Desarrollo"**. Cualquier usuario registra
+  necesidades/mejoras/errores; el Área de Desarrollo los gestiona.
+  - **DB** (migración `030`): schema `desarrollo` con 4 tablas (`requerimientos`,
+    `requerimiento_comentarios`, `_adjuntos`, `_historial`). Código secuencial `DEV-000001`
+    (trigger). Estados (11) y prioridades como `VARCHAR+CHECK`. Auditoría + historial inmutable.
+    Rol nuevo `desarrollo` + permisos `desarrollo.read/crear/gestionar` (read+crear a todos los
+    roles internos). Migración `031`: `core.notificaciones` gana `leido/leido_at/enlace` (campana in-app).
+  - **Backend** (`/api/requerimientos`): CRUD + scope por rol (solicitante ve solo los suyos),
+    máquina de 11 estados, acciones (asignar/prioridad/estimar/solicitar-info/cancelar),
+    comentarios, adjuntos (multer + `serveStoredFile`, volumen `/uploads` ahora persistente),
+    historial, `/resumen` (KPIs), `/export` (CSV). Notificaciones `notificarReq*` (in-app + email
+    vía worker). Endpoints in-app en `/api/notificaciones` (unread-count, leer, leer-todas).
+  - **Frontend**: menú "Desarrollo → Requerimientos", listado (8 bandejas + filtros + KPIs +
+    paginación + export), formulario nuevo (con adjuntos), detalle + acciones + paneles
+    (comentarios/adjuntos/historial), y campana 🔔 in-app en el header.
+- **Fix**: `subirAdjunto` (y el patrón de subida) ahora manda `X-CSRF-Token` en multipart — el
+  middleware CSRF lo exige y el molde (evidencias/facturas) no lo enviaba (bug latente: esas
+  subidas fallarían con 403 desde el navegador real; pendiente aplicar el mismo fix ahí).
+- **Infra**: volumen `/opt/techtrafo/uploads:/uploads` en la api → los adjuntos (y evidencias/
+  facturas) ya persisten entre reinicios del contenedor.
+
+---
+
 ## [0.17.0] — 2026-06-08
 
 ### Added

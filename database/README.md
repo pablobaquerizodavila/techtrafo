@@ -30,6 +30,8 @@ docker compose exec postgres psql -U techtrafo_admin -d techtrafo \
 - `migrations/001-init-core-schema.sql` - 2026-05-22
 - `seeds/001-roles-iniciales.sql` - 2026-05-22
 - `seeds/002-configuracion-inicial.sql` - 2026-05-22
+- `migrations/030-requerimientos-desarrollo.sql` - 2026-07-22 (schema desarrollo + rol desarrollo)
+- `migrations/031-notificaciones-inapp.sql` - 2026-07-22 (core.notificaciones: leido/leido_at/enlace)
 
 ## Pendientes (FASE 3)
 
