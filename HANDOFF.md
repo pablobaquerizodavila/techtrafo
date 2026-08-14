@@ -1,6 +1,6 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-08-14 · primer ticket real (DEV-000001) ejecutado — cambios en techtrafo.com**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-08-14 · tickets DEV-000001 y DEV-000002 ejecutados y COMPLETADOS — cambios en techtrafo.com**.
 
 > 📄 **Ver también [`ACCESO-Y-BACKUPS.md`](ACCESO-Y-BACKUPS.md)** — guía de hosts, credenciales, ubicación de backups y recuperación desde PC nueva.
 
@@ -54,7 +54,17 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
   Editar SIEMPRE en `techtrafo-landing\prod\`, previsualizar, y pscp a esos 3 destinos.
 - Decisión de Pablo: "solo hacemos lo que se pidió en el ticket" — NO se tocaron los pasos
   internos del Proceso ("Tratamiento de aceite"/"Pintura y control"), el área "Cabina de
-  pintura epóxica", ni la prosa general (hero/Nosotros). Ticket dejado en `listo_produccion`.
+  pintura epóxica", ni la prosa general (hero/Nosotros). **DEV-000001 → completado.**
+- **Ticket DEV-000002 "Fotos de Transformadores" → completado**: se agregaron 6 fotos reales
+  por tipo en la sección Productos (extraídas del catálogo adjunto con pymupdf → `assets/productos/*.jpeg`,
+  `object-fit:contain` + `mix-blend:multiply`), se corrigieron los specs de las 6 tarjetas con
+  los datos del catálogo, se renombró "Equipos especiales" → "Transformadores de Potencia", y se
+  agregó un botón **"Descargar catálogo (PDF)"** que publica `assets/catalogo-techtrafo.pdf`.
+  Cache-bust actual `?v=fotos-ago26i`. También se corrigió un `</script>` faltante en index.html.
+- **Cómo procesar un ticket**: leer `desarrollo.requerimientos` + su PDF adjunto en
+  `/opt/techtrafo/uploads/requerimientos/<id>/` (root — `sudo cp` a /tmp + chmod 644 para bajarlo);
+  ejecutar en `techtrafo-landing\prod\`; desplegar a los 3 destinos; actualizar el ticket por API
+  (mint JWT con `token_version` actual de core.usuarios) o comentario por SQL (evita escaping).
 
 ---
 
