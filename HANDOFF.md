@@ -1,6 +1,6 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-07-22 · módulo Requerimientos de Desarrollo (DEV) EN VIVO**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-08-14 · primer ticket real (DEV-000001) ejecutado — cambios en techtrafo.com**.
 
 > 📄 **Ver también [`ACCESO-Y-BACKUPS.md`](ACCESO-Y-BACKUPS.md)** — guía de hosts, credenciales, ubicación de backups y recuperación desde PC nueva.
 
@@ -41,7 +41,24 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 
 ---
 
-## 0. Estado 2026-07-22 — Módulo "Requerimientos de Desarrollo" (DEV) EN VIVO (leer primero)
+## 0. Estado 2026-08-14 — Módulo DEV en uso real + cambios en techtrafo.com (leer primero)
+
+- El **módulo Requerimientos de Desarrollo está en uso real**: Enrique González creó el
+  ticket **DEV-000001** "Mejora en la Página WEB" (con PDF adjunto), Pablo lo gestionó en el
+  panel (aprobado→…→en_desarrollo), y se ejecutaron los cambios pedidos.
+- **Cambios ejecutados en techtrafo.com** (retiro de la oferta de tratamiento de aceites,
+  mantenimiento/montaje en sitio y pintura epóxica; nuevo titular de Capacidad operativa).
+  ⚠️ **El sitio público NO está en git** — vive en `techtrafo-landing\prod\` (local) y se
+  desplegó por `pscp` a NAS `/volume2/web/techtrafo/` + `.23` `/home/techtrafo/sites/techtrafo/`
+  + mirror NAS `Desarrollos/techtrafo-landing/prod`. Cache-bust `?v=svc-ago26` en index.html.
+  Editar SIEMPRE en `techtrafo-landing\prod\`, previsualizar, y pscp a esos 3 destinos.
+- Decisión de Pablo: "solo hacemos lo que se pidió en el ticket" — NO se tocaron los pasos
+  internos del Proceso ("Tratamiento de aceite"/"Pintura y control"), el área "Cabina de
+  pintura epóxica", ni la prosa general (hero/Nosotros). Ticket dejado en `listo_produccion`.
+
+---
+
+## 0.1 Estado 2026-07-22 — Módulo "Requerimientos de Desarrollo" (DEV) EN VIVO
 
 Ticketing interno completo, desplegado en `.23` y verificado. Spec+plan en
 `docs/superpowers/specs/2026-07-22-*` y `docs/superpowers/plans/2026-07-22-*` (plan gitignoreado).
