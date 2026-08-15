@@ -157,6 +157,17 @@ async function procesarPendientes() {
 
   if (pendientes.length === 0) return { procesadas: 0, ok: 0, fallos: 0 };
 
+  // CC de gerencia comercial: los correos al Gerente Comercial (rol gerencia_comercial)
+  // o a Enrique Gonzales (egonzales@techtrafo.com) se copian tambien a su cuenta de
+  // britransformadores. Se resuelve el set una vez por tick.
+  const CC_GERENCIA_COMERCIAL = "egonzales@britransformadores.com";
+  const gerentesComercial = await prisma.usuarios.findMany({
+    where: { activo: true, roles: { nombre: "gerencia_comercial" } },
+    select: { email: true },
+  });
+  const emailsConCC = new Set<string>(["egonzales@techtrafo.com"]);
+  for (const u of gerentesComercial) if (u.email) emailsConCC.add(u.email.toLowerCase());
+
   let ok = 0;
   let fallos = 0;
 
@@ -164,6 +175,9 @@ async function procesarPendientes() {
     try {
       const res = await sendEmail({
         to: n.destinatario_email,
+        cc: n.destinatario_email && emailsConCC.has(n.destinatario_email.toLowerCase())
+          ? CC_GERENCIA_COMERCIAL
+          : undefined,
         subject: n.asunto,
         html: n.cuerpo_html ?? undefined,
         text: n.cuerpo_texto ?? undefined,
