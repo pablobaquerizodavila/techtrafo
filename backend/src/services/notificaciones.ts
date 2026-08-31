@@ -60,6 +60,10 @@ interface CreateInput {
   enlace?: string;
 }
 
+// Correo fijo que recibe un aviso por CADA ticket nuevo del modulo de
+// Requerimientos (asunto "Ticket Techtrafo"). Solicitado por Pablo 2026-08-31.
+const AVISO_PRESIDENCIA_EMAIL = "pablobaquerizodavila@gmail.com";
+
 async function crear(input: CreateInput) {
   if (!input.destinatario_email) return null;
   return prisma.notificaciones.create({
@@ -599,6 +603,33 @@ type ReqDestinatario = { id: string; email: string | null };
 export async function notificarReqCreado(reqId: bigint, actorId: string): Promise<void> {
   const req = await cargarReqParaNotif(reqId);
   if (!req) return;
+
+  // Aviso fijo a Presidencia (Pablo) por CADA ticket nuevo, con asunto fijo
+  // "Ticket Techtrafo" (solicitado 2026-08-31). Independiente del rol del
+  // destinatario: el correo es el destino aunque no tenga rol "desarrollo".
+  try {
+    const solicitanteNom =
+      req.usuarios_requerimientos_solicitante_idTousuarios?.nombres ?? null;
+    const tplPres = templateReqCreado({
+      id: Number(reqId),
+      codigo: req.codigo,
+      titulo: req.titulo,
+      tipo: req.tipo,
+      prioridad_sugerida: req.prioridad_sugerida,
+      solicitante_nombre: solicitanteNom,
+    });
+    await crear({
+      tipo: "dev_creado",
+      destinatario_email: AVISO_PRESIDENCIA_EMAIL,
+      asunto: "Ticket Techtrafo",
+      cuerpo_html: tplPres.html,
+      cuerpo_texto: tplPres.text,
+      enlace: `/requerimientos/${reqId}`,
+      contexto: { requerimiento_id: Number(reqId), aviso: "presidencia" },
+    });
+  } catch (e) {
+    console.error("[notif] aviso presidencia ticket nuevo:", e);
+  }
 
   const rol = await prisma.roles.findFirst({
     where: { nombre: "desarrollo", activo: true },
