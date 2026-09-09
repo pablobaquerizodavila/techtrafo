@@ -1,6 +1,6 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-08-14 · tickets DEV-000001 y DEV-000002 ejecutados y COMPLETADOS — cambios en techtrafo.com**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-09-09 · tickets DEV-000004/005/006/008 COMPLETADOS (cambios techtrafo.com), aviso de ticket nuevo a Presidencia y límite de subida 25M→100M**.
 
 > 📄 **Ver también [`ACCESO-Y-BACKUPS.md`](ACCESO-Y-BACKUPS.md)** — guía de hosts, credenciales, ubicación de backups y recuperación desde PC nueva.
 
@@ -41,7 +41,31 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 
 ---
 
-## 0. Estado 2026-08-14 — Módulo DEV en uso real + cambios en techtrafo.com (leer primero)
+## 0. Estado 2026-09-09 — Tickets DEV-000004/005/006/008 + notif Presidencia + límite subida (leer primero)
+
+Sesión sobre **techtrafo.com** (landing, NO en git — vive en `C:\Users\Pablo B\techtrafo-landing\prod\`, se despliega por pscp/scp a NAS origin `/volume2/web/techtrafo/` + copia `.23` `/home/techtrafo/sites/techtrafo/` + mirror NAS `Desarrollos/techtrafo-landing/prod/`) y sobre el backend.
+
+**Tickets del módulo DEV cerrados esta sesión** (comentarios + historial vía SQL; actor Pablo `e35c0ded-…`):
+- **DEV-000005** (características de catálogo) → **completado**: reconciliadas specs de las 6 tarjetas de Productos con el catálogo; fix "Padmounted trifásicos" (Frente vivo/muerto + ANSI/IEEE C57).
+- **DEV-000006** (logo oficial) → **completado**: logo isotipo/logotipo oficial (azul `#1317E8`) en nav/footer/favicon (`assets/logo-oficial*.png`, `logo-icon-oficial.png`). ⚠️ PNG baja-res 182×31; conviene SVG/hi-res a futuro.
+- **DEV-000004** (PDF "CAMBIOS PÁGINA WEB", 8 cambios) → **completado**: hero, 4 tarjetas de Servicios (Fabricación/Reparación/Diagnóstico/Alquiler; se retiraron Pruebas/Ensamblaje y "comercialización"), "Fuerza" en la denominación + título Servicios, y secciones nuevas `#planta`/`#reparacion`/`#laboratorios`/`#alquiler` con textos oficiales + 13 fotos. Se añadió "Laboratorios" al menú (reemplazó "Procesos", que sigue en página).
+- **DEV-000007** → **cancelado** (duplicado vacío de 000004).
+- **DEV-000008** (RQ-WEB-01, del Director Comercial) → **completado**: galerías 16:9 uniformes (escritorio 3 / tableta 2 / teléfono 1), Planta con imagen principal (≥2× área) + secundarias, pares de igual tamaño, botón flotante WhatsApp colapsable (no tapa contenido), y **RQ-05**: ficha de catálogo desplegable por producto (tablas capacidades/dimensiones + norma + fuente/vigencia, scroll horizontal en móvil). Fotos llevadas a **1600×900 WebP+JPG ≤250KB** vía `<picture>` (helper `Foto`). ⚠️ upscale de las imágenes existentes (306–624 px) por indicación de Pablo → cumplen formato pero quedan suaves; reemplazar por hi-res reales cae en los mismos nombres de archivo.
+
+**Backend (repo, commiteado+pusheado desde `.23`):**
+- `0d8f933` CC a `egonzales@britransformadores.com` en correos al Gerente Comercial (notif-worker).
+- `7defabd` edge-nginx `client_max_body_size 25M→100M` en api/panel/portal (live `.7` + repo). Backend `UPLOAD_MAX_BYTES=104857600` en `/opt/techtrafo/.env` + `docker compose up -d --force-recreate api`. (Diagnóstico: el uploader del módulo rechazaba paquetes >25MB con 413; NO había bloqueo por IP.)
+- `7be7fd3` cada ticket nuevo del módulo DEV envía además un correo fijo a **pablobaquerizodavila@gmail.com** con asunto **"Ticket Techtrafo"** (`notificarReqCreado` en `backend/src/services/notificaciones.ts`, constante `AVISO_PRESIDENCIA_EMAIL`). Verificado end-to-end (correo enviado, ticket de prueba borrado).
+
+**Cache-bust del landing actual: `?v=web-sep09a`** (fotos `?v=sep09a`).
+
+**Deploy del landing (recordatorio):** el NAS no expone subsistema SFTP → usar `scp -O` desde `.23` hacia el NAS. `.23` tiene llave SSH al NAS (no hace falta el password del NAS en el shell).
+
+**Pendiente / próximos:** (1) fotos hi-res reales 1600×900 para DEV-000008 (las entrega TECHTRAFO). (2) Pablo pidió poder **crear usuarios** desde `/admin/usuarios` del panel (hoy solo se aprueban auto-registrados) — exploré backend (`admin.ts`: no hay POST crear-usuario) y frontend (`frontend/src/app/(app)/admin/usuarios/page.tsx`), pero se descartó/pausó; retomar si lo pide.
+
+---
+
+## 0-bis. Estado 2026-08-14 (histórico) — Módulo DEV en uso real + cambios en techtrafo.com
 
 - El **módulo Requerimientos de Desarrollo está en uso real**: Enrique González creó el
   ticket **DEV-000001** "Mejora en la Página WEB" (con PDF adjunto), Pablo lo gestionó en el
