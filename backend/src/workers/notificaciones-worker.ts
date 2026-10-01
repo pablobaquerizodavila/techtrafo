@@ -21,6 +21,16 @@ import { notificarEstancamiento, notificarGarantiaPorVencer } from "../services/
 const MAX_INTENTOS = 5;
 const BATCH_SIZE = 25;
 
+// Interruptor maestro de NOTIFICACIONES POR EMAIL (Pablo 2026-10-01: OFF).
+// Cuando esta en false, el worker NO envia correos: consume las pendientes
+// marcandolas como omitidas (sin flood al reactivar) y CONSERVA las
+// notificaciones in-app (la fila en core.notificaciones queda intacta).
+// La deteccion de estancamientos/garantias sigue corriendo (crea las in-app).
+// Para REACTIVAR: cambiar a true aqui (hot-reload) o setear
+// EMAIL_NOTIF_ENABLED=true en el entorno del contenedor.
+const EMAIL_NOTIF_ENABLED =
+  (process.env.EMAIL_NOTIF_ENABLED ?? "false").toLowerCase() === "true";
+
 interface EstancadoRow {
   expediente_id: bigint;
   hito_id: bigint;
@@ -156,6 +166,20 @@ async function procesarPendientes() {
   });
 
   if (pendientes.length === 0) return { procesadas: 0, ok: 0, fallos: 0 };
+
+  // Notificaciones por email desactivadas: consumir sin enviar (se conserva la
+  // notificacion in-app; no se acumulan ni se disparan al reactivar).
+  if (!EMAIL_NOTIF_ENABLED) {
+    await prisma.notificaciones.updateMany({
+      where: { id: { in: pendientes.map((n) => n.id) } },
+      data: {
+        enviado: true,
+        fecha_envio: new Date(),
+        error: "omitida: notificaciones por email desactivadas",
+      },
+    });
+    return { procesadas: pendientes.length, ok: 0, fallos: 0 };
+  }
 
   // CC de gerencia comercial: los correos al Gerente Comercial (rol gerencia_comercial)
   // o a Enrique Gonzales (egonzales@techtrafo.com) se copian tambien a su cuenta de
