@@ -80,7 +80,7 @@ services:
       # extra_hosts resuelve mail.eneural.org → 192.168.0.3 dentro del container,
       # lo que permite verificar el cert Let's Encrypt (CN=mail.eneural.org) sin
       # skip_verify. Fix auditoria B-3.
-      GF_SMTP_ENABLED: "true"
+      GF_SMTP_ENABLED: "false"
       GF_SMTP_HOST: "mail.eneural.org:465"   # hardcoded: extra_hosts resuelve a .3 internamente
       GF_SMTP_USER: ${SMTP_USER}
       GF_SMTP_PASSWORD: ${SMTP_PASS}
