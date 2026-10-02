@@ -1,6 +1,6 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-09-09 · tickets DEV-000004/005/006/008 COMPLETADOS (cambios techtrafo.com), aviso de ticket nuevo a Presidencia y límite de subida 25M→100M**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-10-02 · notificaciones por email DESACTIVADAS (2 canales: worker backend + Grafana) + IP estática fija del `.23`**.
 
 > 📄 **Ver también [`ACCESO-Y-BACKUPS.md`](ACCESO-Y-BACKUPS.md)** — guía de hosts, credenciales, ubicación de backups y recuperación desde PC nueva.
 
@@ -41,7 +41,22 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 
 ---
 
-## 0. Estado 2026-09-09 — Tickets DEV-000004/005/006/008 + notif Presidencia + límite subida (leer primero)
+## 0. Estado 2026-10-02 — Notificaciones por email DESACTIVADAS + IP estática del `.23` (leer primero)
+
+**⚠️ Notificaciones por email DESACTIVADAS a pedido de Pablo — SON DOS CANALES independientes:**
+1. **Worker del backend** (envía por mailcow): interruptor `EMAIL_NOTIF_ENABLED` en `backend/src/workers/notificaciones-worker.ts` (default `false`). Con OFF consume las pendientes de `core.notificaciones` marcándolas `enviado=true, error='omitida: notificaciones por email desactivadas'` SIN enviar; conserva las notificaciones in-app y la detección de estancamientos/garantías. Commit `acf9056`. Verificado end-to-end. **Reactivar**: constante a `true` (hot-reload) o `EMAIL_NOTIF_ENABLED=true` en el env.
+2. **Grafana Alerting** (canal SEPARADO; enviaba como "TECHTRAFO Alerting" por SMTP, p.ej. alerta "Hitos estancados"): apagado con `GF_SMTP_ENABLED: "false"` en `infrastructure/docker/docker-compose.yml` (~línea 83) + `docker compose up -d grafana`. Commit `d863164`. **Reactivar**: `"true"` + recrear grafana. Reglas provisionadas en `infrastructure/docker/grafana/provisioning/alerting/`.
+> Si una sesión futura ve que "no salen correos de TECHTRAFO", es intencional (ambos canales). El envío MANUAL de informes técnicos (`routes/informes-tecnicos.ts`) NO pasa por ningún switch — sigue activo.
+
+**IP del `.23` ahora es ESTÁTICA (2026-09-16).** Tras un reinicio (actualización de sistema/firmware), el `.23` tomó `192.168.0.239` por DHCP en vez de `.23` → el edge `.7` (proxya panel/api a `192.168.0.23`) daba **502** y SSH no llegaba (ping sí). Los contenedores nunca se cayeron. Fix: se agregó `addresses: [192.168.0.23/24]` (manteniendo `dhcp4: true` para gateway/DNS) en `/etc/netplan/00-installer-config.yaml` (es Ubuntu **desktop con NetworkManager**, MAC `bc:fc:e7:dc:92:69`). Sobrevive reinicios. Opcional pendiente: reserva DHCP en el router (MAC→.23).
+
+**Lo demás sigue igual que el cierre anterior** (ver §0-bis): tickets DEV-000004/005/006/008 completados, aviso "Ticket Techtrafo" a Presidencia, límite de subida 100M. Landing en vivo `?v=web-sep09a`.
+
+**Pendiente / próximos:** (1) fotos hi-res reales 1600×900 para DEV-000008 (las entrega TECHTRAFO; hoy son upscale). (2) "Crear usuarios" desde `/admin/usuarios` del panel (explorado, pausado). (3) opcional: reserva DHCP del `.23` en el router.
+
+---
+
+## 0-bis. Estado 2026-09-09 — Tickets DEV-000004/005/006/008 + notif Presidencia + límite subida
 
 Sesión sobre **techtrafo.com** (landing, NO en git — vive en `C:\Users\Pablo B\techtrafo-landing\prod\`, se despliega por pscp/scp a NAS origin `/volume2/web/techtrafo/` + copia `.23` `/home/techtrafo/sites/techtrafo/` + mirror NAS `Desarrollos/techtrafo-landing/prod/`) y sobre el backend.
 
@@ -65,7 +80,7 @@ Sesión sobre **techtrafo.com** (landing, NO en git — vive en `C:\Users\Pablo 
 
 ---
 
-## 0-bis. Estado 2026-08-14 (histórico) — Módulo DEV en uso real + cambios en techtrafo.com
+## 0-ter. Estado 2026-08-14 (histórico) — Módulo DEV en uso real + cambios en techtrafo.com
 
 - El **módulo Requerimientos de Desarrollo está en uso real**: Enrique González creó el
   ticket **DEV-000001** "Mejora en la Página WEB" (con PDF adjunto), Pablo lo gestionó en el
