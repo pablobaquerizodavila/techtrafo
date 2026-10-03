@@ -1,6 +1,6 @@
 # TECHTRAFO — Handoff entre sesiones de Claude
 
-> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-10-02 · notificaciones por email DESACTIVADAS (2 canales: worker backend + Grafana) + IP estática fija del `.23`**.
+> Documento para que una nueva sesión de Claude arranque sin perder contexto sobre el estado del proyecto. Leer COMPLETO antes de hacer cambios. Última actualización: **2026-10-03 · alertas email OFF 3er canal (tt-alert.py) + certs SSL renovados (A records www en GoDaddy, renovados en el edge `.7`, válidos hasta 2027-01-01) + cron certbot duplicado del `.23` deshabilitado**.
 
 > 📄 **Ver también [`ACCESO-Y-BACKUPS.md`](ACCESO-Y-BACKUPS.md)** — guía de hosts, credenciales, ubicación de backups y recuperación desde PC nueva.
 
@@ -41,7 +41,15 @@ editar. Si se va a editar local antes de pscp, primero alinearlo:
 
 ---
 
-## 0. Estado 2026-10-02 — Notificaciones por email DESACTIVADAS + IP estática del `.23` (leer primero)
+## 0. Estado 2026-10-03 — Alertas email OFF (3er canal) + certs SSL renovados (leer primero)
+
+**ALERTAS DE SCRIPTS por email DESACTIVADAS (3er canal, 2026-10-03):** además del worker backend y de Grafana (ver abajo), los scripts (`certbot-renew`, `tt-backup`) alertaban por email vía `scripts/tt-alert.py`. Apagado con el flag `ALERT_EMAIL_ENABLED` (si no es "true" el helper NO envía) + `ALERT_EMAIL_ENABLED=false` en `/opt/techtrafo/.env`. Commit `f83e9bd`. **Reactivar**: `ALERT_EMAIL_ENABLED=true` en el `.env`. → **Con esto los 3 canales de email quedan OFF.**
+
+**Certs SSL RENOVADOS — incidente resuelto 2026-10-03:** techtrafo.com / siscormed.com / buscoartista.com **expiraron el 1-oct** porque sus certs incluían un `www.*` **sin DNS** (NXDOMAIN) → certbot valida todos los dominios y uno malo tumba el cert entero. ⚠️ La renovación REAL vive en el **edge `.7`** (`certbot.timer` + webroot `/var/www/certbot`), NO en `.23` (su `/home/techtrafo/web-public/certbot-renew.sh` era un DUPLICADO que nunca podía funcionar → **su cron en `.23` quedó DESHABILITADO/comentado**). Fix aplicado: se agregaron en **GoDaddy** los A records `www.techtrafo.com` / `www.siscormed.com` / `www.buscoartista.com` → `186.101.238.135`, y `sudo certbot renew` en `.7` → **válidos hasta 2027-01-01**. SSH `.7`: `pbaquerizo` / `groundunder8299` (minúscula). (Detalle completo en la memoria `project_techtrafo_infra`.)
+
+---
+
+### Contexto del cierre 2026-10-02 (sigue vigente)
 
 **⚠️ Notificaciones por email DESACTIVADAS a pedido de Pablo — SON DOS CANALES independientes:**
 1. **Worker del backend** (envía por mailcow): interruptor `EMAIL_NOTIF_ENABLED` en `backend/src/workers/notificaciones-worker.ts` (default `false`). Con OFF consume las pendientes de `core.notificaciones` marcándolas `enviado=true, error='omitida: notificaciones por email desactivadas'` SIN enviar; conserva las notificaciones in-app y la detección de estancamientos/garantías. Commit `acf9056`. Verificado end-to-end. **Reactivar**: constante a `true` (hot-reload) o `EMAIL_NOTIF_ENABLED=true` en el env.
