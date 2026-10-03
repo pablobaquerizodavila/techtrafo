@@ -36,6 +36,16 @@ except FileNotFoundError:
     print(f"ERROR: no se encontro {ENV_FILE}", file=sys.stderr)
     sys.exit(1)
 
+# ─── Interruptor maestro de ALERTAS por email (Pablo 2026-10-03) ──
+# Si ALERT_EMAIL_ENABLED (en el .env o en el entorno) no es "true", este
+# helper NO envia correo: todas las alertas de scripts (certbot-renew,
+# tt-backup, etc.) quedan silenciadas de una sola vez. Reactivar: poner
+# ALERT_EMAIL_ENABLED=true en /opt/techtrafo/.env.
+_alert_on = os.environ.get("ALERT_EMAIL_ENABLED", env.get("ALERT_EMAIL_ENABLED", "true"))
+if str(_alert_on).strip().lower() not in ("true", "1", "yes", "on"):
+    print(f"Alertas por email desactivadas (ALERT_EMAIL_ENABLED); se omite: {subject}")
+    sys.exit(0)
+
 host      = env.get("SMTP_HOST", "192.168.0.3")
 port      = int(env.get("SMTP_PORT", "465"))
 user      = env.get("SMTP_USER", "")
